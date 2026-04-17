@@ -277,13 +277,163 @@ desktop-client/
 │   │   │   └── google-adapter.ts
 │   │   ├── prompt/          # Prompt 模板管理
 │   │   ├── remote-api.ts    # 远程 backtest-engine 客户端
-│   │   └── context-builder.ts  # AI 上下文构造
+│   │   ├── context-builder.ts  # AI 上下文构造
+│   │   ├── theme.ts         # 主题管理（dark/light/auto）
+│   │   └── i18n.ts          # i18n 初始化 + 语言检测
+│   ├── locales/
+│   │   ├── en.json          # 英文翻译
+│   │   └── zh.json          # 中文翻译
+│   ├── styles/
+│   │   └── theme.css        # CSS 变量定义（两套主题 token）
 │   ├── hooks/
 │   └── utils/
 ├── package.json
 ├── electron-builder.yml     # 打包配置
 ├── vite.config.ts
 └── tsconfig.json
+```
+
+### Decision 11: 主题实现 — CSS 变量 + data-theme 属性
+
+**选择**: 所有颜色通过 CSS 自定义属性（CSS variables）定义；主题切换通过 `<html data-theme="light|dark">` 属性触发 CSS 规则级联。
+
+**替代方案**:
+- A) Tailwind `dark:` 前缀：简单但所有组件都要写 `bg-white dark:bg-black` 这种对偶 class，token 离散
+- B) JavaScript 主题 provider（context + inline style）：切换时需要 re-render 组件树，性能差
+- C) 多 CSS 文件按主题加载：包体增大，切换需要 reload
+
+**方案 C 的选择（CSS 变量）理由**:
+- 切换主题无需 re-render，只改一个 DOM 属性，CSS 引擎自动重算
+- 所有 color token 集中在一个 `theme.css` 文件，维护方便
+- TradingView Lightweight Charts 也能消费 CSS 变量（通过 `getComputedStyle`）
+
+**Token 体系**:
+```css
+:root {
+  --surface-primary: #0A0A0A;
+  --surface-secondary: #1A1A1A;
+  --fg-primary: #FFFFFF;
+  --accent-primary: #A855F7;
+  /* ... */
+}
+[data-theme="light"] {
+  --surface-primary: #FFFFFF;
+  --surface-secondary: #F5F5F5;
+  --fg-primary: #0A0A0A;
+  --accent-primary: #7C3AED;
+  /* ... */
+}
+```
+
+**Auto 模式实现**:
+```typescript
+function applyTheme(pref: 'auto' | 'dark' | 'light') {
+  const resolved = pref === 'auto'
+    ? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+    : pref;
+  document.documentElement.dataset.theme = resolved;
+}
+// 监听系统主题变化，Auto 模式下自动跟随
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+  if (settings.theme === 'auto') applyTheme('auto');
+});
+```
+
+### Decision 12: K 线涨跌色 — 独立于主题的设置
+
+**选择**: K 线涨跌配色（`chart.candleUp`）作为独立设置项，不跟主题绑定。默认值根据 UI 语言初始化（英文→绿涨，中文→红涨），用户显式修改后锁定。
+
+**替代方案**:
+- A) 强制跟语言（改语言就换配色）：容易让老用户困惑
+- B) 只用单一配色：忽视中国用户的习惯，差评
+- C) 独立设置，默认跟语言，用户可改：**采用**
+
+**K 线渲染注入**:
+```typescript
+const palette = candleUp === 'green-up'
+  ? { up: 'var(--accent-green)', down: 'var(--accent-red)' }
+  : { up: 'var(--accent-red)',   down: 'var(--accent-green)' };
+
+chart.applyOptions({
+  upColor: palette.up,
+  downColor: palette.down,
+  borderUpColor: palette.up,
+  borderDownColor: palette.down,
+  wickUpColor: palette.up,
+  wickDownColor: palette.down,
+});
+```
+
+### Decision 13: i18n 框架 — react-i18next + 语言自动检测
+
+**选择**: 使用 `react-i18next`（业界标准），配合 `i18next-browser-languagedetector` 实现系统语言检测。翻译资源以 JSON 文件组织在 `src/locales/`。
+
+**替代方案**:
+- A) 自研 i18n hook：轻量但要重新实现插值、复数、命名空间等
+- B) FormatJS / react-intl：功能全，但 API 比 i18next 繁琐
+- C) react-i18next：**采用**，生态最成熟，支持 LLM 集成
+
+**初始化**:
+```typescript
+i18n
+  .use(LanguageDetector)
+  .use(initReactI18next)
+  .init({
+    resources: {
+      en: { translation: enTranslations },
+      zh: { translation: zhTranslations },
+    },
+    fallbackLng: 'en',
+    supportedLngs: ['en', 'zh'],
+    detection: {
+      order: ['localStorage', 'navigator'],
+      caches: ['localStorage'],
+      lookupLocalStorage: 'ui.language',
+    },
+    interpolation: { escapeValue: false },
+  });
+```
+
+**翻译键命名约定**: 点分命名空间 `<section>.<key>`，例如 `screener.title`, `metric.sharpeRatio`, `error.apiKeyInvalid`。
+
+### Decision 14: AI 回复语言 — 检测用户输入而非 UI 语言
+
+**选择**: AI 回复语言默认跟随**用户输入语言**（不是 UI 语言），因为用户可能在英文 UI 下用中文聊天。提供三档策略：`follow-input`（默认） / `always-en` / `always-zh`。
+
+**输入语言检测**:
+```typescript
+function detectLang(text: string): 'en' | 'zh' {
+  // 简单启发式：出现任何 CJK 字符 → zh，否则 en
+  return /[\u4e00-\u9fff]/.test(text) ? 'zh' : 'en';
+}
+```
+
+**System prompt 注入**:
+```typescript
+const systemPrompt = [
+  basePrompt,
+  aiLangStrategy === 'always-en' ? "Always reply in English."
+    : aiLangStrategy === 'always-zh' ? "Always reply in Simplified Chinese."
+    : `Reply in the same language as the user's message (detected: ${detectLang(userMsg)}).`
+].join('\n\n');
+```
+
+### Decision 15: 设置页 Appearance 区块
+
+**选择**: 所有主题 / 语言 / K 线配色 / AI 回复语言 四个设置集中在 Settings > Appearance 页面，不分散到多个位置。顶部不设全局快捷切换图标（保持 UI 清爽，低频操作进 Settings 即可）。
+
+**Settings 结构**:
+```
+Settings
+├── AI & API Keys
+├── Remote Service
+├── Appearance            ← 新增
+│   ├── Theme             (Auto / Dark / Light)
+│   ├── Language          (English / 简体中文)
+│   ├── K-line convention (Green-up / Red-up)
+│   └── AI response lang  (Follow input / Always EN / Always ZH)
+├── Local Storage
+└── About
 ```
 
 ## Risks / Trade-offs
@@ -299,3 +449,13 @@ desktop-client/
 **[预回测和深度回测的数据一致性]** → 预回测用最近 1 周，深度回测用半年，策略在两个尺度上表现可能差异大。这是正常的，但需要在 UI 上明确提示用户两者的区别。
 
 **[多币种回测结果数据量]** → 12 个币种 × 半年 × 1h ≈ 52k bars × 12 = 624k 数据点。权益曲线和交易列表可能较大。本地 SQLite 存储无压力，但从远程传输需注意响应体大小（~MB 级，可接受）。
+
+**[CSS 变量被硬编码颜色绕过]** → 开发过程中容易不小心 `color: #FFF`。通过 ESLint 规则禁止在 component 文件中使用十六进制颜色 literal（除图片/emoji 场景），强制走 CSS 变量。
+
+**[TradingView Charts 主题切换]** → Lightweight Charts 初始化时读取颜色配置。主题切换需要调用 `chart.applyOptions()` 重新配置。通过 `useEffect` 监听主题变化，主动更新图表配置。
+
+**[翻译覆盖缺漏]** → 某些动态生成的文案（例如 AI 回复的摘要、错误信息的二级描述）可能漏翻。通过 CI 检查：强制所有 JSX 中的字符串字面量走 `t()` 或加 `// i18n-ignore` 注释。
+
+**[中文文本导致 UI 布局破坏]** → 中文字符更宽，某些按钮文本可能超出原设计宽度。通过 `min-width` + `white-space: nowrap` + 视需要截断省略号；设计稿在开发前先在中文下过一遍。
+
+**[AI 回复语言检测误判]** → 混合语言输入（如 "make me 均线 strategy"）可能检测不准。采用保守策略：任何 CJK 字符都判为中文；若用户不满可切到 `always-en`/`always-zh`。

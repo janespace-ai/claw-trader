@@ -129,3 +129,52 @@
 - [ ] 14.5 验证策略管理：收藏、有效/无效标记、筛选、版本链追溯
 - [ ] 14.6 验证 5 家 LLM 适配器均可正常流式对话
 - [ ] 14.7 打包测试：macOS .dmg 和 Windows .exe 安装包生成验证
+
+## 15. 主题系统（Theming）
+
+- [ ] 15.1 创建 `src/styles/theme.css`，定义 `:root` 暗色 token 和 `[data-theme="light"]` 亮色 token 完整集合
+- [ ] 15.2 实现 `src/services/theme.ts`：`applyTheme(pref)` 函数处理 auto/dark/light 逻辑
+- [ ] 15.3 监听 `matchMedia('(prefers-color-scheme: dark)')` 变化事件，Auto 模式下自动跟随系统
+- [ ] 15.4 在 `settings` 表支持 `ui.theme` 键（default `"auto"`）
+- [ ] 15.5 启动时从 SQLite 读取 `ui.theme` 并应用；未设置时默认 Auto
+- [ ] 15.6 配置 ESLint 规则禁止组件文件中硬编码十六进制颜色
+- [ ] 15.7 实现 Settings > Appearance 的 Theme 切换器（Auto / Dark / Light 三档，带 mini preview）
+- [ ] 15.8 TradingView Lightweight Charts 主题适配：`useEffect` 监听主题变化，调用 `chart.applyOptions()` 更新图表配色
+- [ ] 15.9 K 线涨跌色独立配置：`chart.candleUp` 设置项，写入 SQLite
+- [ ] 15.10 首次启动根据 UI 语言初始化 K 线惯例：英文→`green-up`，中文→`red-up`
+- [ ] 15.11 实现 Settings > Appearance 的 K-line color convention 切换器（带 mini 蜡烛预览）
+- [ ] 15.12 将 `chart.candleUp` 注入所有 K 线图组件，映射到 TradingView upColor / downColor / borderColor / wickColor
+- [ ] 15.13 权益曲线、信号标注等非 K 线的图形也使用 token 驱动的颜色
+
+## 16. 国际化（i18n）
+
+- [ ] 16.1 安装 `react-i18next` + `i18next` + `i18next-browser-languagedetector`
+- [ ] 16.2 实现 `src/services/i18n.ts`：初始化 i18next，配置 detector、fallback、supportedLngs
+- [ ] 16.3 创建 `src/locales/en.json`：英文翻译资源，覆盖所有 UI 字符串
+- [ ] 16.4 创建 `src/locales/zh.json`：简体中文翻译资源，覆盖所有 UI 字符串
+- [ ] 16.5 翻译键命名规范：`<section>.<key>`（screener/strategy/metric/error/action 等）
+- [ ] 16.6 在 App 根组件 wrap `I18nextProvider`
+- [ ] 16.7 所有现有组件迁移：硬编码字符串 → `useTranslation()` + `t()` 调用
+- [ ] 16.8 回测指标标签全部 i18n 化（Sharpe, Return, Drawdown 等 30+ 项）
+- [ ] 16.9 错误提示与确认对话框 i18n 化
+- [ ] 16.10 空状态提示、placeholder、tooltip 全部 i18n 化
+- [ ] 16.11 在 `settings` 表支持 `ui.language` 键
+- [ ] 16.12 首次启动语言检测：读取系统语言，`zh-*` → `zh`，其他 → `en`
+- [ ] 16.13 Settings > Appearance > Language 切换器（English / 简体中文）
+- [ ] 16.14 配置字体回退链：Inter / Geist / Geist Mono → PingFang SC / Microsoft YaHei / Noto Sans SC
+- [ ] 16.15 实现输入语言检测工具：`detectLang(text)` 基于 CJK 字符检测
+- [ ] 16.16 在 LLM system prompt 注入 AI 回复语言指令（follow-input / always-en / always-zh）
+- [ ] 16.17 在 `settings` 表支持 `ai.language` 键（default `"follow-input"`）
+- [ ] 16.18 Settings > Appearance > AI response language 切换器
+- [ ] 16.19 策略生成 prompt 模板根据 AI 回复语言输出对应语言的策略摘要
+- [ ] 16.20 CI 检查：lint 规则阻止 JSX 中硬编码字符串字面量（需配合 `// i18n-ignore` 注释例外）
+
+## 17. 主题与 i18n 集成测试
+
+- [ ] 17.1 端到端：首次启动 Auto 模式，切换系统主题验证自动跟随
+- [ ] 17.2 端到端：手动切换 Dark ↔ Light，无 flash、无 re-render 抖动
+- [ ] 17.3 端到端：首次启动系统为中文，UI 默认中文 + K 线默认红涨绿跌
+- [ ] 17.4 端到端：中文 UI 下发送中文消息，AI 用中文回复；切换到英文 UI 但输入中文，AI 仍用中文（Follow input）
+- [ ] 17.5 中文文本布局检查：所有 8 个核心屏幕在 `zh` 下无溢出、无截断
+- [ ] 17.6 主题切换时 K 线图立即重绘，不出现旧配色残留
+- [ ] 17.7 `chart.candleUp` 切换立即生效，所有图表同步更新
