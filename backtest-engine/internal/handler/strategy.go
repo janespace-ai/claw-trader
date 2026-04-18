@@ -55,9 +55,14 @@ func (h *StrategyHandler) Create(ctx context.Context, c *app.RequestContext) {
 	c.JSON(http.StatusOK, map[string]any{"id": id, "name": req.Name})
 }
 
-// List handles GET /api/strategies?type=&limit=.
+// List handles GET /api/strategies?code_type=&limit=.
+// `code_type` is the canonical query param (matches the JSON field on create);
+// `type` is accepted as an alias for backward compatibility.
 func (h *StrategyHandler) List(ctx context.Context, c *app.RequestContext) {
-	codeType := string(c.Query("type"))
+	codeType := string(c.Query("code_type"))
+	if codeType == "" {
+		codeType = string(c.Query("type"))
+	}
 	limit := 50
 	if v := string(c.Query("limit")); v != "" {
 		if n, err := strconv.Atoi(v); err == nil && n > 0 {

@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 
 # --- Runtime stage ---
 FROM alpine:3.19
-RUN apk --no-cache add ca-certificates tzdata docker-cli && \
+RUN apk --no-cache add ca-certificates tzdata docker-cli python3 && \
     adduser -D -u 10002 app
 
 WORKDIR /app
