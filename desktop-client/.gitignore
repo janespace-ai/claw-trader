@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dist-electron/
+release/
+*.log
+.env
+.env.*
+.DS_Store
+.vscode/
+claw-data.sqlite

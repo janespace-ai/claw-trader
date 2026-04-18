@@ -1,0 +1,41 @@
+server:
+  address: "0.0.0.0"
+  port: 8080
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "claw"
+  password: "claw"
+  name: "claw"
+  schema: "claw"
+  max_conns: 20
+  min_conns: 2
+
+gateio:
+  s3_base_url: "https://gateio-public-data.s3.ap-northeast-1.amazonaws.com"
+  s3_path_template: "futures_usdt/candlesticks_{interval}/{yyyymm}/{pair}-{yyyymm}.csv.gz"
+  api_base_url: "https://api.gateio.ws/api/v4"
+  tickers_endpoint: "/futures/usdt/tickers"
+  candles_endpoint: "/futures/usdt/candlesticks"
+  rate_limit_per_sec: 180
+  request_timeout_sec: 30
+
+sync:
+  top_symbols: 300
+  concurrency: 50
+  max_retry: 3
+  retry_backoff_sec: 2
+  s3_intervals: ["5m", "1h", "4h", "1d"]
+  aggregated_intervals: ["15m", "30m"]
+  api_intervals: ["5m", "15m", "30m", "1h", "4h", "1d"]
+  months_back: 12
+
+gap:
+  threshold_multiplier: 1.5
+  max_retry_per_gap: 3
+  skip_on_failure: true
+  max_gap_age_days: 365
+  min_completeness: 99.0
+  excluded_symbols: []
+  excluded_ranges: []

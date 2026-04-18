@@ -1,0 +1,75 @@
+server:
+  address: "0.0.0.0"
+  port: 8081
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "claw"
+  password: "claw"
+  name: "claw"
+  schema: "claw"
+  max_conns: 10
+  min_conns: 2
+
+readonly:
+  user: "claw_readonly"
+  password: "claw_readonly"
+
+sandbox:
+  image: "claw-sandbox:latest"
+  network: "claw-sandbox-net"
+  callback_base: "http://claw-backtest-engine:8081"
+  # Resource limits
+  memory_mb: 2048
+  cpu_cores: 2
+  pids_limit: 100
+  timeout_sec: 1800        # 30 min hard kill
+  # tmpfs mount for /workspace — user code lands here
+  workspace_size_mb: 64
+  cleanup_delay_sec: 10
+  # Only allow inbound to these internal hosts from the sandbox network
+  # (enforced at Docker network level; documented here for operators)
+  allowed_hosts:
+    - "timescaledb:5432"
+    - "claw-backtest-engine:8081"
+
+compliance:
+  # Python modules explicitly allowed in user-submitted code.
+  module_whitelist:
+    - "numpy"
+    - "pandas"
+    - "talib"
+    - "math"
+    - "datetime"
+    - "collections"
+    - "typing"
+    - "dataclasses"
+    - "decimal"
+    - "json"
+    - "claw"
+    - "claw.strategy"
+    - "claw.screener"
+  # Hard-banned builtins that indicate dangerous code.
+  forbidden_builtins:
+    - "exec"
+    - "eval"
+    - "compile"
+    - "__import__"
+    - "open"
+    - "input"
+  # Explicit module blocklist (overrides whitelist on conflict).
+  forbidden_modules:
+    - "os"
+    - "sys"
+    - "subprocess"
+    - "socket"
+    - "shutil"
+    - "pathlib"
+    - "importlib"
+    - "ctypes"
+
+backtest:
+  max_optimization_runs: 100
+  default_lookback_days: 180    # deep backtest default ~6 months
+  preview_lookback_days: 7

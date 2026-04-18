@@ -1,0 +1,47 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: claw-timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: claw
+      POSTGRES_USER: claw
+      POSTGRES_PASSWORD: claw
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U claw -d claw"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - claw-net
+
+  data-aggregator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: claw-data-aggregator
+    restart: unless-stopped
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    environment:
+      DATA_AGGREGATOR_DATABASE_HOST: timescaledb
+      DATA_AGGREGATOR_DATABASE_PORT: 5432
+      DATA_AGGREGATOR_DATABASE_USER: claw
+      DATA_AGGREGATOR_DATABASE_PASSWORD: claw
+      DATA_AGGREGATOR_DATABASE_NAME: claw
+    ports:
+      - "8080:8080"
+    networks:
+      - claw-net
+
+volumes:
+  timescale-data:
+
+networks:
+  claw-net:
+    driver: bridge

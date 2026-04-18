@@ -1,0 +1,6 @@
+# E2E test override: mounts config.test.yaml into the container.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.test.yml up
+services:
+  data-aggregator:
+    volumes:
+      - ./config.test.yaml:/app/config.yaml:ro

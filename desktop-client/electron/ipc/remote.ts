@@ -1,0 +1,79 @@
+import type { IpcMain } from 'electron';
+
+/** Remote backtest-engine API client. Runs in main process so renderer
+ *  doesn't have to deal with CORS / cookies / connection retries. */
+
+let baseURL = 'http://localhost:8081';
+
+async function fetchJSON(url: string, init?: RequestInit) {
+  const resp = await fetch(url, init);
+  const ct = resp.headers.get('content-type') ?? '';
+  const body = ct.includes('json') ? await resp.json() : await resp.text();
+  if (!resp.ok) {
+    const msg = typeof body === 'string' ? body : (body?.error ?? JSON.stringify(body));
+    const err = new Error(`${resp.status} ${msg}`);
+    (err as any).status = resp.status;
+    (err as any).body = body;
+    throw err;
+  }
+  return body;
+}
+
+export function registerRemoteHandlers(ipcMain: IpcMain): void {
+  ipcMain.handle('remote:setBaseURL', (_e, url: string) => {
+    if (typeof url === 'string' && url) baseURL = url.replace(/\/+$/, '');
+  });
+
+  ipcMain.handle('remote:health', async () => {
+    try {
+      const body = await fetchJSON(`${baseURL}/healthz`);
+      return { ok: true, data: body };
+    } catch (err: any) {
+      return { ok: false, error: err?.message ?? String(err) };
+    }
+  });
+
+  ipcMain.handle('remote:backtest:start', (_e, payload) =>
+    fetchJSON(`${baseURL}/api/backtest/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  );
+
+  ipcMain.handle('remote:backtest:status', (_e, taskId: string) =>
+    fetchJSON(`${baseURL}/api/backtest/status/${encodeURIComponent(taskId)}`),
+  );
+
+  ipcMain.handle('remote:backtest:result', (_e, taskId: string) =>
+    fetchJSON(`${baseURL}/api/backtest/result/${encodeURIComponent(taskId)}`),
+  );
+
+  ipcMain.handle('remote:backtest:history', (_e, strategyId?: string, limit?: number) => {
+    const params = new URLSearchParams();
+    if (strategyId) params.set('strategy_id', strategyId);
+    if (limit) params.set('limit', String(limit));
+    const q = params.toString();
+    return fetchJSON(`${baseURL}/api/backtest/history${q ? '?' + q : ''}`);
+  });
+
+  ipcMain.handle('remote:screener:start', (_e, payload) =>
+    fetchJSON(`${baseURL}/api/screener/start`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  );
+
+  ipcMain.handle('remote:screener:result', (_e, taskId: string) =>
+    fetchJSON(`${baseURL}/api/screener/result/${encodeURIComponent(taskId)}`),
+  );
+
+  ipcMain.handle('remote:strategies:create', (_e, payload) =>
+    fetchJSON(`${baseURL}/api/strategies`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    }),
+  );
+}
