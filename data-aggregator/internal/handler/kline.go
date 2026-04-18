@@ -73,6 +73,14 @@ func (h *KlineHandler) Query(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	// Optional `limit` param caps the number of returned candles. When applied,
+	// we keep the most recent N (QueryCandles returns rows in ascending time order).
+	if v := string(c.Query("limit")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n < len(rows) {
+			rows = rows[len(rows)-n:]
+		}
+	}
+
 	resp := make([]klineResponse, 0, len(rows))
 	for _, r := range rows {
 		resp = append(resp, klineResponse{

@@ -225,8 +225,16 @@ func (s *SyncService) finish(task *model.SyncTask) {
 	}
 	task.Progress.Phase = "done"
 
-	log.Printf("[sync] task %s finished status=%s duration=%s",
-		task.TaskID, task.Status, now.Sub(task.StartedAt))
+	// Capture final fetcher progress into the task snapshot so /api/sync/status
+	// keeps reporting the real terminal counts after the task moves to lastDone
+	// (the fetchers themselves reset their live counters between runs).
+	task.Progress.S3 = s.s3Fetcher.Progress()
+	task.Progress.API = s.apiFetcher.Progress()
+
+	log.Printf("[sync] task %s finished status=%s duration=%s s3=%d/%d api=%d/%d",
+		task.TaskID, task.Status, now.Sub(task.StartedAt),
+		task.Progress.S3.Done, task.Progress.S3.Total,
+		task.Progress.API.Done, task.Progress.API.Total)
 
 	s.lastDone = task
 	s.current = nil
