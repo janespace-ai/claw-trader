@@ -3,10 +3,14 @@ import react from '@vitejs/plugin-react';
 import electron from 'vite-plugin-electron';
 import path from 'node:path';
 
+// When CLAW_BROWSER_ONLY=1 (Preview MCP / plain browser dev), skip the
+// electron plugin entirely so Vite runs a normal SPA.
+const browserOnly = process.env.CLAW_BROWSER_ONLY === '1';
+
 export default defineConfig({
   plugins: [
     react(),
-    electron([
+    ...(browserOnly ? [] : [electron([
       {
         entry: 'electron/main.ts',
         onstart(opt) {
@@ -43,7 +47,7 @@ export default defineConfig({
           },
         },
       },
-    ]),
+    ])]),
   ],
   resolve: {
     alias: {

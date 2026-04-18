@@ -39,11 +39,10 @@ export function KlineChart({ candles, trades = [], indicators = [], height = 420
   const indRefs = useRef<ISeriesApi<'Line'>[]>([]);
   const candleUp = useSettingsStore((s) => s.candleConvention);
 
+  // Create chart once per mount — do NOT destroy on theme/candle change;
+  // instead update via applyOptions() in a separate effect.
   useEffect(() => {
     if (!ref.current) return;
-
-    const up = candleUp === 'red-up' ? readToken('--accent-red') : readToken('--accent-green');
-    const down = candleUp === 'red-up' ? readToken('--accent-green') : readToken('--accent-red');
 
     const chart = createChart(ref.current, {
       width: ref.current.clientWidth,
@@ -60,14 +59,7 @@ export function KlineChart({ candles, trades = [], indicators = [], height = 420
       timeScale: { timeVisible: true, secondsVisible: false },
     });
 
-    const series = chart.addCandlestickSeries({
-      upColor: up,
-      downColor: down,
-      borderUpColor: up,
-      borderDownColor: down,
-      wickUpColor: up,
-      wickDownColor: down,
-    });
+    const series = chart.addCandlestickSeries();
 
     chartRef.current = chart;
     seriesRef.current = series;
@@ -83,7 +75,22 @@ export function KlineChart({ candles, trades = [], indicators = [], height = 420
       indRefs.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candleUp, height]);
+  }, [height]);
+
+  // Apply candle colors whenever the convention changes — no chart recreate.
+  useEffect(() => {
+    if (!seriesRef.current) return;
+    const up = candleUp === 'red-up' ? readToken('--accent-red') : readToken('--accent-green');
+    const down = candleUp === 'red-up' ? readToken('--accent-green') : readToken('--accent-red');
+    seriesRef.current.applyOptions({
+      upColor: up,
+      downColor: down,
+      borderUpColor: up,
+      borderDownColor: down,
+      wickUpColor: up,
+      wickDownColor: down,
+    });
+  }, [candleUp]);
 
   // Push candle data.
   useEffect(() => {
@@ -113,7 +120,7 @@ export function KlineChart({ candles, trades = [], indicators = [], height = 420
           position: t.side === 'long' ? 'belowBar' : 'aboveBar',
           shape: t.side === 'long' ? 'arrowUp' : 'arrowDown',
           color: t.side === 'long' ? up : down,
-          text: t.side.toUpperCase(),
+          // No text label — the arrow shape + position already conveys side.
         },
         {
           time: exit,

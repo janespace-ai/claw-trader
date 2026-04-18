@@ -1,64 +1,111 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStrategyStore } from '@/stores/strategyStore';
 import { useCoinListStore } from '@/stores/coinListStore';
 import { useBacktestStore } from '@/stores/backtestStore';
-import { KlineChart } from '@/components/charts/KlineChart';
+import { KlineChart, type KlineCandle } from '@/components/charts/KlineChart';
 import { EquityCurve } from '@/components/charts/EquityCurve';
+import { DrawdownCurve, computeDrawdown } from '@/components/charts/DrawdownCurve';
+import { MonthlyHeatmap } from '@/components/charts/MonthlyHeatmap';
+import { SymbolRankingTable } from '@/components/backtest/SymbolRankingTable';
+import { TradeList } from '@/components/backtest/TradeList';
+import { SymbolDetailPage } from './SymbolDetailPage';
+import { useAppStore } from '@/stores/appStore';
+import type { Trade, BacktestResultRecord } from '@/types/domain';
 
-const DEFAULT_INTERVAL = '1h';
+type Dimension = 'all' | 'long' | 'short';
+
+function useLoadLatestResult(strategyId: string | undefined) {
+  const loadCached = useBacktestStore((s) => s.loadCached);
+  const cached = useBacktestStore((s) => s.cached);
+  useEffect(() => {
+    void loadCached(strategyId);
+  }, [strategyId, loadCached]);
+  return cached[0] as BacktestResultRecord | undefined;
+}
 
 export function BacktestPage() {
   const { t } = useTranslation();
   const current = useStrategyStore((s) => s.current);
+  const strategies = useStrategyStore((s) => s.list);
+  const setCurrent = useStrategyStore((s) => s.setCurrent);
   const symbols = useCoinListStore((s) => s.symbols);
+  const setSymbols = useCoinListStore((s) => s.set);
+
   const phase = useBacktestStore((s) => s.phase);
   const progress = useBacktestStore((s) => s.progress);
-  const result = useBacktestStore((s) => s.result);
+  const storeResult = useBacktestStore((s) => s.result);
   const runPreview = useBacktestStore((s) => s.runPreview);
   const runDeep = useBacktestStore((s) => s.runDeep);
 
-  const ready = !!current && symbols.length > 0;
-  const [interval, setInterval] = useState(DEFAULT_INTERVAL);
+  const [interval, setInterval] = useState('1h');
+  const [dimension, setDimension] = useState<Dimension>('all');
+  const [drilldownSymbol, setDrilldownSymbol] = useState<string | null>(null);
+
+  // On first mount: if no current strategy, pick the first seeded one; if no
+  // symbols selected, populate from the cached backtest result for visual demo.
+  useEffect(() => {
+    if (!current && strategies.length > 0) {
+      const firstStrategy = strategies.find((s) => s.type === 'strategy') ?? strategies[0];
+      setCurrent(firstStrategy);
+    }
+  }, [current, strategies, setCurrent]);
+
+  const latestCached = useLoadLatestResult(current?.id);
 
   useEffect(() => {
-    // Noop - load recent result for current strategy into view.
-  }, [current]);
+    if (symbols.length === 0 && latestCached?.symbols?.length) {
+      setSymbols(latestCached.symbols);
+    }
+  }, [symbols, latestCached, setSymbols]);
+
+  // Prefer live run result over cached.
+  const effective = storeResult?.result ?? latestCached ?? null;
+  const summary = (effective as any)?.summary_metrics ?? (effective as any)?.metrics ?? null;
+  const perSymbol = (effective as any)?.per_symbol_metrics ?? (effective as any)?.per_symbol ?? {};
+  const equity = (effective as any)?.equity_curve ?? [];
+  const trades: Trade[] = (effective as any)?.trades ?? [];
+
+  const drawdown = useMemo(() => computeDrawdown(equity), [equity]);
+
+  const metrics = summary?.[dimension] ?? summary?.all ?? null;
+
+  const ready = !!current && symbols.length > 0;
 
   const triggerPreview = () => {
     if (!current) return;
     const toDate = new Date();
     const fromDate = new Date(Date.now() - 7 * 24 * 3600 * 1000);
     void runPreview(current.id, current.code, {
-      symbols,
-      interval,
-      from: fromDate.toISOString(),
-      to: toDate.toISOString(),
-      initial_capital: 10_000,
-      commission: 0.0006,
-      slippage: 0.0001,
-      fill_mode: 'close',
+      symbols, interval,
+      from: fromDate.toISOString(), to: toDate.toISOString(),
+      initial_capital: 10_000, commission: 0.0006, slippage: 0.0001, fill_mode: 'close',
     });
   };
-
   const triggerDeep = () => {
     if (!current) return;
     const toDate = new Date();
     const fromDate = new Date(Date.now() - 180 * 24 * 3600 * 1000);
     void runDeep(current.id, current.code, {
-      symbols,
-      interval,
-      from: fromDate.toISOString(),
-      to: toDate.toISOString(),
-      initial_capital: 10_000,
-      commission: 0.0006,
-      slippage: 0.0001,
-      fill_mode: 'close',
+      symbols, interval,
+      from: fromDate.toISOString(), to: toDate.toISOString(),
+      initial_capital: 10_000, commission: 0.0006, slippage: 0.0001, fill_mode: 'close',
     });
   };
 
-  const summary = result?.result?.metrics?.all ?? null;
-  const equity = result?.result?.equity_curve ?? [];
+  const setTab = useAppStore((s) => s.setTab);
+
+  // Symbol drill-down: show SymbolDetailPage with a working cached result.
+  if (drilldownSymbol && (latestCached || storeResult?.result)) {
+    const ref = (latestCached ?? storeResult?.result) as BacktestResultRecord;
+    return (
+      <SymbolDetailPage
+        result={ref}
+        symbol={drilldownSymbol}
+        onBack={() => setDrilldownSymbol(null)}
+      />
+    );
+  }
 
   return (
     <div className="p-6 space-y-4">
@@ -70,6 +117,7 @@ export function BacktestPage() {
           </div>
           <div className="text-xs text-fg-muted mt-1">
             {symbols.length} symbols · {interval} · phase: {phase}
+            {latestCached ? ' · cached result' : ''}
           </div>
         </div>
         <div className="flex gap-2">
@@ -102,48 +150,102 @@ export function BacktestPage() {
       {/* Readiness checklist */}
       {!ready && (
         <div className="p-4 bg-surface-secondary rounded-lg text-sm space-y-2">
-          <div>
-            {current ? '✅' : '⬜'} Strategy: {current?.name ?? 'not set'}
-          </div>
-          <div>
-            {symbols.length > 0 ? '✅' : '⬜'} Symbols: {symbols.length} selected
+          <div>{current ? '✅' : '⬜'} Strategy: {current?.name ?? 'not set'}</div>
+          <div>{symbols.length > 0 ? '✅' : '⬜'} Symbols: {symbols.length} selected</div>
+          <div className="text-xs text-fg-muted">
+            Load a strategy from the{' '}
+            <button onClick={() => setTab('strategies')} className="text-accent-primary hover:underline">
+              Strategies
+            </button>{' '}
+            tab.
           </div>
         </div>
       )}
 
-      {/* Metrics strip */}
-      {summary && (
-        <div className="grid grid-cols-6 gap-3">
-          <Metric label={t('metric.total_return')} value={fmt(summary.total_return, '%')} positive={summary.total_return >= 0} />
-          <Metric label={t('metric.sharpe_ratio')} value={fmt(summary.sharpe_ratio)} />
-          <Metric label={t('metric.max_drawdown')} value={fmt(summary.max_drawdown, '%')} negative />
-          <Metric label={t('metric.win_rate')} value={fmt(summary.win_rate, '%')} />
-          <Metric label={t('metric.profit_factor')} value={fmt(summary.profit_factor)} />
-          <Metric label={t('metric.total_trades')} value={String(summary.total_trades ?? 0)} />
-        </div>
+      {/* Dimension toggle + metrics strip */}
+      {metrics && (
+        <>
+          <div className="flex items-center gap-2">
+            <div className="flex bg-surface-secondary rounded-md p-1 text-xs">
+              {(['all', 'long', 'short'] as Dimension[]).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDimension(d)}
+                  className={
+                    'px-3 py-1.5 rounded-sm ' +
+                    (dimension === d
+                      ? 'bg-surface-tertiary text-fg-primary'
+                      : 'text-fg-secondary')
+                  }
+                >
+                  {d.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-6 gap-3">
+            <Metric label={t('metric.total_return')} value={fmt(metrics.total_return, '%')} positive={metrics.total_return >= 0} />
+            <Metric label={t('metric.sharpe_ratio')} value={fmt(metrics.sharpe_ratio)} />
+            <Metric label={t('metric.max_drawdown')} value={fmt(metrics.max_drawdown, '%')} negative />
+            <Metric label={t('metric.win_rate')} value={fmt(metrics.win_rate, '%')} />
+            <Metric label={t('metric.profit_factor')} value={fmt(metrics.profit_factor)} />
+            <Metric label={t('metric.total_trades')} value={String(metrics.total_trades ?? 0)} />
+          </div>
+        </>
       )}
 
-      {/* Equity curve */}
+      {/* Equity + drawdown row */}
       {equity.length > 0 && (
-        <div className="p-4 bg-surface-secondary rounded-lg">
-          <div className="font-heading font-semibold text-sm mb-2">Equity</div>
-          <EquityCurve points={equity} height={200} />
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-4 bg-surface-secondary rounded-lg">
+            <div className="font-heading font-semibold text-sm mb-2">Equity curve</div>
+            <EquityCurve points={equity} height={220} />
+          </div>
+          <div className="p-4 bg-surface-secondary rounded-lg">
+            <div className="font-heading font-semibold text-sm mb-2">Drawdown</div>
+            <DrawdownCurve points={drawdown} height={220} />
+          </div>
         </div>
       )}
 
-      {/* Empty K-line placeholder for now (real candles would come from remote data API) */}
-      {result && (
-        <div className="p-4 bg-surface-secondary rounded-lg">
-          <div className="font-heading font-semibold text-sm mb-2">Price & signals</div>
-          <KlineChart candles={[]} trades={result?.result?.trades ?? []} height={340} />
+      {/* Per-symbol ranking + monthly heatmap */}
+      {Object.keys(perSymbol).length > 0 && (
+        <div className="grid grid-cols-[1.2fr_1fr] gap-3">
+          <div className="p-4 bg-surface-secondary rounded-lg">
+            <div className="font-heading font-semibold text-sm mb-2">Per-symbol ranking</div>
+            <SymbolRankingTable perSymbol={perSymbol} onSelect={setDrilldownSymbol} />
+          </div>
+          <div className="p-4 bg-surface-secondary rounded-lg">
+            <div className="font-heading font-semibold text-sm mb-2">Monthly returns</div>
+            <MonthlyHeatmap points={equity} />
+          </div>
         </div>
       )}
 
-      {phase === 'preview' || phase === 'deep' ? (
+      {/* K-line + trade list */}
+      {trades.length > 0 && (
+        <div className="grid grid-cols-[1.4fr_1fr] gap-3">
+          <div className="p-4 bg-surface-secondary rounded-lg">
+            <div className="font-heading font-semibold text-sm mb-2">Price & signals</div>
+            <KlineChart
+              candles={syntheticCandles(trades)}
+              trades={trades}
+              height={340}
+            />
+          </div>
+          <div className="p-4 bg-surface-secondary rounded-lg">
+            <div className="font-heading font-semibold text-sm mb-2">Trade journal</div>
+            <TradeList trades={trades} />
+          </div>
+        </div>
+      )}
+
+      {(phase === 'preview' || phase === 'deep') && (
         <div className="text-xs text-fg-muted">
           Backtest running… {progress ? JSON.stringify(progress) : ''}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
@@ -175,4 +277,41 @@ function Metric({
 function fmt(n: unknown, suffix = ''): string {
   if (typeof n !== 'number' || Number.isNaN(n)) return '—';
   return (n >= 0 && suffix === '%' ? '+' : '') + n.toFixed(2) + suffix;
+}
+
+/** Build a synthetic candle series from trade timestamps and prices so the
+ *  KlineChart renders something realistic even without real K-line data.
+ *  Only used when no live K-line data is attached. */
+function syntheticCandles(trades: Trade[]): KlineCandle[] {
+  if (trades.length === 0) return [];
+  const byTime = new Map<number, { open: number; high: number; low: number; close: number }>();
+  for (const t of trades) {
+    const entry = Math.floor(Date.parse(t.entry_time) / 1000);
+    const exit = Math.floor(Date.parse(t.exit_time) / 1000);
+    addCandle(byTime, entry, t.entry_price);
+    addCandle(byTime, exit, t.exit_price);
+  }
+  // Add random midpoints
+  const times = [...byTime.keys()].sort();
+  const out: KlineCandle[] = times.map((time) => {
+    const v = byTime.get(time)!;
+    return { time, open: v.open, high: v.high, low: v.low, close: v.close };
+  });
+  // De-dup consecutive identical times.
+  return out.filter((c, i, a) => i === 0 || c.time !== a[i - 1].time);
+}
+
+function addCandle(
+  m: Map<number, { open: number; high: number; low: number; close: number }>,
+  time: number,
+  price: number,
+) {
+  const existing = m.get(time);
+  if (!existing) {
+    m.set(time, { open: price, high: price, low: price, close: price });
+  } else {
+    existing.high = Math.max(existing.high, price);
+    existing.low = Math.min(existing.low, price);
+    existing.close = price;
+  }
 }
