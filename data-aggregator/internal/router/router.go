@@ -6,37 +6,15 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
-
-	"github.com/janespace-ai/claw-trader/data-aggregator/internal/handler"
-	"github.com/janespace-ai/claw-trader/data-aggregator/internal/service"
-	"github.com/janespace-ai/claw-trader/data-aggregator/internal/store"
 )
 
-// Register wires every HTTP endpoint onto the given Hertz server.
-func Register(h *server.Hertz, st *store.Store, svc *service.SyncService) {
-	syncH := handler.NewSyncHandler(svc)
-	symH := handler.NewSymbolHandler(st)
-	gapH := handler.NewGapHandler(st, svc)
-	klH := handler.NewKlineHandler(st)
-
+// Register wires the minimal HTTP surface onto the given Hertz server.
+//
+// data-aggregator is a headless worker: it runs its sync pipeline on boot and
+// does not expose business APIs to the frontend. The only route kept is a
+// liveness probe, and the server is expected to bind to 127.0.0.1 (see config).
+func Register(h *server.Hertz) {
 	h.GET("/healthz", func(ctx context.Context, c *app.RequestContext) {
 		c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
-
-	api := h.Group("/api")
-	{
-		// Sync
-		api.POST("/sync/start", syncH.Start)
-		api.GET("/sync/status", syncH.Status)
-
-		// Symbols
-		api.GET("/symbols", symH.List)
-
-		// Gaps
-		api.GET("/gaps", gapH.List)
-		api.POST("/gaps/repair", gapH.Repair)
-
-		// Klines
-		api.GET("/klines", klH.Query)
-	}
 }

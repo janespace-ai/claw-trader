@@ -24,14 +24,14 @@ func main() {
 	flag.Parse()
 
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
-	log.Printf("data-aggregator starting")
+	log.Printf("data-aggregator starting (headless worker mode)")
 
 	// 1. Load config (YAML + env overrides).
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	log.Printf("config loaded: db=%s:%d server=%s:%d",
+	log.Printf("config loaded: db=%s:%d bind=%s:%d",
 		cfg.Database.Host, cfg.Database.Port, cfg.Server.Address, cfg.Server.Port)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -54,21 +54,28 @@ func main() {
 	// 3. Sync orchestrator.
 	syncSvc := service.NewSyncService(*cfg, st)
 
-	// 4. Hertz server.
+	// 4. Minimal HTTP server — only /healthz. Intended to bind to 127.0.0.1.
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Address, cfg.Server.Port)
 	h := server.New(
 		server.WithHostPorts(addr),
 		server.WithReadTimeout(30*time.Second),
 		server.WithWriteTimeout(30*time.Second),
 	)
-	router.Register(h, st, syncSvc)
+	router.Register(h)
 
 	go func() {
-		log.Printf("HTTP server listening on %s", addr)
+		log.Printf("HTTP /healthz listening on %s", addr)
 		h.Spin()
 	}()
 
-	// 5. Wait for signal.
+	// 5. Boot-time auto-sync. Runs in its own goroutine so /healthz is
+	// available as soon as DB + migrations are ready. Cold-start downloads
+	// may take hours; that is expected and MUST NOT block liveness.
+	taskID := syncSvc.RunBoot(ctx)
+	log.Printf("boot pipeline started task=%s (running in background)", taskID)
+
+	// 6. Wait for signal. After boot catch-up completes, the process stays
+	// alive (future WebSocket realtime work will live here).
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	sig := <-sigCh
