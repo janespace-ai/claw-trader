@@ -68,6 +68,10 @@ func (s *Store) Close() {
 // Pool exposes the underlying pool for advanced queries.
 func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 
+// Schema returns the configured schema name. Useful for tests that want
+// to run raw SQL against the store's schema.
+func (s *Store) Schema() string { return s.schema }
+
 // Migrate applies every SQL file under migrations/ in filename order.
 //
 // Each file is rendered through text/template with {"Schema": s.schema}
