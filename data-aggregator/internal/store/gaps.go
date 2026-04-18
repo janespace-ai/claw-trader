@@ -11,14 +11,14 @@ import (
 
 // InsertGap adds a new gap record or updates retry_count when the range already exists.
 func (s *Store) InsertGap(ctx context.Context, g model.Gap) (int64, error) {
-	const sql = `
-		INSERT INTO claw.gaps
+	sql := fmt.Sprintf(`
+		INSERT INTO %s.gaps
 			(symbol, market, interval, gap_from, gap_to, missing_bars, status, retry_count, error)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		ON CONFLICT (symbol, market, interval, gap_from, gap_to)
 		DO UPDATE SET missing_bars = EXCLUDED.missing_bars
 		RETURNING id
-	`
+	`, s.schema)
 	var id int64
 	err := s.pool.QueryRow(ctx, sql,
 		g.Symbol, g.Market, g.Interval, g.GapFrom, g.GapTo, g.MissingBars, g.Status, g.RetryCount, g.LastError,
@@ -41,8 +41,8 @@ func (s *Store) UpdateGapStatus(ctx context.Context, id int64, status string, la
 	}
 
 	sql := fmt.Sprintf(
-		`UPDATE claw.gaps SET status = $1, error = $2%s%s WHERE id = $3`,
-		retryExpr, repairedExpr,
+		`UPDATE %s.gaps SET status = $1, error = $2%s%s WHERE id = $3`,
+		s.schema, retryExpr, repairedExpr,
 	)
 	_, err := s.pool.Exec(ctx, sql, status, lastError, id)
 	if err != nil {
@@ -86,11 +86,11 @@ func (s *Store) QueryGaps(ctx context.Context, f GapFilter) ([]model.Gap, error)
 	sql := fmt.Sprintf(
 		`SELECT id, symbol, market, interval, gap_from, gap_to, missing_bars,
 		        status, retry_count, COALESCE(error, ''), detected_at, COALESCE(repaired_at, detected_at)
-		 FROM claw.gaps
+		 FROM %s.gaps
 		 WHERE %s
 		 ORDER BY detected_at DESC
 		 LIMIT %s`,
-		strings.Join(conditions, " AND "), limitArg,
+		s.schema, strings.Join(conditions, " AND "), limitArg,
 	)
 
 	rows, err := s.pool.Query(ctx, sql, args...)
@@ -114,10 +114,10 @@ func (s *Store) QueryGaps(ctx context.Context, f GapFilter) ([]model.Gap, error)
 
 // DeleteGapsBefore removes gaps detected before the given cutoff. Useful for reruns.
 func (s *Store) DeleteGapsBefore(ctx context.Context, symbol, market, interval string, cutoff time.Time) error {
-	const sql = `
-		DELETE FROM claw.gaps
+	sql := fmt.Sprintf(`
+		DELETE FROM %s.gaps
 		WHERE symbol = $1 AND market = $2 AND interval = $3 AND detected_at < $4
-	`
+	`, s.schema)
 	_, err := s.pool.Exec(ctx, sql, symbol, market, interval, cutoff)
 	return err
 }

@@ -124,21 +124,22 @@ func renderMigration(name, sql, schema string) (string, error) {
 // CreateStrategy inserts a new strategy row and returns the assigned ID.
 func (s *Store) CreateStrategy(ctx context.Context, st model.Strategy) (string, error) {
 	var id string
-	err := s.pool.QueryRow(ctx, `
-		INSERT INTO claw.strategies (name, code_type, code, params_schema)
+	sql := fmt.Sprintf(`
+		INSERT INTO %[1]s.strategies (name, code_type, code, params_schema)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id
-	`, st.Name, st.CodeType, st.Code, marshalJSONB(st.ParamsSchema)).Scan(&id)
+	`, s.schema)
+	err := s.pool.QueryRow(ctx, sql, st.Name, st.CodeType, st.Code, marshalJSONB(st.ParamsSchema)).Scan(&id)
 	return id, err
 }
 
 // GetStrategy reads by ID, returning ok=false if missing.
 func (s *Store) GetStrategy(ctx context.Context, id string) (model.Strategy, bool, error) {
-	const sql = `
+	sql := fmt.Sprintf(`
 		SELECT id, name, code_type, code, COALESCE(params_schema, '{}'::jsonb),
 		       created_at, updated_at
-		FROM claw.strategies WHERE id = $1
-	`
+		FROM %[1]s.strategies WHERE id = $1
+	`, s.schema)
 	var st model.Strategy
 	var params []byte
 	err := s.pool.QueryRow(ctx, sql, id).Scan(
@@ -169,10 +170,10 @@ func (s *Store) ListStrategies(ctx context.Context, codeType string, limit int) 
 	sql := fmt.Sprintf(`
 		SELECT id, name, code_type, code, COALESCE(params_schema, '{}'::jsonb),
 		       created_at, updated_at
-		FROM claw.strategies%s
+		FROM %[1]s.strategies%[2]s
 		ORDER BY created_at DESC
 		LIMIT $1
-	`, where)
+	`, s.schema, where)
 
 	rows, err := s.pool.Query(ctx, sql, args...)
 	if err != nil {
@@ -199,24 +200,26 @@ func (s *Store) ListStrategies(ctx context.Context, codeType string, limit int) 
 // CreateBacktestRun inserts a new run row in "pending" state.
 func (s *Store) CreateBacktestRun(ctx context.Context, run model.BacktestRun) (string, error) {
 	var id string
-	err := s.pool.QueryRow(ctx, `
-		INSERT INTO claw.backtest_runs (strategy_id, status, mode, config)
+	sql := fmt.Sprintf(`
+		INSERT INTO %[1]s.backtest_runs (strategy_id, status, mode, config)
 		VALUES ($1, $2, $3, $4)
 		RETURNING id
-	`, run.StrategyID, run.Status, run.Mode, run.Config).Scan(&id)
+	`, s.schema)
+	err := s.pool.QueryRow(ctx, sql, run.StrategyID, run.Status, run.Mode, run.Config).Scan(&id)
 	return id, err
 }
 
 // UpdateBacktestStatus sets status + optional started/finished timestamps.
 func (s *Store) UpdateBacktestStatus(ctx context.Context, id, status string, startedAt, finishedAt *time.Time, errMsg string) error {
-	_, err := s.pool.Exec(ctx, `
-		UPDATE claw.backtest_runs
+	sql := fmt.Sprintf(`
+		UPDATE %[1]s.backtest_runs
 		SET status = $2,
 		    started_at  = COALESCE($3, started_at),
 		    finished_at = COALESCE($4, finished_at),
 		    error       = NULLIF($5, '')
 		WHERE id = $1
-	`, id, status, startedAt, finishedAt, errMsg)
+	`, s.schema)
+	_, err := s.pool.Exec(ctx, sql, id, status, startedAt, finishedAt, errMsg)
 	return err
 }
 
@@ -226,10 +229,8 @@ func (s *Store) UpdateBacktestProgress(ctx context.Context, id string, progress 
 	if err != nil {
 		return err
 	}
-	_, err = s.pool.Exec(ctx,
-		`UPDATE claw.backtest_runs SET progress = $2 WHERE id = $1`,
-		id, raw,
-	)
+	sql := fmt.Sprintf(`UPDATE %[1]s.backtest_runs SET progress = $2 WHERE id = $1`, s.schema)
+	_, err = s.pool.Exec(ctx, sql, id, raw)
 	return err
 }
 
@@ -240,26 +241,27 @@ func (s *Store) UpdateBacktestResult(ctx context.Context, id string, result any)
 		return err
 	}
 	now := time.Now().UTC()
-	_, err = s.pool.Exec(ctx, `
-		UPDATE claw.backtest_runs
+	sql := fmt.Sprintf(`
+		UPDATE %[1]s.backtest_runs
 		SET result = $2,
 		    status = 'done',
 		    finished_at = $3
 		WHERE id = $1
-	`, id, raw, now)
+	`, s.schema)
+	_, err = s.pool.Exec(ctx, sql, id, raw, now)
 	return err
 }
 
 // GetBacktestRun reads by ID.
 func (s *Store) GetBacktestRun(ctx context.Context, id string) (model.BacktestRun, bool, error) {
-	const sql = `
+	sql := fmt.Sprintf(`
 		SELECT id, strategy_id, status, mode, config,
 		       COALESCE(progress, '{}'::jsonb),
 		       COALESCE(result,   'null'::jsonb),
 		       COALESCE(error, ''),
 		       started_at, finished_at, created_at
-		FROM claw.backtest_runs WHERE id = $1
-	`
+		FROM %[1]s.backtest_runs WHERE id = $1
+	`, s.schema)
 	var run model.BacktestRun
 	err := s.pool.QueryRow(ctx, sql, id).Scan(
 		&run.ID, &run.StrategyID, &run.Status, &run.Mode, &run.Config,
@@ -292,10 +294,10 @@ func (s *Store) ListBacktestRuns(ctx context.Context, strategyID string, limit i
 		       COALESCE(result,   'null'::jsonb),
 		       COALESCE(error, ''),
 		       started_at, finished_at, created_at
-		FROM claw.backtest_runs%s
+		FROM %[1]s.backtest_runs%[2]s
 		ORDER BY created_at DESC
 		LIMIT $1
-	`, where)
+	`, s.schema, where)
 	rows, err := s.pool.Query(ctx, sql, args...)
 	if err != nil {
 		return nil, err
@@ -318,9 +320,8 @@ func (s *Store) ListBacktestRuns(ctx context.Context, strategyID string, limit i
 // HasRunningBacktest returns true if any backtest run is currently in 'running' state.
 func (s *Store) HasRunningBacktest(ctx context.Context) (bool, string, error) {
 	var id string
-	err := s.pool.QueryRow(ctx,
-		`SELECT id FROM claw.backtest_runs WHERE status = 'running' LIMIT 1`,
-	).Scan(&id)
+	sql := fmt.Sprintf(`SELECT id FROM %[1]s.backtest_runs WHERE status = 'running' LIMIT 1`, s.schema)
+	err := s.pool.QueryRow(ctx, sql).Scan(&id)
 	if err != nil {
 		if strings.Contains(err.Error(), "no rows") {
 			return false, "", nil
@@ -335,24 +336,26 @@ func (s *Store) HasRunningBacktest(ctx context.Context) (bool, string, error) {
 // CreateScreenerRun inserts a screener task row.
 func (s *Store) CreateScreenerRun(ctx context.Context, run model.ScreenerRun) (string, error) {
 	var id string
-	err := s.pool.QueryRow(ctx, `
-		INSERT INTO claw.screener_runs (strategy_id, status, config)
+	sql := fmt.Sprintf(`
+		INSERT INTO %[1]s.screener_runs (strategy_id, status, config)
 		VALUES ($1, $2, $3)
 		RETURNING id
-	`, run.StrategyID, run.Status, run.Config).Scan(&id)
+	`, s.schema)
+	err := s.pool.QueryRow(ctx, sql, run.StrategyID, run.Status, run.Config).Scan(&id)
 	return id, err
 }
 
 // UpdateScreenerStatus updates status + timestamps.
 func (s *Store) UpdateScreenerStatus(ctx context.Context, id, status string, startedAt, finishedAt *time.Time, errMsg string) error {
-	_, err := s.pool.Exec(ctx, `
-		UPDATE claw.screener_runs
+	sql := fmt.Sprintf(`
+		UPDATE %[1]s.screener_runs
 		SET status = $2,
 		    started_at  = COALESCE($3, started_at),
 		    finished_at = COALESCE($4, finished_at),
 		    error       = NULLIF($5, '')
 		WHERE id = $1
-	`, id, status, startedAt, finishedAt, errMsg)
+	`, s.schema)
+	_, err := s.pool.Exec(ctx, sql, id, status, startedAt, finishedAt, errMsg)
 	return err
 }
 
@@ -363,25 +366,26 @@ func (s *Store) UpdateScreenerResult(ctx context.Context, id string, result any)
 		return err
 	}
 	now := time.Now().UTC()
-	_, err = s.pool.Exec(ctx, `
-		UPDATE claw.screener_runs
+	sql := fmt.Sprintf(`
+		UPDATE %[1]s.screener_runs
 		SET result = $2,
 		    status = 'done',
 		    finished_at = $3
 		WHERE id = $1
-	`, id, raw, now)
+	`, s.schema)
+	_, err = s.pool.Exec(ctx, sql, id, raw, now)
 	return err
 }
 
 // GetScreenerRun reads by ID.
 func (s *Store) GetScreenerRun(ctx context.Context, id string) (model.ScreenerRun, bool, error) {
-	const sql = `
+	sql := fmt.Sprintf(`
 		SELECT id, strategy_id, status, config,
 		       COALESCE(result, 'null'::jsonb),
 		       COALESCE(error, ''),
 		       started_at, finished_at, created_at
-		FROM claw.screener_runs WHERE id = $1
-	`
+		FROM %[1]s.screener_runs WHERE id = $1
+	`, s.schema)
 	var run model.ScreenerRun
 	err := s.pool.QueryRow(ctx, sql, id).Scan(
 		&run.ID, &run.StrategyID, &run.Status, &run.Config,

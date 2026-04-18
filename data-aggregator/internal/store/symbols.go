@@ -18,14 +18,14 @@ func (s *Store) UpsertSymbols(ctx context.Context, market string, symbols []mode
 
 	// Null rank for everyone first - any ones we're about to upsert will be overwritten.
 	if _, err := tx.Exec(ctx,
-		`UPDATE claw.symbols SET rank = NULL, updated_at = now() WHERE market = $1`,
+		fmt.Sprintf(`UPDATE %s.symbols SET rank = NULL, updated_at = now() WHERE market = $1`, s.schema),
 		market,
 	); err != nil {
 		return fmt.Errorf("null previous ranks: %w", err)
 	}
 
-	const upsert = `
-		INSERT INTO claw.symbols (symbol, market, rank, trade_size, volume_24h_quote, status, updated_at)
+	upsert := fmt.Sprintf(`
+		INSERT INTO %s.symbols (symbol, market, rank, trade_size, volume_24h_quote, status, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, now())
 		ON CONFLICT (market, symbol) DO UPDATE SET
 			rank = EXCLUDED.rank,
@@ -33,7 +33,7 @@ func (s *Store) UpsertSymbols(ctx context.Context, market string, symbols []mode
 			volume_24h_quote = EXCLUDED.volume_24h_quote,
 			status = EXCLUDED.status,
 			updated_at = now()
-	`
+	`, s.schema)
 	for _, sym := range symbols {
 		if _, err := tx.Exec(ctx, upsert,
 			sym.Symbol, sym.Market, sym.Rank, 0.0, sym.Volume24hQuote, sym.Status,
@@ -50,13 +50,13 @@ func (s *Store) ActiveSymbols(ctx context.Context, market string, limit int) ([]
 	if limit <= 0 {
 		limit = 300
 	}
-	const sql = `
+	sql := fmt.Sprintf(`
 		SELECT symbol, market, rank, COALESCE(volume_24h_quote, 0), status, updated_at
-		FROM claw.symbols
+		FROM %s.symbols
 		WHERE market = $1 AND rank IS NOT NULL AND status = 'active'
 		ORDER BY rank ASC
 		LIMIT $2
-	`
+	`, s.schema)
 	rows, err := s.pool.Query(ctx, sql, market, limit)
 	if err != nil {
 		return nil, fmt.Errorf("active symbols: %w", err)
@@ -78,12 +78,12 @@ func (s *Store) ActiveSymbols(ctx context.Context, market string, limit int) ([]
 
 // AllSymbols returns every row for the market including rank=NULL (dropped) entries.
 func (s *Store) AllSymbols(ctx context.Context, market string) ([]model.Symbol, error) {
-	const sql = `
+	sql := fmt.Sprintf(`
 		SELECT symbol, market, rank, COALESCE(volume_24h_quote, 0), status, updated_at
-		FROM claw.symbols
+		FROM %s.symbols
 		WHERE market = $1
 		ORDER BY rank ASC NULLS LAST, symbol ASC
-	`
+	`, s.schema)
 	rows, err := s.pool.Query(ctx, sql, market)
 	if err != nil {
 		return nil, fmt.Errorf("all symbols: %w", err)

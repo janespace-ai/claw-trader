@@ -47,8 +47,9 @@ func (s *Store) QueryKlines(ctx context.Context, market, interval, symbol string
 	if market == "" {
 		market = "futures"
 	}
-	// Table name is {schema}.{market}_{interval} — data-aggregator writes here.
-	table := fmt.Sprintf("claw.%s_%s", market, interval)
+	// Table name is {schema}.{market}_{interval} — data-aggregator writes
+	// the rows; backtest-engine reads from the same schema.
+	table := fmt.Sprintf("%s.%s_%s", s.schema, market, interval)
 
 	query := fmt.Sprintf(`
 		SELECT ts, open, high, low, close, volume, quote_volume
@@ -98,13 +99,13 @@ func (s *Store) ListActiveSymbols(ctx context.Context, market string, limit int)
 	if limit <= 0 {
 		limit = 300
 	}
-	const sql = `
+	sql := fmt.Sprintf(`
 		SELECT symbol, market, rank, COALESCE(volume_24h_quote, 0), status, updated_at
-		FROM claw.symbols
+		FROM %s.symbols
 		WHERE market = $1 AND rank IS NOT NULL AND status = 'active'
 		ORDER BY rank ASC
 		LIMIT $2
-	`
+	`, s.schema)
 	rows, err := s.pool.Query(ctx, sql, market, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list symbols: %w", err)
@@ -178,11 +179,11 @@ func (s *Store) QueryGaps(ctx context.Context, f GapFilter) ([]Gap, error) {
 	sql := fmt.Sprintf(`
 		SELECT id, symbol, market, interval, gap_from, gap_to, missing_bars,
 		       status, retry_count, COALESCE(error, ''), detected_at, COALESCE(repaired_at, detected_at)
-		FROM claw.gaps
+		FROM %s.gaps
 		WHERE %s
 		ORDER BY detected_at DESC
 		LIMIT %s
-	`, conditions, limitArg)
+	`, s.schema, conditions, limitArg)
 
 	rows, err := s.pool.Query(ctx, sql, args...)
 	if err != nil {
