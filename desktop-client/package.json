@@ -1,0 +1,62 @@
+{
+  "name": "claw-trader-desktop",
+  "version": "0.1.0",
+  "description": "Claw Trader desktop client — AI-driven crypto strategy design and backtesting",
+  "main": "dist-electron/main.cjs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && electron-builder",
+    "build:renderer": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src electron --ext .ts,.tsx"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "@google/generative-ai": "^0.21.0",
+    "better-sqlite3": "^11.5.0",
+    "i18next": "^23.16.5",
+    "i18next-browser-languagedetector": "^8.0.0",
+    "lightweight-charts": "^4.2.0",
+    "openai": "^4.70.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-i18next": "^15.1.1",
+    "zustand": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.9.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.10",
+    "vite-plugin-electron": "^0.28.8",
+    "vite-plugin-electron-renderer": "^0.14.6"
+  },
+  "build": {
+    "appId": "com.janespace.claw-trader",
+    "productName": "Claw Trader",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.finance"
+    },
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

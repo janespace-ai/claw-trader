@@ -1,0 +1,63 @@
+services:
+  backtest-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: claw-backtest-engine:latest
+    container_name: claw-backtest-engine
+    restart: unless-stopped
+    depends_on:
+      - timescaledb
+    environment:
+      BACKTEST_DATABASE_HOST: timescaledb
+      BACKTEST_DATABASE_PORT: 5432
+      BACKTEST_DATABASE_USER: claw
+      BACKTEST_DATABASE_PASSWORD: claw
+      BACKTEST_DATABASE_NAME: claw
+      # readonly user must be created via migration; password below is what the sandbox will use
+      BACKTEST_READONLY_USER: claw_readonly
+      BACKTEST_READONLY_PASSWORD: claw_readonly
+      BACKTEST_SANDBOX_IMAGE: claw-sandbox:latest
+      BACKTEST_SANDBOX_NETWORK: claw-sandbox-net
+      # Internal callback base URL — containers reach this host via the bridge network
+      BACKTEST_CALLBACK_BASE: http://claw-backtest-engine:8081
+    volumes:
+      # Mount docker socket so the service can launch sandbox containers.
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "8081:8081"
+    networks:
+      - claw-net
+      - claw-sandbox-net
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: claw-timescaledb
+    environment:
+      POSTGRES_DB: claw
+      POSTGRES_USER: claw
+      POSTGRES_PASSWORD: claw
+    ports:
+      - "5432:5432"
+    volumes:
+      - timescale-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U claw -d claw"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - claw-net
+      - claw-sandbox-net
+
+volumes:
+  timescale-data:
+
+networks:
+  claw-net:
+    driver: bridge
+  claw-sandbox-net:
+    # Sandbox containers attach here; only TimescaleDB + backtest-engine share this network.
+    # Sandbox itself has --network=none for external access and only joins this net.
+    driver: bridge
+    internal: true
