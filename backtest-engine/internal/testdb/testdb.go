@@ -5,12 +5,17 @@
 package testdb
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
+	"embed"
 	"encoding/hex"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,10 +23,26 @@ import (
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/store"
 )
 
+// aggregatorMigrations holds a snapshot of data-aggregator's migration
+// SQL files, copied here by `make sync-aggregator-migrations`. Applying
+// them in the test schema gives backtest-engine tests access to the
+// shared `futures_*`, `symbols`, and `gaps` tables that the aggregator
+// owns in production.
+//
+// The shared-schema contract test also reads this directory and
+// verifies checksums against a committed CHECKSUMS file so drift
+// between the two services' schemas fails loudly at test time.
+//
+//go:embed testdata/aggregator-migrations/*.sql
+var aggregatorMigrations embed.FS
+
 const envDSN = "CLAW_TEST_DSN"
 const SchemaPrefix = "test_"
 
-// New returns a Store pointed at a fresh per-test schema.
+// New returns a Store pointed at a fresh per-test schema with BOTH
+// data-aggregator and backtest-engine migrations applied. Aggregator
+// migrations go first so the shared tables (futures_*, symbols, gaps)
+// exist before backtest-engine's own migrations run.
 func New(t *testing.T) *store.Store {
 	t.Helper()
 
@@ -44,11 +65,19 @@ func New(t *testing.T) *store.Store {
 		t.Fatalf("create schema %q: %v", schema, err)
 	}
 
+	// Apply aggregator migrations first (copied into testdata via
+	// `make sync-aggregator-migrations`).
+	if err := applyAggregatorMigrations(ctx, pool, schema); err != nil {
+		dropSchema(ctx, pool, schema)
+		pool.Close()
+		t.Fatalf("apply aggregator migrations: %v", err)
+	}
+
 	s := store.NewFromPool(pool, schema)
 	if err := s.Migrate(ctx); err != nil {
 		dropSchema(ctx, pool, schema)
 		pool.Close()
-		t.Fatalf("migrate schema %q: %v", schema, err)
+		t.Fatalf("migrate backtest-engine schema %q: %v", schema, err)
 	}
 
 	t.Cleanup(func() {
@@ -59,6 +88,43 @@ func New(t *testing.T) *store.Store {
 	})
 
 	return s
+}
+
+// applyAggregatorMigrations renders each embedded aggregator migration
+// SQL file with the target schema and executes it against the pool.
+// Files are applied in lexical order (001_*, 002_*, 003_*).
+func applyAggregatorMigrations(ctx context.Context, pool *pgxpool.Pool, schema string) error {
+	entries, err := aggregatorMigrations.ReadDir("testdata/aggregator-migrations")
+	if err != nil {
+		return fmt.Errorf("read aggregator-migrations dir: %w", err)
+	}
+	files := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".sql") {
+			continue
+		}
+		files = append(files, e.Name())
+	}
+	sort.Strings(files)
+
+	for _, name := range files {
+		raw, err := aggregatorMigrations.ReadFile("testdata/aggregator-migrations/" + name)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", name, err)
+		}
+		tmpl, err := template.New(name).Option("missingkey=error").Parse(string(raw))
+		if err != nil {
+			return fmt.Errorf("parse %s: %w", name, err)
+		}
+		var buf bytes.Buffer
+		if err := tmpl.Execute(&buf, map[string]string{"Schema": schema}); err != nil {
+			return fmt.Errorf("render %s: %w", name, err)
+		}
+		if _, err := pool.Exec(ctx, buf.String()); err != nil {
+			return fmt.Errorf("apply %s: %w", name, err)
+		}
+	}
+	return nil
 }
 
 // Reap drops orphaned `test_*` schemas. Used by `make db-reap`.
