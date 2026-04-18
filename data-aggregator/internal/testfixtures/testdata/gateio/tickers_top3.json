@@ -1,0 +1,23 @@
+[
+  {
+    "contract": "BTC_USDT",
+    "last": "61234.5",
+    "volume_24h": "180000",
+    "volume_24h_base": "180000",
+    "volume_24h_quote": "11000000000"
+  },
+  {
+    "contract": "ETH_USDT",
+    "last": "3421.88",
+    "volume_24h": "820000",
+    "volume_24h_base": "820000",
+    "volume_24h_quote": "2800000000"
+  },
+  {
+    "contract": "XYZ_USDT",
+    "last": "0.0123",
+    "volume_24h": "50000000",
+    "volume_24h_base": "50000000",
+    "volume_24h_quote": "615000"
+  }
+]
