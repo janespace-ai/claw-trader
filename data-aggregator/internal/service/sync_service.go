@@ -54,79 +54,97 @@ func NewSyncService(cfg config.Config, st *store.Store) *SyncService {
 	}
 }
 
-// Start kicks off a background sync in the requested mode and returns the task id.
-// Returns an error if another sync is already running.
-func (s *SyncService) Start(mode model.SyncMode) (string, error) {
+// RunBoot kicks off the boot-time sync pipeline and returns immediately.
+// The pipeline runs in a background goroutine so callers (typically main.go
+// after DB + migrations are ready) can proceed without blocking on S3 / API
+// work that may take hours on a cold start.
+//
+// If a pipeline is already running (e.g. two RunBoot calls in quick succession),
+// the second call is a no-op and the existing task id is returned.
+func (s *SyncService) RunBoot(ctx context.Context) string {
 	s.mu.Lock()
 	if s.current != nil && s.current.Status == model.SyncStatusRunning {
+		existing := s.current.TaskID
 		s.mu.Unlock()
-		return "", fmt.Errorf("sync already running: %s", s.current.TaskID)
+		log.Printf("[sync] RunBoot: pipeline already running task=%s, skipping", existing)
+		return existing
 	}
 
 	taskID := newTaskID()
 	task := &model.SyncTask{
 		TaskID:    taskID,
-		Mode:      mode,
+		Mode:      model.SyncModeFull,
 		Status:    model.SyncStatusRunning,
 		StartedAt: time.Now().UTC(),
 	}
 	s.current = task
 	s.mu.Unlock()
 
-	go s.run(task)
-
-	return taskID, nil
+	log.Printf("[sync] RunBoot: starting boot pipeline task=%s", taskID)
+	go s.runWithContext(ctx, task)
+	return taskID
 }
 
-// Status returns the current or most-recent task snapshot.
-func (s *SyncService) Status() *model.SyncTask {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if s.current != nil {
-		snapshot := *s.current
-		snapshot.Progress.S3 = s.s3Fetcher.Progress()
-		snapshot.Progress.API = s.apiFetcher.Progress()
-		return &snapshot
-	}
-	if s.lastDone != nil {
-		snapshot := *s.lastDone
-		return &snapshot
-	}
-	return nil
-}
-
-// run executes the pipeline for the given task in the background.
-func (s *SyncService) run(task *model.SyncTask) {
-	ctx := context.Background()
+// runWithContext executes the detect-first boot pipeline using the provided context.
+// Order: refresh symbols → pre-detect (visibility only) → S3 backfill → aggregate →
+// API fill → detect → repair. The S3 and API fetchers are already incremental
+// (S3 skips months marked done in sync_state; API resumes from LatestTimestamp),
+// so re-runs after a crash only touch data that is actually missing.
+func (s *SyncService) runWithContext(ctx context.Context, task *model.SyncTask) {
 	defer s.finish(task)
-
-	switch task.Mode {
-	case model.SyncModeFull:
-		s.phaseSymbols(ctx, task)
-		s.phaseS3(ctx, task)
-		s.phaseAggregate(ctx, task)
-		s.phaseAPI(ctx, task)
-		s.phaseGap(ctx, task)
-	case model.SyncModeS3:
-		s.phaseSymbols(ctx, task)
-		s.phaseS3(ctx, task)
-		s.phaseAggregate(ctx, task)
-	case model.SyncModeAPI:
-		s.phaseAPI(ctx, task)
-	case model.SyncModeRepair:
-		s.phaseGap(ctx, task)
-	default:
-		task.Error = fmt.Sprintf("unknown mode %q", task.Mode)
-	}
+	s.phaseSymbols(ctx, task)
+	s.phasePreDetect(ctx, task)
+	s.phaseS3(ctx, task)
+	s.phaseAggregate(ctx, task)
+	s.phaseAPI(ctx, task)
+	s.phaseGap(ctx, task)
 }
 
 func (s *SyncService) phaseSymbols(ctx context.Context, task *model.SyncTask) {
 	s.mu.Lock()
 	task.Progress.Phase = "symbols"
 	s.mu.Unlock()
-	if _, err := s.symbolService.Refresh(ctx); err != nil {
+	log.Printf("[sync] phase=symbols task=%s refreshing top-%d", task.TaskID, s.cfg.Sync.TopSymbols)
+	syms, err := s.symbolService.Refresh(ctx)
+	if err != nil {
 		s.setError(task, fmt.Sprintf("refresh symbols: %v", err))
+		return
 	}
+	log.Printf("[sync] phase=symbols task=%s done symbol_count=%d", task.TaskID, len(syms))
+}
+
+// phasePreDetect runs gap detection BEFORE any downloads so the logs show
+// exactly how much work the boot pipeline is about to do. The S3 and API
+// fetchers still self-filter using sync_state / LatestTimestamp, so this phase
+// is informational; it does not gate subsequent phases. This is the "detect-first"
+// checkpoint of the boot pipeline.
+func (s *SyncService) phasePreDetect(ctx context.Context, task *model.SyncTask) {
+	s.mu.Lock()
+	task.Progress.Phase = "pre_detect"
+	s.mu.Unlock()
+
+	now := time.Now().UTC()
+	from := now.AddDate(0, -s.cfg.Sync.MonthsBack, 0)
+	intervals := []string{"5m", "1h", "4h", "1d"}
+	log.Printf("[sync] phase=pre_detect task=%s scanning from=%s intervals=%v",
+		task.TaskID, from.Format("2006-01-02"), intervals)
+
+	reports, err := s.detector.DetectAll(ctx, intervals, from, now)
+	if err != nil {
+		// Non-fatal: log and continue, downstream phases still work.
+		log.Printf("[sync] phase=pre_detect task=%s warn: %v", task.TaskID, err)
+		return
+	}
+	var totalGaps int
+	var totalMissing int
+	for _, r := range reports {
+		totalGaps += len(r.Gaps)
+		for _, g := range r.Gaps {
+			totalMissing += g.MissingBars
+		}
+	}
+	log.Printf("[sync] phase=pre_detect task=%s done reports=%d gap_count=%d missing_bars=%d",
+		task.TaskID, len(reports), totalGaps, totalMissing)
 }
 
 func (s *SyncService) phaseS3(ctx context.Context, task *model.SyncTask) {
@@ -143,19 +161,27 @@ func (s *SyncService) phaseS3(ctx context.Context, task *model.SyncTask) {
 	for _, sym := range symbols {
 		names = append(names, sym.Symbol)
 	}
+	log.Printf("[sync] phase=s3_download task=%s symbol_count=%d months_back=%d",
+		task.TaskID, len(names), s.cfg.Sync.MonthsBack)
 	if err := s.s3Fetcher.Run(ctx, names); err != nil {
 		s.setError(task, fmt.Sprintf("s3 fetch: %v", err))
+		return
 	}
+	p := s.s3Fetcher.Progress()
+	log.Printf("[sync] phase=s3_download task=%s done ok=%d failed=%d total=%d",
+		task.TaskID, p.Done, p.Failed, p.Total)
 }
 
 func (s *SyncService) phaseAggregate(ctx context.Context, task *model.SyncTask) {
 	s.mu.Lock()
 	task.Progress.Phase = "aggregate"
 	s.mu.Unlock()
-
+	log.Printf("[sync] phase=aggregate task=%s starting", task.TaskID)
 	if err := s.aggregator.AggregateAll(ctx); err != nil {
 		s.setError(task, fmt.Sprintf("aggregate: %v", err))
+		return
 	}
+	log.Printf("[sync] phase=aggregate task=%s done", task.TaskID)
 }
 
 func (s *SyncService) phaseAPI(ctx context.Context, task *model.SyncTask) {
@@ -172,9 +198,14 @@ func (s *SyncService) phaseAPI(ctx context.Context, task *model.SyncTask) {
 	for _, sym := range symbols {
 		names = append(names, sym.Symbol)
 	}
+	log.Printf("[sync] phase=api_fill task=%s symbol_count=%d", task.TaskID, len(names))
 	if err := s.apiFetcher.FillAll(ctx, names); err != nil {
 		s.setError(task, fmt.Sprintf("api fill: %v", err))
+		return
 	}
+	p := s.apiFetcher.Progress()
+	log.Printf("[sync] phase=api_fill task=%s done ok=%d failed=%d total=%d",
+		task.TaskID, p.Done, p.Failed, p.Total)
 }
 
 func (s *SyncService) phaseGap(ctx context.Context, task *model.SyncTask) {
@@ -185,18 +216,25 @@ func (s *SyncService) phaseGap(ctx context.Context, task *model.SyncTask) {
 	now := time.Now().UTC()
 	from := now.AddDate(0, -s.cfg.Sync.MonthsBack, 0)
 	intervals := []string{"5m", "1h", "4h", "1d"}
+	log.Printf("[sync] phase=gap_repair task=%s detect intervals=%v", task.TaskID, intervals)
 
-	if _, err := s.detector.DetectAll(ctx, intervals, from, now); err != nil {
+	reports, err := s.detector.DetectAll(ctx, intervals, from, now)
+	if err != nil {
 		s.setError(task, fmt.Sprintf("detect gaps: %v", err))
 		return
 	}
+	var remainingGaps int
+	for _, r := range reports {
+		remainingGaps += len(r.Gaps)
+	}
+	log.Printf("[sync] phase=gap_repair task=%s detect_done remaining_gaps=%d", task.TaskID, remainingGaps)
 
 	repaired, skipped, err := s.repairer.RepairAll(ctx)
 	if err != nil {
 		s.setError(task, fmt.Sprintf("repair gaps: %v", err))
 		return
 	}
-	log.Printf("[sync] gaps repaired=%d skipped=%d", repaired, skipped)
+	log.Printf("[sync] phase=gap_repair task=%s done repaired=%d skipped=%d", task.TaskID, repaired, skipped)
 }
 
 // setError appends an error to the running task under lock. Best-effort, does not abort.

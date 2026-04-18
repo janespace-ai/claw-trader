@@ -19,6 +19,13 @@ func Register(h *server.Hertz, st *store.Store, bs *service.BacktestService, ss 
 	th := handler.NewStrategyHandler(st)
 	ch := handler.NewCallbackHandler(bs, ss)
 
+	// Market-data gateway: these replace the data-aggregator endpoints of
+	// the same path. backtest-engine owns frontend reads; data-aggregator is
+	// now a headless worker with no external HTTP surface.
+	klH := handler.NewKlineHandler(st)
+	symH := handler.NewSymbolHandler(st)
+	gapH := handler.NewGapHandler(st)
+
 	h.GET("/healthz", func(ctx context.Context, c *app.RequestContext) {
 		c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
@@ -36,6 +43,11 @@ func Register(h *server.Hertz, st *store.Store, bs *service.BacktestService, ss 
 		api.POST("/strategies", th.Create)
 		api.GET("/strategies", th.List)
 		api.GET("/strategies/:id", th.Get)
+
+		// Market-data reads (sourced from shared TimescaleDB)
+		api.GET("/klines", klH.Query)
+		api.GET("/symbols", symH.List)
+		api.GET("/gaps", gapH.List)
 	}
 
 	internal := h.Group("/internal")

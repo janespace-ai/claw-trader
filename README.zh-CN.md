@@ -103,30 +103,45 @@ pnpm dev
   │  desktop-client(Electron +   │
   │  React + TypeScript)         │
   └───────────┬───────────────────┘
-              │ HTTP 8080 / 8081
-     ┌────────┴─────────┐
-     │                  │
-     ▼                  ▼
-  ┌──────────────┐   ┌─────────────────────┐
-  │ data-        │   │ backtest-engine     │
-  │ aggregator   │   │ (Go + Hertz)        │
-  │ (Go + Hertz) │   │   │                 │
-  └──────┬───────┘   │   │ 派生             │
-         │           │   ▼                 │
-         ▼           │ ┌─────────────────┐ │
-  ┌──────────────┐◄──┘ │ Python 沙箱     │ │
-  │ TimescaleDB  │◄────┤ 容器            │ │
-  │ (OHLCV)      │ 只读 │(你的策略)      │ │
-  └──────────────┘     └─────────────────┘ │
-                                           │
-  ┌─ AI(你自己的 API Key)──────────────────┐│
-  │  OpenAI / Anthropic / DeepSeek /      ││
-  │  Gemini / Moonshot — 只从桌面         ││
-  │  客户端发起调用                       │◄┘
+              │ HTTP 8081
+              ▼
+              ┌─────────────────────────┐
+              │ backtest-engine         │
+              │ (Go + Hertz)            │
+              │  • /api/backtest/*      │
+              │  • /api/screener/*      │
+              │  • /api/klines /symbols │
+              │    /gaps(数据网关)     │
+              │  • 派生 Python 沙箱     │
+              └───────┬─────────────────┘
+                      │ SQL(只读)
+                      ▼
+              ┌──────────────┐
+              │ TimescaleDB  │ ◄── SQL(写入)
+              │ (OHLCV)      │      │
+              └──────────────┘      │
+                                    │
+              ┌─────────────────────┴───┐
+              │ data-aggregator         │
+              │ (Go,无头 worker)       │
+              │  • 启动即刷新 top 300   │
+              │  • 检测数据缺口         │
+              │  • S3 + API 补齐        │
+              │  • 不对外暴露 HTTP API  │
+              └─────────────────────────┘
+                      ▲
+                      │ S3 CSV + REST
+                      │
+                 Gate.io 公开数据
+
+  ┌─ AI(你自己的 API Key)────────────────┐
+  │  OpenAI / Anthropic / DeepSeek /      │
+  │  Gemini / Moonshot — 只从桌面         │
+  │  客户端发起调用                       │
   └───────────────────────────────────────┘
 ```
 
-三个服务、一个数据库、每次回测起一个沙箱。沙箱使用一个只读的数据库账号:用户提交的 Python 代码可以查询历史 K 线,但写不动、删不掉。
+三个服务、一个数据库、每次回测起一个沙箱。`data-aggregator` 是一个**无头 worker**:启动时自动检查数据完整性并补齐缺失,前端不直接访问它。`backtest-engine` 是桌面端唯一对接的入口,既负责回测编排,也兼任市场数据的只读网关。沙箱使用一个只读的数据库账号:用户提交的 Python 代码可以查询历史 K 线,但写不动、删不掉。
 
 本仓库使用 [OpenSpec](openspec/) 做 proposal 驱动的开发——每个值得记录的改动都在 `openspec/` 下留有 proposal、design 和 spec。
 

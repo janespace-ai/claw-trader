@@ -105,30 +105,45 @@ The app opens against your local services. On first launch it asks for an AI API
   │  desktop-client (Electron +   │
   │  React + TypeScript)          │
   └───────────┬───────────────────┘
-              │ HTTP 8080 / 8081
-     ┌────────┴─────────┐
-     │                  │
-     ▼                  ▼
-  ┌──────────────┐   ┌─────────────────────┐
-  │ data-        │   │ backtest-engine     │
-  │ aggregator   │   │ (Go + Hertz)        │
-  │ (Go + Hertz) │   │   │                 │
-  └──────┬───────┘   │   │ spawns          │
-         │           │   ▼                 │
-         ▼           │ ┌─────────────────┐ │
-  ┌──────────────┐◄──┘ │ Python sandbox  │ │
-  │ TimescaleDB  │◄────┤ container       │ │
-  │ (OHLCV)      │ R/O │ (your strategy) │ │
-  └──────────────┘     └─────────────────┘ │
-                                           │
-  ┌─ AI (your API key) ───────────────────┐│
-  │  OpenAI / Anthropic / DeepSeek /      ││
-  │  Gemini / Moonshot — called from      ││
-  │  the desktop client only              │◄┘
+              │ HTTP 8081
+              ▼
+              ┌─────────────────────────┐
+              │ backtest-engine         │
+              │ (Go + Hertz)            │
+              │  • /api/backtest/*      │
+              │  • /api/screener/*      │
+              │  • /api/klines /symbols │
+              │    /gaps (data gateway) │
+              │  • spawns Python sandbox│
+              └───────┬─────────────────┘
+                      │ SQL (read)
+                      ▼
+              ┌──────────────┐
+              │ TimescaleDB  │ ◄── SQL (write)
+              │ (OHLCV)      │      │
+              └──────────────┘      │
+                                    │
+              ┌─────────────────────┴───┐
+              │ data-aggregator         │
+              │ (Go, headless worker)   │
+              │  • boot → refresh tops  │
+              │  • detect gaps          │
+              │  • S3 + API backfill    │
+              │  • NO external HTTP API │
+              └─────────────────────────┘
+                      ▲
+                      │ S3 CSV + REST
+                      │
+                 Gate.io public data
+
+  ┌─ AI (your API key) ───────────────────┐
+  │  OpenAI / Anthropic / DeepSeek /      │
+  │  Gemini / Moonshot — called from      │
+  │  the desktop client only              │
   └───────────────────────────────────────┘
 ```
 
-Three services, one database, one sandbox per backtest run. The sandbox gets a read-only DB user — user-submitted Python can query historical candles but can't write or delete anything.
+Three services, one database, one sandbox per backtest run. `data-aggregator` is a **headless worker**: on startup it checks data completeness and backfills what's missing; the frontend never talks to it directly. `backtest-engine` is the single entry point the desktop client hits, serving both backtest orchestration and read-only market-data endpoints. The sandbox gets a read-only DB user — user-submitted Python can query historical candles but can't write or delete anything.
 
 The repo uses [OpenSpec](openspec/) for proposal-driven development — every notable change has a proposal, a design doc, and a spec under `openspec/`.
 

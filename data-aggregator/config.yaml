@@ -1,5 +1,9 @@
+# data-aggregator is a headless worker. It only exposes /healthz; bind to
+# 127.0.0.1 by default so nothing outside the host can reach it. Override
+# to 0.0.0.0 only if a container healthcheck or external liveness probe
+# requires it.
 server:
-  address: "0.0.0.0"
+  address: "127.0.0.1"
   port: 8080
 
 database:
