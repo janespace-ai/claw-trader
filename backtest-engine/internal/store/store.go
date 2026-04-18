@@ -1,12 +1,14 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -47,7 +49,13 @@ func New(ctx context.Context, cfg config.DatabaseConfig) (*Store, error) {
 		pool.Close()
 		return nil, fmt.Errorf("ping: %w", err)
 	}
-	return &Store{pool: pool, schema: cfg.Schema}, nil
+	return NewFromPool(pool, cfg.Schema), nil
+}
+
+// NewFromPool wraps an already-open pool with an explicit schema name.
+// Exposed for tests that want to inject an isolated schema.
+func NewFromPool(pool *pgxpool.Pool, schema string) *Store {
+	return &Store{pool: pool, schema: schema}
 }
 
 // Close releases the pool.
@@ -61,6 +69,10 @@ func (s *Store) Close() {
 func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 
 // Migrate applies every SQL file under migrations/ in filename order.
+//
+// Each file is rendered through text/template with {"Schema": s.schema}
+// before execution, so `{{.Schema}}` placeholders resolve to the configured
+// schema name (production: "claw", tests: a disposable per-suite schema).
 func (s *Store) Migrate(ctx context.Context) error {
 	entries, err := migrationsFS.ReadDir("migrations")
 	if err != nil {
@@ -80,11 +92,27 @@ func (s *Store) Migrate(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", name, err)
 		}
-		if _, err := s.pool.Exec(ctx, string(sqlBytes)); err != nil {
+		rendered, err := renderMigration(name, string(sqlBytes), s.schema)
+		if err != nil {
+			return fmt.Errorf("render migration %s: %w", name, err)
+		}
+		if _, err := s.pool.Exec(ctx, rendered); err != nil {
 			return fmt.Errorf("apply migration %s: %w", name, err)
 		}
 	}
 	return nil
+}
+
+func renderMigration(name, sql, schema string) (string, error) {
+	tmpl, err := template.New(name).Option("missingkey=error").Parse(sql)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, map[string]string{"Schema": schema}); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 // ---------------- Strategy CRUD ----------------

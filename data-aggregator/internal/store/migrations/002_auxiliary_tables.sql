@@ -1,7 +1,7 @@
 -- Migration 002: symbols, sync_state, gaps tables
 
 -- Symbol master list (Top-N by USDT 24h volume).
-CREATE TABLE IF NOT EXISTS claw.symbols (
+CREATE TABLE IF NOT EXISTS {{.Schema}}.symbols (
     symbol              TEXT            NOT NULL,
     market              TEXT            NOT NULL DEFAULT 'futures',
     rank                INTEGER,
@@ -11,11 +11,11 @@ CREATE TABLE IF NOT EXISTS claw.symbols (
     updated_at          TIMESTAMPTZ     NOT NULL DEFAULT now(),
     PRIMARY KEY (market, symbol)
 );
-CREATE INDEX IF NOT EXISTS symbols_rank_idx ON claw.symbols (market, rank) WHERE rank IS NOT NULL;
+CREATE INDEX IF NOT EXISTS symbols_rank_idx ON {{.Schema}}.symbols (market, rank) WHERE rank IS NOT NULL;
 
 -- Sync state: (symbol, market, interval, source, period) -> completion status.
 -- period is 'YYYYMM' for S3 backfills, 'api' for rolling API fill.
-CREATE TABLE IF NOT EXISTS claw.sync_state (
+CREATE TABLE IF NOT EXISTS {{.Schema}}.sync_state (
     symbol      TEXT            NOT NULL,
     market      TEXT            NOT NULL DEFAULT 'futures',
     interval    TEXT            NOT NULL,
@@ -27,10 +27,10 @@ CREATE TABLE IF NOT EXISTS claw.sync_state (
     synced_at   TIMESTAMPTZ     NOT NULL DEFAULT now(),
     PRIMARY KEY (symbol, market, interval, source, period)
 );
-CREATE INDEX IF NOT EXISTS sync_state_status_idx ON claw.sync_state (status);
+CREATE INDEX IF NOT EXISTS sync_state_status_idx ON {{.Schema}}.sync_state (status);
 
 -- Gap records.
-CREATE TABLE IF NOT EXISTS claw.gaps (
+CREATE TABLE IF NOT EXISTS {{.Schema}}.gaps (
     id              BIGSERIAL       PRIMARY KEY,
     symbol          TEXT            NOT NULL,
     market          TEXT            NOT NULL DEFAULT 'futures',
@@ -46,5 +46,5 @@ CREATE TABLE IF NOT EXISTS claw.gaps (
     repaired_at     TIMESTAMPTZ,
     UNIQUE (symbol, market, interval, gap_from, gap_to)
 );
-CREATE INDEX IF NOT EXISTS gaps_status_idx ON claw.gaps (status);
-CREATE INDEX IF NOT EXISTS gaps_symbol_interval_idx ON claw.gaps (symbol, market, interval);
+CREATE INDEX IF NOT EXISTS gaps_status_idx ON {{.Schema}}.gaps (status);
+CREATE INDEX IF NOT EXISTS gaps_symbol_interval_idx ON {{.Schema}}.gaps (symbol, market, interval);
