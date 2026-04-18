@@ -23772,7 +23772,7 @@
                       "id": "TrxUH",
                       "x": 100,
                       "y": 220,
-                      "fill": "#22C55E15",
+                      "fill": "#16a34a15",
                       "width": 240,
                       "height": 80
                     },
@@ -23782,7 +23782,7 @@
                       "id": "E5g6Y",
                       "x": 480,
                       "y": 170,
-                      "fill": "#22C55E15",
+                      "fill": "#16a34a15",
                       "width": 240,
                       "height": 110
                     },
@@ -24303,7 +24303,7 @@
                               "type": "frame",
                               "id": "9odn5",
                               "name": "dotY",
-                              "fill": "#F59E0B33",
+                              "fill": "#d9770633",
                               "cornerRadius": "$radius-full",
                               "padding": [
                                 1,
@@ -30036,7 +30036,7 @@
                       "id": "9PbxC",
                       "x": 20,
                       "y": 30,
-                      "fill": "#A855F70A",
+                      "fill": "#7c3aed0a",
                       "width": 400,
                       "height": 380
                     },
@@ -30675,7 +30675,7 @@
                           "type": "frame",
                           "id": "5iZ3y",
                           "name": "lock",
-                          "fill": "#F59E0B22",
+                          "fill": "#d9770622",
                           "cornerRadius": "$radius-md",
                           "stroke": {
                             "align": "inside",
@@ -33958,7 +33958,7 @@
                           "id": "Azcda",
                           "x": 170,
                           "y": 40,
-                          "fill": "#22C55E11",
+                          "fill": "#16a34a11",
                           "width": 55,
                           "height": 60
                         },
@@ -33968,7 +33968,7 @@
                           "id": "Pa3rd",
                           "x": 350,
                           "y": 45,
-                          "fill": "#22C55E11",
+                          "fill": "#16a34a11",
                           "width": 145,
                           "height": 60
                         },
@@ -33978,7 +33978,7 @@
                           "id": "kqOsM",
                           "x": 620,
                           "y": 25,
-                          "fill": "#22C55E11",
+                          "fill": "#16a34a11",
                           "width": 85,
                           "height": 85
                         },
@@ -34808,7 +34808,7 @@
                               "x": 0,
                               "y": 0,
                               "geometry": "M0 5l40 3 40 14 40-12 40 25 40-7 40-13 40 30 40-25 30-12 0 72-350 0z",
-                              "fill": "#EF444422",
+                              "fill": "#dc262622",
                               "width": 350,
                               "height": 80
                             }
@@ -35960,7 +35960,7 @@
                           "y": 82,
                           "descendants": {
                             "kAFSb": {
-                              "fill": "#A855F744"
+                              "fill": "#7c3aed44"
                             },
                             "rwAvl": {
                               "content": "A"
@@ -36042,7 +36042,7 @@
                           "y": 328,
                           "descendants": {
                             "kAFSb": {
-                              "fill": "#F59E0B44"
+                              "fill": "#d9770644"
                             },
                             "rwAvl": {
                               "content": "K"
@@ -36493,12 +36493,11 @@
                           "id": "8HaSj",
                           "name": "tOpt2",
                           "width": "fill_container",
-                          "fill": "$accent-primary-dim",
+                          "fill": "$surface-tertiary",
                           "cornerRadius": "$radius-md",
                           "stroke": {
-                            "align": "inside",
-                            "thickness": 1,
-                            "fill": "$accent-primary"
+                            "thickness": 0,
+                            "fill": "$surface-tertiary"
                           },
                           "layout": "vertical",
                           "gap": 8,
@@ -36568,33 +36567,20 @@
                                 {
                                   "type": "text",
                                   "id": "kVVjo",
-                                  "fill": "$accent-primary",
+                                  "fill": "$fg-primary",
                                   "content": "Dark",
                                   "fontFamily": "Geist",
                                   "fontSize": 13,
-                                  "fontWeight": "600"
+                                  "fontWeight": "500"
                                 },
                                 {
-                                  "type": "frame",
-                                  "id": "dazyE",
-                                  "name": "tChk",
-                                  "width": 16,
-                                  "height": 16,
-                                  "fill": "$accent-primary",
-                                  "cornerRadius": "$radius-full",
-                                  "justifyContent": "center",
-                                  "alignItems": "center",
-                                  "children": [
-                                    {
-                                      "type": "icon_font",
-                                      "id": "mLDoD",
-                                      "width": 11,
-                                      "height": 11,
-                                      "iconFontName": "check",
-                                      "iconFontFamily": "lucide",
-                                      "fill": "$fg-inverse"
-                                    }
-                                  ]
+                                  "type": "icon_font",
+                                  "id": "flRW6",
+                                  "width": 13,
+                                  "height": 13,
+                                  "iconFontName": "moon",
+                                  "iconFontFamily": "lucide",
+                                  "fill": "$fg-secondary"
                                 }
                               ]
                             }
@@ -36605,8 +36591,13 @@
                           "id": "v4TGy",
                           "name": "tOpt3",
                           "width": "fill_container",
-                          "fill": "$surface-tertiary",
+                          "fill": "$accent-primary-dim",
                           "cornerRadius": "$radius-md",
+                          "stroke": {
+                            "align": "inside",
+                            "thickness": 1,
+                            "fill": "$accent-primary"
+                          },
                           "layout": "vertical",
                           "gap": 8,
                           "padding": 12,
@@ -36675,20 +36666,33 @@
                                 {
                                   "type": "text",
                                   "id": "AsZM6",
-                                  "fill": "$fg-primary",
+                                  "fill": "$accent-primary",
                                   "content": "Light",
                                   "fontFamily": "Geist",
                                   "fontSize": 13,
-                                  "fontWeight": "500"
+                                  "fontWeight": "600"
                                 },
                                 {
-                                  "type": "icon_font",
-                                  "id": "Wi1l8",
-                                  "width": 13,
-                                  "height": 13,
-                                  "iconFontName": "sun",
-                                  "iconFontFamily": "lucide",
-                                  "fill": "$fg-secondary"
+                                  "type": "frame",
+                                  "id": "V4NL1",
+                                  "name": "tChkLight",
+                                  "width": 16,
+                                  "height": 16,
+                                  "fill": "$accent-primary",
+                                  "cornerRadius": "$radius-full",
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "icon_font",
+                                      "id": "aEuHC",
+                                      "width": 11,
+                                      "height": 11,
+                                      "iconFontName": "check",
+                                      "iconFontFamily": "lucide",
+                                      "fill": "$fg-inverse"
+                                    }
+                                  ]
                                 }
                               ]
                             }
