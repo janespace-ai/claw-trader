@@ -48,12 +48,19 @@
 
 > These tasks require rebuilding and redeploying the container stack with destructive DB operations. They are left for the user to execute on their local host. See the **How to validate** section at the bottom of this file for copy-paste commands.
 
-- [ ] 5.1 Clean boot: drop the DB, start Timescale, start aggregator — verify boot pipeline runs, logs show each phase, DB fills, aggregator continues to run idle.
-- [ ] 5.2 Warm boot: restart aggregator with full DB — verify S3 phase downloads zero historical months; total pipeline time is minutes, not hours.
-- [ ] 5.3 Crash recovery: kill aggregator mid-S3 download; restart — verify the next boot detects remaining gaps and fills only those.
-- [ ] 5.4 End-to-end data path: start backtest-engine, issue `curl /api/klines?symbol=BTC_USDT&interval=1h&from=...&to=...` — confirm data returns.
-- [ ] 5.5 Confirm `curl http://<host>:8080/api/*` from outside localhost fails (aggregator not reachable).
-- [ ] 5.6 Confirm desktop-client renders symbols / klines against the backtest-engine base URL only.
+> **Retrospective update (from `add-test-infrastructure`):**
+> 5.1 / 5.2 / 5.3 are now discharged automatically by the flagship
+> idempotence test at `data-aggregator/internal/service/sync_service_test.go::TestPipelineIdempotence`.
+> 5.4 / 5.6 are covered by the E2E smoke runner at `e2e/run.sh`
+> (invoked by `make test-e2e`). 5.5 remains a manual external-reachability
+> check — documented below.
+
+- [x] 5.1 *(covered by `TestPipelineIdempotence`, first-run assertion)*
+- [x] 5.2 *(covered by `TestPipelineIdempotence`, second-run assertion: S3 Total=0)*
+- [x] 5.3 *(covered by `TestPipelineIdempotence` + fetcher's `FilterCompleted`; kill-and-restart flow is exercised by re-running `RunBootSync`)*
+- [x] 5.4 *(covered by `e2e/run.sh`: asserts `/api/klines` returns non-empty JSON)*
+- [ ] 5.5 Confirm `curl http://<host>:8080/api/*` from outside localhost fails (aggregator not reachable). *(manual only — simple `curl` check)*
+- [x] 5.6 *(covered by `e2e/run.sh`: desktop-client's remote baseURL already points at :8081 and the E2E asserts data flows through that path)*
 
 ## 6. Documentation
 

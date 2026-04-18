@@ -1,0 +1,8 @@
+# Test-only requirements. Mirrors the production sandbox's numeric stack
+# so metrics golden values stay reproducible across environments.
+# Do NOT add these to the production sandbox Docker image — tests run
+# in a separate venv created by `make test-sandbox`.
+pytest==8.3.3
+pytest-cov==5.0.0
+numpy==1.26.4
+pandas==2.2.2

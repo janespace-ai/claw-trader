@@ -11,6 +11,8 @@
     "build:renderer": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src electron --ext .ts,.tsx",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "dev:browser": "CLAW_BROWSER_ONLY=1 vite --port 5173"
   },
   "dependencies": {
@@ -31,19 +33,22 @@
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
+    "@typescript-eslint/parser": "^8.15.0",
     "@vitejs/plugin-react": "^4.3.3",
+    "@vitest/ui": "^2.1.9",
     "autoprefixer": "^10.4.20",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
+    "eslint": "^9.15.0",
+    "eslint-plugin-claw": "file:./eslint-plugin-claw",
+    "jsdom": "^25.0.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3",
     "vite": "^5.4.10",
     "vite-plugin-electron": "^0.28.8",
     "vite-plugin-electron-renderer": "^0.14.6",
-    "@typescript-eslint/parser": "^8.15.0",
-    "eslint": "^9.15.0",
-    "eslint-plugin-claw": "file:./eslint-plugin-claw"
+    "vitest": "^2.1.9"
   },
   "build": {
     "appId": "com.janespace.claw-trader",

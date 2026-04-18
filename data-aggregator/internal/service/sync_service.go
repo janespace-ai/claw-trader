@@ -85,6 +85,30 @@ func (s *SyncService) RunBoot(ctx context.Context) string {
 	return taskID
 }
 
+// RunBootSync is the synchronous variant of RunBoot — it runs the full
+// pipeline on the calling goroutine and returns only after all phases
+// have completed (or errored). Tests use this to assert outcomes
+// deterministically without polling. Production code should stay on
+// RunBoot so /healthz is not blocked by cold-start downloads.
+//
+// Returns the completed task snapshot; task.Error is set if any phase
+// reported a problem but the pipeline still ran to the end.
+func (s *SyncService) RunBootSync(ctx context.Context) *model.SyncTask {
+	s.mu.Lock()
+	taskID := newTaskID()
+	task := &model.SyncTask{
+		TaskID:    taskID,
+		Mode:      model.SyncModeFull,
+		Status:    model.SyncStatusRunning,
+		StartedAt: time.Now().UTC(),
+	}
+	s.current = task
+	s.mu.Unlock()
+
+	s.runWithContext(ctx, task)
+	return task
+}
+
 // runWithContext executes the detect-first boot pipeline using the provided context.
 // Order: refresh symbols → pre-detect (visibility only) → S3 backfill → aggregate →
 // API fill → detect → repair. The S3 and API fetchers are already incremental

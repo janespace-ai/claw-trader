@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+# Optional pre-commit hook — fast checks only (under ~10s).
+# Does NOT run the test suite (too slow); that's `make test`.
+#
+# Install with:
+#   ln -s ../../scripts/pre-commit .git/hooks/pre-commit
+# Uninstall by removing that symlink. Bypass a single commit with
+# `git commit --no-verify`.
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel)"
+cd "$ROOT"
+
+fail=0
+
+run() {
+  echo "  $1"
+  if ! eval "$1" >/dev/null 2>&1; then
+    echo "    ✗ failed"
+    fail=1
+  fi
+}
+
+echo "[pre-commit] fast checks"
+run "cd data-aggregator && go build ./..."
+run "cd data-aggregator && go vet ./..."
+run "cd backtest-engine && go build ./..."
+run "cd backtest-engine && go vet ./..."
+
+if [[ -d desktop-client/node_modules ]]; then
+  run "cd desktop-client && npx tsc --noEmit"
+  run "cd desktop-client && ESLINT_USE_FLAT_CONFIG=false ./node_modules/.bin/eslint src electron --ext .ts,.tsx --max-warnings 9999 --quiet"
+else
+  echo "  (skipping desktop-client — run 'cd desktop-client && npm install' first)"
+fi
+
+if (( fail != 0 )); then
+  echo
+  echo "[pre-commit] one or more checks failed."
+  echo "Run individually to see output, or commit with --no-verify to bypass."
+  exit 1
+fi
+echo "[pre-commit] OK"

@@ -1,11 +1,13 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"fmt"
 	"sort"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -49,7 +51,14 @@ func New(ctx context.Context, cfg config.DatabaseConfig) (*Store, error) {
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
 
-	return &Store{pool: pool, schema: cfg.Schema}, nil
+	return NewFromPool(pool, cfg.Schema), nil
+}
+
+// NewFromPool wraps an already-open pool with an explicit schema name.
+// Exposed for tests that want to inject an isolated schema. Production
+// callers should use New.
+func NewFromPool(pool *pgxpool.Pool, schema string) *Store {
+	return &Store{pool: pool, schema: schema}
 }
 
 // Close releases the pool.
@@ -62,6 +71,10 @@ func (s *Store) Close() {
 // Pool exposes the underlying pool for advanced queries.
 func (s *Store) Pool() *pgxpool.Pool { return s.pool }
 
+// Schema returns the configured schema name. Useful for tests that want
+// to run raw SQL against the store's schema.
+func (s *Store) Schema() string { return s.schema }
+
 // TableName returns the fully-qualified hypertable name for (market, interval).
 // Example: TableName("futures", "5m") => "claw.futures_5m".
 func (s *Store) TableName(market, interval string) string {
@@ -70,6 +83,11 @@ func (s *Store) TableName(market, interval string) string {
 
 // Migrate applies every SQL file under migrations/ in filename order.
 // Migrations are idempotent (use IF NOT EXISTS, if_not_exists=> TRUE).
+//
+// Each SQL file is rendered through text/template with {"Schema": s.schema}
+// before execution, so `{{.Schema}}` placeholders resolve to the configured
+// schema. In production this is "claw"; in tests this is a disposable
+// per-suite schema injected via NewFromPool.
 func (s *Store) Migrate(ctx context.Context) error {
 	entries, err := migrationsFS.ReadDir("migrations")
 	if err != nil {
@@ -90,11 +108,29 @@ func (s *Store) Migrate(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("read migration %s: %w", name, err)
 		}
-		if _, err := s.pool.Exec(ctx, string(sqlBytes)); err != nil {
+		rendered, err := renderMigration(name, string(sqlBytes), s.schema)
+		if err != nil {
+			return fmt.Errorf("render migration %s: %w", name, err)
+		}
+		if _, err := s.pool.Exec(ctx, rendered); err != nil {
 			return fmt.Errorf("apply migration %s: %w", name, err)
 		}
 	}
 	return nil
+}
+
+// renderMigration executes the migration SQL as a text/template with the
+// given schema substituted for {{.Schema}}. Kept package-private.
+func renderMigration(name, sql, schema string) (string, error) {
+	tmpl, err := template.New(name).Option("missingkey=error").Parse(sql)
+	if err != nil {
+		return "", err
+	}
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, map[string]string{"Schema": schema}); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 // CopyCandles bulk-inserts candlesticks using pgx's COPY protocol.
