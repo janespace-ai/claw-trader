@@ -4,57 +4,72 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> A research-first quant platform for everyday users. Write a strategy, backtest it against real historical market data, and see whether the idea actually holds up — all running on your own machine.
-
-<p align="center">
-  <img src="docs/screenshots/multi-symbol-grid-light.png" alt="Multi-symbol grid view — nine mini equity curves, one screen" width="860">
-</p>
-
-<p align="center">
-  <em>Multi-symbol grid: run one strategy across many markets, see equity curves and trade markers at a glance.</em>
-</p>
-
----
-
-## What you can do
-
-- **Write strategies in plain Python.** Subclass `Strategy`, implement `on_bar(bar)`, call `self.buy()` / `self.sell()` / `self.close()`. No DSL to learn, no configuration cliffs.
-- **Let AI draft a strategy or screener for you.** Describe the idea in natural language and get runnable Python back. Edit it, backtest it, iterate.
-- **Backtest against real historical K-lines.** Hourly, 4h, daily, and more — pulled from public datasets, stored in a time-series database on your machine.
-- **Screen many symbols at once.** Express a filter ("volume over $100M, trend up, RSI below 70"), see the matches ranked, drill into any of them.
-- **Deep-dive one symbol.** Candles, indicators, your trade markers, equity curve, drawdown, and a full trade journal — side by side.
-
-## What it isn't
-
-- **Not a trading bot.** There is no live order execution. It reads historical market data and simulates strategies; it does not place real trades.
-- **Not a paper-trading service.** No forward testing against live feeds yet. Backtest only.
-- **Not a managed service.** Nothing runs in our cloud. There is no signup, no account, no server we control. You run the three services locally.
-- **Not financial advice.** The tool shows what a strategy *would have done* on historical data. What the strategy does next is not something anyone can promise.
+> **AI-assisted quant research for everyday users.** Describe a strategy in plain English, let AI turn it into code, and see how it would have played out on real historical markets — all on your own machine.
 
 <p align="center">
   <img src="docs/screenshots/workspace-strategy-design-light.png" alt="Strategy design workspace — K-lines, indicators, and the AI strategist panel" width="860">
 </p>
 
+<p align="center">
+  <em>Talk to the AI on the right. It writes the strategy. You hit Run and see whether it worked.</em>
+</p>
+
+---
+
+## How it works
+
+```
+  1. Describe your idea           2. AI drafts the strategy       3. Backtest it
+  ───────────────────────         ───────────────────────         ───────────────────────
+  "Buy BTC when RSI on            Python code appears             Run against years of
+   the 1h chart drops below        in the editor. Edit it if      real historical data.
+   30 and close on the first       you want. Hit Run.             See the return, Sharpe,
+   red candle."                                                    drawdown, and every
+                                                                    trade the strategy made.
+```
+
+Iterate until the numbers look like something you'd stake real money on. **Live order execution is on the roadmap; today the platform is backtest-only.**
+
+## You don't need to code
+
+> **Don't code? That's fine.** Tell the AI what you want in plain English — *"buy when RSI crosses above 30, close on the next red candle"* — and it produces a runnable strategy for you. Look at the Python if you're curious, but you don't have to.
+
+## What you can do
+
+- **Talk to AI, get a strategy.** Describe the idea in natural language. The AI strategist writes the code. Tweak the prompt, re-run, iterate.
+- **See how it would have played out.** Run the strategy against years of real historical market data. Metrics, trade journal, equity curve, drawdown — all in one place.
+- **Compare ideas across many markets at once.** Write a filter ("volume over $100M, trend up, RSI below 70"), see the matches ranked, drill into any of them.
+- **Keep everything on your machine.** No cloud accounts, no uploaded data, no telemetry. Your API keys and results never leave your laptop.
+
+*Already fluent in Python?* You can edit the AI's output or write strategies from scratch — the `Strategy` class is plain Python with `on_bar`, `buy`, `sell`, `close` methods.
+
+## What it isn't
+
+- **Not a trading bot — yet.** Live order execution is planned (see below) but not yet implemented. Today the platform reads historical market data and simulates strategies only.
+- **Not a paper-trading service.** No forward testing against live market feeds yet.
+- **Not a managed service.** Nothing runs in our cloud. There is no signup, no account, no server we control. You run it locally.
+- **Not financial advice.** A strategy that performs well on historical data can still lose money in live markets.
+
+**What's on the way:** live order execution against supported exchanges, paper trading on live feeds, and more data connectors. Roadmap, not promises — see `openspec/` for active proposals.
+
 ## Quick start
 
-You need **Docker** and **Docker Compose**. Everything else is in the repo.
+You need **Docker** and **Docker Compose**. That's it.
 
-**1. Bring up the data aggregator + time-series database:**
+**1. Start the data + database services:**
 
 ```bash
 cd data-aggregator
 docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build
 ```
 
-This downloads a small slice of historical K-lines (two symbols, two months) so you have something to backtest against immediately. A full sync takes longer — edit `config.yaml` when you're ready to scale up.
+First run pulls a small slice of historical K-lines so you have something to backtest immediately.
 
-**2. Build the strategy sandbox image:**
+**2. Build the strategy sandbox (first time only, takes a few minutes):**
 
 ```bash
 docker build -t claw-sandbox:latest backtest-engine/sandbox/
 ```
-
-The sandbox is a locked-down Python container that runs your strategy code. It ships `pandas`, `numpy`, `ta-lib`, and a bundled `claw` framework. First build takes a few minutes because it compiles the TA-Lib C library.
 
 **3. Start the backtest engine:**
 
@@ -63,7 +78,7 @@ cd ../backtest-engine
 docker compose up -d --build
 ```
 
-**4. Launch the desktop client:**
+**4. Open the desktop app:**
 
 ```bash
 cd ../desktop-client
@@ -71,11 +86,19 @@ pnpm install
 pnpm dev
 ```
 
-The Electron window opens against the two local services. Design a strategy in the left panel, hit *Run Preview*, watch the result land in the bottom drawer.
+The app opens against your local services. On first launch it asks for an AI API key — paste one from OpenAI, Anthropic, DeepSeek, Gemini, or Moonshot. Then start asking the AI for strategy ideas.
 
-Full commands and verified overrides are in each service's own `README` (and in the proposals under `openspec/`).
+<p align="center">
+  <img src="docs/screenshots/multi-symbol-grid-light.png" alt="Multi-symbol grid view — nine mini equity curves, one screen" width="860">
+</p>
+
+<p align="center">
+  <em>Screen many markets at once. Find the ones worth a closer look.</em>
+</p>
 
 ## Architecture
+
+*For developers who want to poke around. Regular users can skip this.*
 
 ```
   ┌───────────────────────────────┐
@@ -105,21 +128,23 @@ Full commands and verified overrides are in each service's own `README` (and in 
   └───────────────────────────────────────┘
 ```
 
-Three services, one database, one sandbox per backtest run. The sandbox gets a read-only DB user so user-supplied Python code can query historical candles but cannot write or delete anything.
+Three services, one database, one sandbox per backtest run. The sandbox gets a read-only DB user — user-submitted Python can query historical candles but can't write or delete anything.
 
-This repository uses [OpenSpec](openspec/) for proposal-driven development — every notable change has a proposal, a design doc, and a spec under `openspec/`.
+The repo uses [OpenSpec](openspec/) for proposal-driven development — every notable change has a proposal, a design doc, and a spec under `openspec/`.
 
 <p align="center">
   <img src="docs/screenshots/deep-backtest-light.png" alt="Deep backtest view — equity curve, metrics, AI optimize panel" width="860">
 </p>
 
+<p align="center">
+  <em>Deep analysis for one symbol — equity curve, metrics, and a full trade journal side by side.</em>
+</p>
+
 ## Data sources & AI providers
 
-**Market data** is pulled from Gate.io's public historical dataset (hosted on S3) and its REST API. Both are open, no API key required. The `data-aggregator` handles the download, schema, and gap detection.
+**Market data** currently comes from Gate.io's public historical dataset (hosted on S3) and its REST API. Both are open — no API key required. The `data-aggregator` handles download, storage, and gap detection. Other venues are on the roadmap; the engine itself is venue-agnostic and operates on a generic `Bar(open, high, low, close, volume)` abstraction.
 
-Supporting other venues (Binance, Bybit, CME, TradFi feeds) is a matter of writing another aggregator connector — the engine itself is venue-agnostic and operates on a generic `Bar(open, high, low, close, volume)` abstraction. Other connectors are not part of this release.
-
-**AI providers** — any OpenAI-compatible endpoint works. Tested against:
+**AI providers** — any OpenAI-compatible endpoint works. Tested with:
 
 - OpenAI (`gpt-4o`, `gpt-4o-mini`)
 - Anthropic (`claude-*`)
@@ -127,23 +152,20 @@ Supporting other venues (Binance, Bybit, CME, TradFi feeds) is a matter of writi
 - Google Gemini (`gemini-*`)
 - Moonshot (`kimi-*`)
 
-You bring your own API key. It is stored locally (in the Electron app's local storage) and sent only from your machine to the provider you chose.
+Bring your own API key. It stays on your machine.
 
 ## Privacy
 
-- **Your API keys live on your machine.** The desktop client stores them in its local data directory and never sends them anywhere except the provider endpoint you configured.
-- **No telemetry.** There is no analytics SDK, no crash reporter, no "phone home". If the app hits the internet, it's to reach a data source or an AI provider you explicitly configured.
-- **No account, no cloud sync.** Backtests, strategies, and screeners are saved in the local database you spun up. Deleting the Docker volume deletes everything.
+- **Your API keys stay on your machine.** Stored locally, sent only to the provider you chose.
+- **No telemetry.** No analytics SDK, no crash reporter, no phone-home. If the app hits the internet, it's a data source or AI provider you configured.
+- **No account, no cloud sync.** Backtests, strategies, and screeners live in the local database you spun up. Delete the Docker volume, and it's all gone.
 
 ## Tech stack
 
-- **Languages**: Go (services), Python 3.11 (sandbox), TypeScript + React 18 (client)
-- **Services framework**: [Hertz](https://github.com/cloudwego/hertz) (HTTP) on Go 1.25
-- **Storage**: [TimescaleDB](https://www.timescale.com/) (Postgres + time-series extension)
+- **Languages**: Go (services), Python 3.11 (strategies), TypeScript + React (client)
+- **Storage**: [TimescaleDB](https://www.timescale.com/) (Postgres + time-series)
 - **Charting**: [TradingView Lightweight Charts](https://www.tradingview.com/lightweight-charts/)
-- **Indicators**: [TA-Lib](https://github.com/TA-Lib/ta-lib) inside the sandbox
-- **Desktop shell**: Electron 33 + Vite + Tailwind
-- **Tooling**: Docker Compose, pnpm, OpenSpec
+- **Indicators**: [TA-Lib](https://github.com/TA-Lib/ta-lib)
 
 ## Project layout
 
@@ -160,15 +182,15 @@ claw-trader/
 
 ## Contributing
 
-PRs are welcome. For anything non-trivial, please open an issue (or a proposal under `openspec/`) first so we can agree on the approach before code gets written. Small fixes — typos, docs, obvious bugs — just send the PR.
+PRs welcome. For anything non-trivial please open an issue (or a proposal under `openspec/`) first. Typos, docs, obvious bugs — just send the PR.
 
 ## Status
 
-Early alpha. The three services work end-to-end and the desktop client renders the full flow, but APIs and database schemas may still change as the spec catalogue settles. Pin to a tag if stability matters to you.
+**Early alpha.** The three services work end-to-end and the desktop client renders the full AI-to-backtest flow, but APIs and schemas may change. Pin to a tag if stability matters.
 
 ## Disclaimer
 
-This project is a research and educational tool. It does not execute trades. Nothing in this repository constitutes financial, investment, legal, or tax advice. Historical backtest results do not predict future returns, and a strategy that looks profitable in a backtest can lose money when applied to live markets for reasons the backtest cannot model (slippage, liquidity, regime change, data quality, and the user's own behaviour). You are solely responsible for complying with the laws and regulations of your jurisdiction when using any data source or integrating with any third-party service referenced by this software.
+This project is a research and educational tool. It does not execute real trades. Nothing here is financial, investment, legal, or tax advice. Historical backtest results do not predict future returns, and a strategy that looks profitable in a backtest can lose money in live markets for reasons the backtest cannot model — slippage, liquidity, regime change, data quality, and user behaviour. You are solely responsible for complying with the laws and regulations of your jurisdiction when using any data source or integrating with any third-party service referenced by this software.
 
 ## License
 
