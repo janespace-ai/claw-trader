@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
-import { AIPanel } from '@/components/chat/AIPanel';
 import { ScreenerScreen } from '@/screens/ScreenerScreen';
 import { StrategiesScreen } from '@/screens/StrategiesScreen';
 import { StrategyDesign } from '@/screens/workspace/StrategyDesign';
@@ -23,11 +22,14 @@ import { useWorkspaceStore } from '@/stores/workspaceStore';
  *                                    workspaceStore.mode
  *   route.kind === 'symbol-detail' → SymbolDetailScreen
  *   route.kind === 'settings'      → SettingsScreen (full-page)
+ *
+ * The AI chat panel is now rendered **inside each screen's**
+ * `WorkspaceShell.rightRail` (wrapped in `AIPersonaShell`). The old
+ * top-level `<aside><AIPanel /></aside>` was removed to avoid showing
+ * duplicate AI panels on the same screen.
  */
 export default function App() {
   const route = useAppStore((s) => s.route);
-  const panelW = useAppStore((s) => s.aiPanelWidth);
-  const panelCollapsed = useAppStore((s) => s.aiPanelCollapsed);
   const workspaceMode = useWorkspaceStore((s) => s.mode);
 
   const loadSettings = useSettingsStore((s) => s.load);
@@ -61,15 +63,6 @@ export default function App() {
             <SettingsScreen initialSection={route.section} />
           )}
         </main>
-
-        {!panelCollapsed && route.kind !== 'settings' && (
-          <aside
-            className="flex-shrink-0 border-l border-border-subtle bg-surface-secondary"
-            style={{ width: panelW }}
-          >
-            <AIPanel />
-          </aside>
-        )}
       </div>
     </div>
   );
