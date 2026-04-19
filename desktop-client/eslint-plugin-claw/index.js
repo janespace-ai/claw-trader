@@ -13,6 +13,7 @@
 'use strict';
 
 const HEX_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const RGB_HSL_RE = /\b(?:rgba?|hsla?)\s*\(\s*[0-9.\s,%]+\s*\)/i;
 
 function isShortOrSymbolic(str) {
   const trimmed = str.trim();
@@ -27,7 +28,7 @@ module.exports = {
     'no-hex-color': {
       meta: {
         type: 'problem',
-        docs: { description: 'Disallow hardcoded hex colors in components; use CSS variables.' },
+        docs: { description: 'Disallow hardcoded hex / rgb / hsl colors in components; use CSS variables.' },
         schema: [],
       },
       create(context) {
@@ -41,14 +42,30 @@ module.exports = {
                   'Hardcoded hex color "{{color}}" — use a CSS variable (var(--accent-green), var(--fg-primary), …) or a Tailwind token class.',
                 data: { color: node.value },
               });
+              return;
+            }
+            if (RGB_HSL_RE.test(node.value)) {
+              context.report({
+                node,
+                message:
+                  'Hardcoded rgb()/hsl() literal "{{color}}" — use a CSS variable or Tailwind token class.',
+                data: { color: node.value.trim().slice(0, 60) },
+              });
             }
           },
           TemplateElement(node) {
-            // Conservative: flag backtick-embedded hex colors too.
+            // Conservative: flag backtick-embedded hex / rgb / hsl colors too.
             const raw = node.value?.cooked ?? '';
-            const m = raw.match(/#[0-9a-fA-F]{3,8}\b/);
-            if (m && HEX_RE.test(m[0])) {
-              context.report({ node, message: `Hardcoded hex color "${m[0]}" — use a CSS variable instead.` });
+            const hex = raw.match(/#[0-9a-fA-F]{3,8}\b/);
+            if (hex && HEX_RE.test(hex[0])) {
+              context.report({ node, message: `Hardcoded hex color "${hex[0]}" — use a CSS variable instead.` });
+              return;
+            }
+            if (RGB_HSL_RE.test(raw)) {
+              context.report({
+                node,
+                message: 'Hardcoded rgb()/hsl() literal — use a CSS variable instead.',
+              });
             }
           },
         };

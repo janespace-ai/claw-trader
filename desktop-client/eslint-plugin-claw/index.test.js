@@ -17,10 +17,11 @@ const ruleTester = new RuleTester({
 ruleTester.run('no-hex-color', plugin.rules['no-hex-color'], {
   valid: [
     { code: "const c = 'var(--accent-green)';" },
-    { code: "const c = 'rgb(255, 0, 0)';" },
     { code: "const c = 'not-a-hex';" },
     // Shorter than 3 hex is not matched.
     { code: "const c = '#f';" },
+    // `rgb(` and `hsl(` used to be valid; the rule now also rejects
+    // them since tokens are mandatory post light-theme-polish.
   ],
   invalid: [
     {
@@ -34,6 +35,18 @@ ruleTester.run('no-hex-color', plugin.rules['no-hex-color'], {
     {
       code: "const c = `background:#1a2b3c`;",
       errors: [{ message: /Hardcoded hex color/ }],
+    },
+    {
+      code: "const c = 'rgb(255, 0, 0)';",
+      errors: [{ message: /rgb\(\)\/hsl\(\) literal/ }],
+    },
+    {
+      code: "const c = 'hsl(120, 100%, 50%)';",
+      errors: [{ message: /rgb\(\)\/hsl\(\) literal/ }],
+    },
+    {
+      code: "const c = `padding:0; color:rgba(0,0,0,0.5)`;",
+      errors: [{ message: /rgb\(\)\/hsl\(\) literal/ }],
     },
   ],
 });
