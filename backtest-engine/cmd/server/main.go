@@ -18,6 +18,7 @@ import (
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/sandbox"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/service"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/store"
+	"github.com/janespace-ai/claw-trader/backtest-engine/internal/version"
 )
 
 func main() {
@@ -25,8 +26,11 @@ func main() {
 	flag.StringVar(&configPath, "config", "config.yaml", "path to config.yaml")
 	flag.Parse()
 
+	// Capture process start so GET /api/engine/status can compute uptime.
+	version.ProcessStartUnix = time.Now().Unix()
+
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds | log.Lshortfile)
-	log.Printf("backtest-engine starting")
+	log.Printf("backtest-engine starting (version=%s)", version.Version)
 
 	cfg, err := config.Load(configPath)
 	if err != nil {

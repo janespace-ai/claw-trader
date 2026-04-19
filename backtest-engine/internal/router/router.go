@@ -26,6 +26,8 @@ func Register(h *server.Hertz, st *store.Store, bs *service.BacktestService, ss 
 	klH := handler.NewKlineHandler(st)
 	symH := handler.NewSymbolHandler(st)
 	gapH := handler.NewGapHandler(st)
+	metaH := handler.NewSymbolMetadataHandler(st)
+	engH := handler.NewEngineStatusHandler(st, bs, ss)
 
 	h.GET("/healthz", func(ctx context.Context, c *app.RequestContext) {
 		c.JSON(http.StatusOK, map[string]string{"status": "ok"})
@@ -52,7 +54,10 @@ func Register(h *server.Hertz, st *store.Store, bs *service.BacktestService, ss 
 		// Market-data reads (sourced from shared TimescaleDB)
 		api.GET("/klines", klH.Query)
 		api.GET("/symbols", symH.List)
+		api.GET("/symbols/:symbol/metadata", metaH.Get)
 		api.GET("/gaps", gapH.List)
+
+		api.GET("/engine/status", engH.Get)
 	}
 
 	internal := h.Group("/internal")
