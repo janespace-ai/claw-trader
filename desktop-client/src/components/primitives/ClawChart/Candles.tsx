@@ -8,7 +8,7 @@ import {
   type SeriesMarker,
   type Time,
 } from 'lightweight-charts';
-import { chartOptionsFromTheme, observeThemeChanges, readThemeVars } from './theme';
+import { chartOptionsFromTheme, observeThemeChanges, readThemeVars, resolveCssColor } from './theme';
 
 export interface CandlePoint {
   ts: number; // unix seconds
@@ -71,7 +71,12 @@ export function Candles({
     if (!containerRef.current) return;
     const chart = createChart(
       containerRef.current,
-      chartOptionsFromTheme(containerRef.current.clientWidth, height),
+      // `autoSize: true` (lightweight-charts ≥ 4.0) lets the library
+      // track container size via its own ResizeObserver. Our manual
+      // observer below stays as a belt-and-suspenders guard for older
+      // browser quirks; the library owning the primary path avoids the
+      // "mount at small width, never catches up" failure mode.
+      { ...chartOptionsFromTheme(containerRef.current.clientWidth, height), autoSize: true },
     );
     chartRef.current = chart;
 
@@ -177,16 +182,23 @@ export function Candles({
       }
     }
     // Add/update series in incoming.
+    const themeVars = readThemeVars();
     for (const ov of overlays) {
       let ser = existing.get(ov.id);
+      // lightweight-charts doesn't understand CSS variables (the `color`
+      // option goes straight into canvas stroke style). Resolve `var(...)`
+      // via getComputedStyle so callers can pass token names for free.
+      const resolvedColor = resolveCssColor(ov.color) ?? themeVars.accentPrimary;
       if (!ser) {
         ser = chart.addLineSeries({
-          color: ov.color ?? readThemeVars().accentPrimary,
+          color: resolvedColor,
           lineWidth: ov.lineWidth ?? 2,
           priceLineVisible: false,
           lastValueVisible: false,
         });
         existing.set(ov.id, ser);
+      } else {
+        ser.applyOptions({ color: resolvedColor, lineWidth: ov.lineWidth ?? 2 });
       }
       ser.setData(
         ov.data.map((p) => ({

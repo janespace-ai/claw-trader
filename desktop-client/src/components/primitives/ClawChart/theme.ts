@@ -35,6 +35,47 @@ export function readThemeVars(): {
   };
 }
 
+/** Resolve a CSS color string to a format lightweight-charts accepts.
+ *
+ * Supports:
+ *   - `var(--accent-primary)` → reads the computed value of the token
+ *   - `--accent-primary` → same (bare token name)
+ *   - `#xxxxxx`, `rgb(...)`, named colors → passed through unchanged
+ *   - `undefined` / `null` → returns `null` so callers can fall back
+ *
+ * Needed because `lightweight-charts` writes colors directly into
+ * canvas stroke style, which does NOT evaluate CSS variables —
+ * passing `var(--x)` there draws in the default (black) rather than
+ * the themed color.
+ */
+export function resolveCssColor(
+  input: string | null | undefined,
+): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (typeof document === 'undefined') return trimmed;
+
+  // `var(--name, fallback)` or `var(--name)`
+  const varMatch = trimmed.match(/^var\(\s*(--[a-zA-Z0-9_-]+)\s*(?:,\s*([^)]+))?\)$/);
+  if (varMatch) {
+    const resolved = getComputedStyle(document.documentElement)
+      .getPropertyValue(varMatch[1])
+      .trim();
+    if (resolved) return resolved;
+    if (varMatch[2]) return varMatch[2].trim();
+    return null;
+  }
+  // Bare token name
+  if (trimmed.startsWith('--')) {
+    const resolved = getComputedStyle(document.documentElement)
+      .getPropertyValue(trimmed)
+      .trim();
+    return resolved || null;
+  }
+  return trimmed;
+}
+
 /** Default chart options derived from the current theme. Passed to
  *  `createChart` and re-applied on theme flips via `chart.applyOptions`. */
 export function chartOptionsFromTheme(width?: number, height?: number): DeepPartial<ChartOptions> {
