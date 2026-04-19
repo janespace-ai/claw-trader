@@ -11,5 +11,5 @@ export const ClawChart = {
   Equity,
 };
 
-export type { CandlePoint, OverlayLine, ChartMarker } from './Candles';
+export type { CandlePoint, OverlayLine, ChartMarker, VisibleTimeRange } from './Candles';
 export type { EquityPoint } from './Equity';

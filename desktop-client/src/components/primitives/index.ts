@@ -2,7 +2,7 @@
 // directory; this file is the single import surface for screens.
 
 export { ClawChart } from './ClawChart';
-export type { CandlePoint, OverlayLine, ChartMarker, EquityPoint } from './ClawChart';
+export type { CandlePoint, OverlayLine, ChartMarker, EquityPoint, VisibleTimeRange } from './ClawChart';
 
 export { Watchlist } from './Watchlist/Watchlist';
 export type { WatchlistItem } from './Watchlist/Watchlist';

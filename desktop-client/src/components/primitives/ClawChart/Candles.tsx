@@ -35,6 +35,15 @@ export interface ChartMarker {
   text?: string;
 }
 
+/** Time range the user is currently looking at, emitted as a pair of
+ *  unix-second timestamps. Subscribers (e.g. indicator panes rendered
+ *  below the chart) use this to clip their own data so zoom/pan stays
+ *  in sync. `null` means "no visible range yet" (pre-data mount). */
+export interface VisibleTimeRange {
+  from: number;
+  to: number;
+}
+
 interface Props {
   data: CandlePoint[];
   overlays?: OverlayLine[];
@@ -44,6 +53,9 @@ interface Props {
   className?: string;
   /** Candle color convention. Defaults to "green-up" (crypto). */
   convention?: 'green-up' | 'red-up';
+  /** Fired whenever the user zooms / pans the chart so pane-indicators
+   *  rendered below can clip their data to the visible range. */
+  onVisibleTimeRangeChange?: (range: VisibleTimeRange | null) => void;
 }
 
 /**
@@ -59,7 +71,12 @@ export function Candles({
   height = 360,
   className,
   convention = 'green-up',
+  onVisibleTimeRangeChange,
 }: Props) {
+  // Latest callback in a ref so the subscribe effect below doesn't
+  // have to re-subscribe every time the parent rebinds it.
+  const onVisibleRef = useRef(onVisibleTimeRangeChange);
+  onVisibleRef.current = onVisibleTimeRangeChange;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -112,6 +129,23 @@ export function Candles({
     });
     ro.observe(containerRef.current);
 
+    // Visible-range sync. We read the `Time` union as unix seconds —
+    // our chart always uses `UTCTimestamp` (number) times, so the
+    // `typeof === 'number'` branch always hits in practice. A defensive
+    // fallback handles the rare edge case.
+    const rangeHandler = (
+      range: { from: Time; to: Time } | null,
+    ) => {
+      if (!range) {
+        onVisibleRef.current?.(null);
+        return;
+      }
+      const from = typeof range.from === 'number' ? range.from : 0;
+      const to = typeof range.to === 'number' ? range.to : 0;
+      onVisibleRef.current?.({ from, to });
+    };
+    chart.timeScale().subscribeVisibleTimeRangeChange(rangeHandler);
+
     // Theme redraw
     const stopTheme = observeThemeChanges(() => {
       const tt = readThemeVars();
@@ -128,6 +162,7 @@ export function Candles({
 
     return () => {
       ro.disconnect();
+      chart.timeScale().unsubscribeVisibleTimeRangeChange(rangeHandler);
       stopTheme();
       chart.remove();
       chartRef.current = null;
