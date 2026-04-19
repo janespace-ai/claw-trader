@@ -6,6 +6,7 @@ import {
   WorkspaceShell,
   type CandlePoint,
   type OverlayLine,
+  type VisibleTimeRange,
 } from '@/components/primitives';
 import { cremote, toErrorBody } from '@/services/remote/contract-client';
 import { useAppStore } from '@/stores/appStore';
@@ -67,6 +68,10 @@ export function StrategyDesign() {
   const [fetchState, setFetchState] = useState<FetchState>('loading');
   const [isRunning, setIsRunning] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
+  /** Time window the user is zoomed into on the main chart. Emitted
+   *  from `ClawChart.Candles` and fed into each `IndicatorPane` so the
+   *  panes stay in sync with the price chart on zoom/pan. */
+  const [visibleRange, setVisibleRange] = useState<VisibleTimeRange | null>(null);
 
   // --- Chart data ----------------------------------------------------------
   useEffect(() => {
@@ -254,6 +259,7 @@ export function StrategyDesign() {
                 overlays={overlayLines}
                 height={360}
                 showVolume
+                onVisibleTimeRangeChange={setVisibleRange}
               />
 
               {activePanes.includes('RSI') && (
@@ -267,6 +273,7 @@ export function StrategyDesign() {
                     { value: 30, color: 'var(--accent-green)' },
                     { value: 50, color: 'var(--border-subtle)', dashed: false },
                   ]}
+                  visibleRange={visibleRange}
                 />
               )}
               {activePanes.includes('MACD') && macdData && (
@@ -279,6 +286,7 @@ export function StrategyDesign() {
                   ]}
                   guides={[{ value: 0, color: 'var(--border-subtle)', dashed: false }]}
                   histogram={macdData.histogram}
+                  visibleRange={visibleRange}
                 />
               )}
               {activePanes.includes('STOCH') && stochData && (
@@ -294,6 +302,7 @@ export function StrategyDesign() {
                     { value: 80, color: 'var(--accent-red)' },
                     { value: 20, color: 'var(--accent-green)' },
                   ]}
+                  visibleRange={visibleRange}
                 />
               )}
               {activePanes.includes('ATR') && atrData.length > 0 && (
@@ -301,6 +310,7 @@ export function StrategyDesign() {
                   title="ATR (14)"
                   latestLabel={atrData.at(-1)?.value.toFixed(2) ?? '—'}
                   lines={[{ data: atrData, color: 'var(--accent-yellow)' }]}
+                  visibleRange={visibleRange}
                 />
               )}
               {activePanes.includes('OBV') && obvData.length > 0 && (
@@ -308,6 +318,7 @@ export function StrategyDesign() {
                   title="OBV"
                   latestLabel={obvData.at(-1)?.value.toFixed(0) ?? '—'}
                   lines={[{ data: obvData, color: 'var(--accent-primary)' }]}
+                  visibleRange={visibleRange}
                 />
               )}
             </>

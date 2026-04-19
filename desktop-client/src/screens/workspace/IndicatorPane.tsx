@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { IndicatorPoint } from '@/services/indicators';
+import type { VisibleTimeRange } from '@/components/primitives';
 
 interface LineSpec {
   data: IndicatorPoint[];
@@ -26,7 +27,30 @@ interface Props {
   guides?: GuideSpec[];
   /** Optional histogram series drawn as vertical bars behind the lines. */
   histogram?: IndicatorPoint[];
+  /** When set, clip every line/histogram to this time window so the
+   *  pane stays in sync with the main chart's zoom/pan. `null` / omitted
+   *  means "show every point". */
+  visibleRange?: VisibleTimeRange | null;
   height?: number;
+}
+
+/** Clip a time-ordered series to a visible time range. Exported so
+ *  unit tests and other panes can reuse the same trimming logic. */
+export function clipToRange<T extends { ts: number }>(
+  points: T[],
+  range: VisibleTimeRange | null | undefined,
+): T[] {
+  if (!range || points.length === 0) return points;
+  const { from, to } = range;
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from >= to) return points;
+  // Data is chronologically ordered, so a linear trim on both ends is
+  // enough — no need for binary search at these lengths (a few thousand
+  // points at most).
+  let lo = 0;
+  let hi = points.length;
+  while (lo < hi && points[lo].ts < from) lo++;
+  while (hi > lo && points[hi - 1].ts > to) hi--;
+  return points.slice(lo, hi);
 }
 
 /**
@@ -43,11 +67,21 @@ export function IndicatorPane({
   domain,
   guides = [],
   histogram,
+  visibleRange,
   height = 84,
 }: Props) {
   const view = useMemo(() => {
-    const all = lines.flatMap((l) => l.data);
-    if (all.length === 0 && !histogram?.length) return null;
+    // Clip every line + histogram to the main chart's visible range
+    // first, then rebuild geometry from the clipped slice so the pane's
+    // x-axis covers exactly the same time window as the chart above.
+    const clippedLines = lines.map((l) => ({
+      ...l,
+      data: clipToRange(l.data, visibleRange),
+    }));
+    const clippedHistogram = clipToRange(histogram ?? [], visibleRange);
+
+    const all = clippedLines.flatMap((l) => l.data);
+    if (all.length === 0 && clippedHistogram.length === 0) return null;
 
     const resolvedDomain = domain ?? (() => {
       let lo = Infinity;
@@ -56,7 +90,7 @@ export function IndicatorPane({
         if (p.value < lo) lo = p.value;
         if (p.value > hi) hi = p.value;
       }
-      for (const p of histogram ?? []) {
+      for (const p of clippedHistogram) {
         if (p.value < lo) lo = p.value;
         if (p.value > hi) hi = p.value;
       }
@@ -72,16 +106,16 @@ export function IndicatorPane({
     const span = max - min || 1;
     const y = (v: number) => height - ((v - min) / span) * height;
 
-    // X axis: use the longest line to pick the denominator.
-    const longest = lines.reduce(
+    // X axis: use the longest clipped line to pick the denominator.
+    const longest = clippedLines.reduce(
       (n, l) => (l.data.length > n ? l.data.length : n),
-      histogram?.length ?? 0,
+      clippedHistogram.length,
     );
     const stepX = longest > 1 ? width / (longest - 1) : 0;
 
     // Each line is plotted using its own indices, but all mapped over
     // the same x-step so shorter lines (e.g. signal) stay aligned.
-    const paths = lines.map((l) => {
+    const paths = clippedLines.map((l) => {
       const offset = longest - l.data.length;
       return {
         d: l.data
@@ -94,21 +128,19 @@ export function IndicatorPane({
       };
     });
 
-    const bars = histogram
-      ? histogram.map((p, i) => {
-          const offset = longest - histogram.length;
-          const x = (offset + i) * stepX;
-          const y0 = y(0);
-          const yv = y(p.value);
-          return {
-            x,
-            y: Math.min(y0, yv),
-            w: stepX * 0.7,
-            h: Math.abs(yv - y0),
-            color: p.value >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
-          };
-        })
-      : [];
+    const bars = clippedHistogram.map((p, i) => {
+      const offset = longest - clippedHistogram.length;
+      const x = (offset + i) * stepX;
+      const y0 = y(0);
+      const yv = y(p.value);
+      return {
+        x,
+        y: Math.min(y0, yv),
+        w: stepX * 0.7,
+        h: Math.abs(yv - y0),
+        color: p.value >= 0 ? 'var(--accent-green)' : 'var(--accent-red)',
+      };
+    });
 
     const guideLines = guides.map((g) => ({
       y: y(g.value),
@@ -117,7 +149,7 @@ export function IndicatorPane({
     }));
 
     return { width, paths, bars, guideLines };
-  }, [lines, domain, guides, histogram, height]);
+  }, [lines, domain, guides, histogram, visibleRange, height]);
 
   if (!view) {
     return (
