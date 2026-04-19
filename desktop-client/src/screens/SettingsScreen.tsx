@@ -8,15 +8,16 @@ import { ThemeTile } from '@/components/settings/ThemeTile';
 import { RemoteEngineCard } from './settings/RemoteEngineCard';
 import type { Provider } from '@/types/domain';
 
+// Section ids stable; labels go through t() below for i18n.
 const SECTIONS = [
-  { id: 'providers', label: 'AI & API Keys' },
-  { id: 'remote', label: 'Remote Engine' },
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'language', label: 'Language' },
-  { id: 'chart', label: 'Chart' },
-  { id: 'storage', label: 'Local Storage' },
-  { id: 'import-export', label: 'Import / Export' },
-  { id: 'about', label: 'About' },
+  { id: 'providers', labelKey: 'settings.section.providers' },
+  { id: 'remote', labelKey: 'settings.section.remote' },
+  { id: 'appearance', labelKey: 'settings.section.appearance' },
+  { id: 'language', labelKey: 'settings.section.language' },
+  { id: 'chart', labelKey: 'settings.section.chart' },
+  { id: 'storage', labelKey: 'settings.section.storage' },
+  { id: 'import-export', labelKey: 'settings.section.import_export' },
+  { id: 'about', labelKey: 'settings.section.about' },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]['id'];
@@ -60,7 +61,7 @@ export function SettingsScreen({ initialSection }: Props) {
               onClick={() => scrollTo(sec.id)}
               className="text-left px-2 py-1.5 rounded-md text-fg-secondary hover:text-fg-primary hover:bg-surface-tertiary"
             >
-              {sec.label}
+              {t(sec.labelKey)}
             </button>
           ))}
         </nav>
@@ -76,7 +77,7 @@ export function SettingsScreen({ initialSection }: Props) {
           }}
           className="space-y-3"
         >
-          <div className="font-heading font-semibold text-base">AI & API Keys</div>
+          <div className="font-heading font-semibold text-base">{t('settings.section.providers')}</div>
           <div className="grid gap-2">
             {PROVIDERS.map((p) => (
               <ProviderCard
@@ -120,10 +121,10 @@ export function SettingsScreen({ initialSection }: Props) {
           }}
           className="space-y-3"
         >
-          <div className="font-heading font-semibold text-base">Remote Engine</div>
+          <div className="font-heading font-semibold text-base">{t('settings.section.remote')}</div>
           <RemoteEngineCard />
           <div className="space-y-2">
-            <label className="text-xs text-fg-muted">Backend URL override</label>
+            <label className="text-xs text-fg-muted">{t('settings.remote.backend_url_label')}</label>
             <input
               type="text"
               value={s.remoteBaseURL}
@@ -131,9 +132,9 @@ export function SettingsScreen({ initialSection }: Props) {
               className="w-full bg-surface-secondary rounded-md px-3 py-1.5 text-xs font-mono"
             />
             <div className="text-[11px] text-fg-muted">
-              Status:{' '}
+              {t('settings.status')}:{' '}
               {s.remoteConnected === null
-                ? 'checking…'
+                ? t('status.checking')
                 : s.remoteConnected
                   ? t('status.connected')
                   : t('status.disconnected')}
@@ -149,7 +150,7 @@ export function SettingsScreen({ initialSection }: Props) {
           }}
           className="space-y-3"
         >
-          <div className="font-heading font-semibold text-base">Appearance</div>
+          <div className="font-heading font-semibold text-base">{t('settings.section.appearance')}</div>
           <div className="grid grid-cols-3 gap-3 max-w-lg">
             {(['auto', 'dark', 'light'] as const).map((opt) => (
               <ThemeTile
@@ -174,7 +175,7 @@ export function SettingsScreen({ initialSection }: Props) {
           }}
           className="space-y-2"
         >
-          <div className="font-heading font-semibold text-base">Language</div>
+          <div className="font-heading font-semibold text-base">{t('settings.section.language')}</div>
           <div className="flex items-center gap-3 text-xs">
             {(['en', 'zh'] as const).map((opt) => (
               <button
@@ -204,7 +205,7 @@ export function SettingsScreen({ initialSection }: Props) {
           }}
           className="space-y-2"
         >
-          <div className="font-heading font-semibold text-base">Chart</div>
+          <div className="font-heading font-semibold text-base">{t('settings.section.chart')}</div>
           <div className="flex items-center gap-3 text-xs">
             <span className="text-fg-muted">{t('settings.candle')}</span>
             {(['green-up', 'red-up'] as const).map((opt) => (
@@ -232,10 +233,9 @@ export function SettingsScreen({ initialSection }: Props) {
           }}
           className="space-y-2"
         >
-          <div className="font-heading font-semibold text-base">Local Storage</div>
+          <div className="font-heading font-semibold text-base">{t('settings.section.storage')}</div>
           <div className="text-xs text-fg-muted">
-            Size + Clear-cache IPC ships in a follow-up change. For now, clear
-            browser localStorage via devtools if needed.
+            {t('settings.storage.coming_soon')}
           </div>
         </section>
 
@@ -247,9 +247,9 @@ export function SettingsScreen({ initialSection }: Props) {
           }}
           className="space-y-2"
         >
-          <div className="font-heading font-semibold text-base">Import / Export</div>
+          <div className="font-heading font-semibold text-base">{t('settings.section.import_export')}</div>
           <div className="text-xs text-fg-muted">
-            Strategy JSON import/export wiring ships in a follow-up change.
+            {t('settings.import_export.coming_soon')}
           </div>
         </section>
 
@@ -261,9 +261,9 @@ export function SettingsScreen({ initialSection }: Props) {
           }}
           className="space-y-2"
         >
-          <div className="font-heading font-semibold text-base">About</div>
+          <div className="font-heading font-semibold text-base">{t('settings.section.about')}</div>
           <div className="text-xs text-fg-secondary">
-            Claw Trader — AI-driven crypto strategy design and backtesting.
+            {t('settings.about.tagline')}
           </div>
           <div className="text-[11px] text-fg-muted">
             <a

@@ -36,46 +36,49 @@ export interface PersonaConfig {
   intro?: string;
 }
 
+// title / subtitle are i18n keys (not raw strings). AIPersonaShell
+// resolves them via `t()` when rendering the header, so switching the
+// UI language flips every persona title instantly.
 export const PERSONAS: Record<PersonaId, PersonaConfig> = {
   strategist: {
     id: 'strategist',
-    title: 'AI Strategist',
-    subtitle: 'Strategy design',
+    title: 'persona.strategist.title',
+    subtitle: 'persona.strategist.subtitle',
     composer: true,
   },
   'signal-review': {
     id: 'signal-review',
-    title: 'Signal Review',
-    subtitle: 'Preview backtest',
+    title: 'persona.signal_review.title',
+    subtitle: 'persona.signal_review.subtitle',
     composer: true,
   },
   optimlens: {
     id: 'optimlens',
-    title: 'OptimLens',
-    subtitle: 'Parameter optimization',
+    title: 'persona.optimlens.title',
+    subtitle: 'persona.optimlens.subtitle',
     composer: true,
   },
   screener: {
     id: 'screener',
-    title: 'Screener Assistant',
-    subtitle: 'Coin screening',
+    title: 'persona.screener.title',
+    subtitle: 'persona.screener.subtitle',
     composer: true,
   },
   'trade-analysis': {
     id: 'trade-analysis',
-    title: 'Trade Analysis',
-    subtitle: 'Per-trade narrative',
+    title: 'persona.trade_analysis.title',
+    subtitle: 'persona.trade_analysis.subtitle',
     composer: false,
   },
   'strategy-history': {
     id: 'strategy-history',
-    title: 'Strategy History',
-    subtitle: 'Version timeline',
+    title: 'persona.strategy_history.title',
+    subtitle: 'persona.strategy_history.subtitle',
     composer: false,
   },
   generic: {
     id: 'generic',
-    title: 'AI',
+    title: 'persona.generic.title',
     composer: true,
   },
 };

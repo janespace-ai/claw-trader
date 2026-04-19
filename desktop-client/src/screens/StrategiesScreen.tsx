@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AIPersonaShell, WorkspaceShell } from '@/components/primitives';
 import { StrategyCard } from '@/components/strategy/StrategyCard';
 import { StrategyHistoryPanel } from '@/components/strategy/StrategyHistoryPanel';
@@ -14,6 +15,7 @@ type Filter = 'all' | 'favorites' | 'active' | 'archived';
  * Pencil frame `pGjNd` (dark) / `PLr19` (light).
  */
 export function StrategiesScreen() {
+  const { t } = useTranslation();
   const list = useStrategyStore((s) => s.list);
   const load = useStrategyStore((s) => s.load);
   const toggleFav = useStrategyStore((s) => s.toggleFavorite);
@@ -90,9 +92,12 @@ export function StrategiesScreen() {
       topbar={
         <div className="flex items-center justify-between h-14 px-5 bg-surface-secondary border-b border-border-subtle">
           <div className="flex items-baseline gap-3">
-            <span className="font-heading font-semibold text-sm">Strategies</span>
+            <span className="font-heading font-semibold text-sm">{t('strategy.title')}</span>
             <span className="text-xs text-fg-muted">
-              {list.length} saved · {list.filter((s) => s.is_favorite).length} favorite
+              {t('strategy.count_summary', {
+                saved: list.length,
+                favorites: list.filter((s) => s.is_favorite).length,
+              })}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -100,14 +105,14 @@ export function StrategiesScreen() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search strategies…"
+              placeholder={t('strategy.search')}
               className="px-3 py-1.5 rounded-md bg-surface-tertiary text-xs w-56"
             />
             <button
               onClick={handleNew}
               className="px-3 py-1.5 rounded-md bg-accent-primary text-fg-inverse text-xs font-semibold"
             >
-              New Strategy
+              {t('action.new_strategy')}
             </button>
           </div>
         </div>
@@ -120,13 +125,13 @@ export function StrategiesScreen() {
                 key={k}
                 onClick={() => setFilter(k)}
                 className={
-                  'text-left px-2 py-1.5 rounded-md capitalize ' +
+                  'text-left px-2 py-1.5 rounded-md ' +
                   (filter === k
                     ? 'bg-surface-tertiary text-fg-primary'
                     : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-secondary')
                 }
               >
-                {k}{' '}
+                {t(`strategy.tabs.${k}`)}{' '}
                 <span className="text-[10px] text-fg-muted ml-1">
                   ({list.filter((s) => {
                     if (k === 'all') return true;
@@ -160,7 +165,7 @@ export function StrategiesScreen() {
             ))}
             {filtered.length === 0 && (
               <div className="col-span-full text-center text-fg-muted text-sm py-10">
-                No strategies match the current filter.
+                {t('strategy.no_match')}
               </div>
             )}
           </div>

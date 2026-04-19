@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AIPersonaShell,
   ClawChart,
@@ -40,6 +41,7 @@ function readInitialTab(): Tab {
  * Pencil frame `QdrlI` (dark) / `TR0Ib` (light).
  */
 export function DeepBacktest() {
+  const { t } = useTranslation();
   const focusedSymbol = useWorkspaceStore((s) => s.focusedSymbol) ?? 'BTC_USDT';
   const setFocus = useWorkspaceStore((s) => s.focus);
   const currentTaskId = useWorkspaceStore((s) => s.currentTaskId);
@@ -130,11 +132,11 @@ export function DeepBacktest() {
   }, [allTrades]);
 
   const summaryLabel = useMemo(() => {
-    if (!metrics) return 'Deep backtest pending';
+    if (!metrics) return t('workspace.deep.summary_pending');
     const ret = metrics.total_return != null ? (metrics.total_return * 100).toFixed(1) + '%' : '—';
     const sharpe = metrics.sharpe != null ? metrics.sharpe.toFixed(2) : '—';
-    return `Deep complete · ${ret} return · Sharpe ${sharpe} · ${allTrades.length} trades`;
-  }, [metrics, allTrades.length]);
+    return t('workspace.deep.summary_done', { ret, sharpe, n: allTrades.length });
+  }, [metrics, allTrades.length, t]);
 
   // --- Optimize flow -----------------------------------------------------
   const paramsSchema: Record<string, unknown> = useMemo(() => {
@@ -164,14 +166,14 @@ export function DeepBacktest() {
     const m = metrics ?? {};
     const pct = (v: number | null | undefined) => (v == null ? null : v * 100);
     return [
-      { label: 'Total Return', value: pct(m.total_return) as number | null, unit: '%' },
-      { label: 'Sharpe', value: m.sharpe ?? null },
-      { label: 'Max DD', value: pct(m.max_drawdown) as number | null, unit: '%' },
-      { label: 'Win Rate', value: pct(m.win_rate) as number | null, unit: '%' },
-      { label: 'Profit Factor', value: m.profit_factor ?? null },
-      { label: 'Trades', value: m.total_trades ?? null },
+      { label: t('metric.total_return'), value: pct(m.total_return) as number | null, unit: '%' },
+      { label: t('metric.sharpe_ratio'), value: m.sharpe ?? null },
+      { label: t('metric.max_drawdown'), value: pct(m.max_drawdown) as number | null, unit: '%' },
+      { label: t('metric.win_rate'), value: pct(m.win_rate) as number | null, unit: '%' },
+      { label: t('metric.profit_factor'), value: m.profit_factor ?? null },
+      { label: t('metric.trades'), value: m.total_trades ?? null },
     ];
-  }, [metrics]);
+  }, [metrics, t]);
 
   void draftCode;
   void draftName;
@@ -182,7 +184,7 @@ export function DeepBacktest() {
     <WorkspaceShell
       topbar={
         <DeepTopbar
-          strategyName={draftName || 'Strategy'}
+          strategyName={draftName || t('backtest.ready.strategy')}
           summaryLabel={summaryLabel}
           onOptimize={() => setModalOpen(true)}
           isOptimizing={isOptimizing}
@@ -242,9 +244,9 @@ export function DeepBacktest() {
           <div className="flex items-center gap-2 border-b border-border-subtle">
             {(
               [
-                ['metrics', 'Metrics'],
-                ['trades', 'Trades'],
-                ['monthly', 'Monthly'],
+                ['metrics', t('workspace.deep.tab.metrics')],
+                ['trades', t('workspace.deep.tab.trades')],
+                ['monthly', t('workspace.deep.tab.monthly')],
               ] as [Tab, string][]
             ).map(([key, label]) => (
               <button

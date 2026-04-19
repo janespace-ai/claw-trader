@@ -29,8 +29,7 @@ export function PreviewTopbar({
       <div className="flex items-baseline gap-3">
         <span className="font-heading font-semibold text-sm">{symbol}</span>
         <span className="text-xs text-fg-secondary">
-          {t('workspace.previewSummary', {
-            defaultValue: 'Preview backtest — {{window}} • {{n}} signals across {{m}} symbols',
+          {t('workspace.preview.summary', {
             window: windowLabel,
             n: signalsTotal,
             m: symbolsTotal,
@@ -44,7 +43,7 @@ export function PreviewTopbar({
           disabled={isRunningDeep}
           className="px-3 py-1.5 rounded-md bg-accent-primary text-fg-inverse text-xs font-semibold disabled:opacity-50"
         >
-          {isRunningDeep ? t('action.running', { defaultValue: 'Running…' }) : t('workspace.confirmDeep', { defaultValue: 'Confirm + Run Deep' })}
+          {isRunningDeep ? t('action.running') : t('action.confirm_deep')}
         </button>
       </div>
     </div>

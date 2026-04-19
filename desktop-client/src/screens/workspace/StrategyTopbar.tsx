@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 const INTERVALS = ['5m', '15m', '30m', '1h', '4h', '1d'] as const;
@@ -28,6 +29,7 @@ export function StrategyTopbar({
   canRunPreview,
   isRunning,
 }: Props) {
+  const { t } = useTranslation();
   const [pickerOpen, setPickerOpen] = useState(false);
   const focused = useWorkspaceStore((s) => s.focusedSymbol) ?? symbol;
 
@@ -91,7 +93,7 @@ export function StrategyTopbar({
             : 'bg-surface-tertiary text-fg-muted cursor-not-allowed',
         ].join(' ')}
       >
-        {isRunning ? '…' : '✦ Run Preview'}
+        {isRunning ? '…' : '✦ ' + t('workspace.design.run_preview')}
       </button>
 
       {pickerOpen && (

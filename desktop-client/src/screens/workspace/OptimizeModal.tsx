@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface ParamRow {
   name: string;
@@ -45,6 +46,7 @@ function expandAxis(row: ParamRow): number[] {
  * server's `PARAM_GRID_TOO_LARGE` contract.
  */
 export function OptimizeModal({ paramsSchema, symbols, onCancel, onSubmit }: Props) {
+  const { t } = useTranslation();
   const tunable = useMemo(() => {
     return Object.entries(paramsSchema).filter(
       ([, v]) => typeof v === 'number' && Number.isFinite(v),
@@ -80,16 +82,15 @@ export function OptimizeModal({ paramsSchema, symbols, onCancel, onSubmit }: Pro
     return (
       <div className="fixed inset-0 bg-black/60 grid place-items-center z-50">
         <div className="bg-surface-primary rounded-lg p-6 w-96 space-y-3">
-          <div className="font-heading font-semibold">Optimize</div>
+          <div className="font-heading font-semibold">{t('workspace.optimize.title')}</div>
           <div className="text-sm text-fg-secondary">
-            This strategy has no tunable numeric params. Edit the strategy
-            in Design to expose params first.
+            {t('workspace.optimize.no_params')}
           </div>
           <button
             onClick={onCancel}
             className="px-3 py-1.5 rounded-md bg-surface-tertiary text-fg-primary text-xs"
           >
-            Close
+            {t('action.close')}
           </button>
         </div>
       </div>
@@ -111,9 +112,9 @@ export function OptimizeModal({ paramsSchema, symbols, onCancel, onSubmit }: Pro
     <div className="fixed inset-0 bg-black/60 grid place-items-center z-50">
       <div className="bg-surface-primary rounded-lg p-6 w-[520px] max-h-[80vh] overflow-y-auto space-y-4">
         <div>
-          <div className="font-heading font-semibold">Optimize</div>
+          <div className="font-heading font-semibold">{t('workspace.optimize.title')}</div>
           <div className="text-[11px] text-fg-muted">
-            Parameter sweep across {symbols.length} symbol{symbols.length === 1 ? '' : 's'}.
+            {t('workspace.optimize.scope', { n: symbols.length })}
           </div>
         </div>
 
@@ -128,13 +129,13 @@ export function OptimizeModal({ paramsSchema, symbols, onCancel, onSubmit }: Pro
                 />
                 <span className="font-mono text-xs">{row.name}</span>
                 <span className="text-[10px] text-fg-muted ml-auto">
-                  {perAxisCounts[i].length} values
+                  {t('workspace.optimize.values_count', { n: perAxisCounts[i].length })}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {(['min', 'max', 'step'] as const).map((f) => (
                   <label key={f} className="flex flex-col">
-                    <span className="text-[10px] text-fg-muted">{f}</span>
+                    <span className="text-[10px] text-fg-muted">{t(`workspace.optimize.field.${f}`)}</span>
                     <input
                       type="text"
                       value={row[f]}
@@ -151,8 +152,8 @@ export function OptimizeModal({ paramsSchema, symbols, onCancel, onSubmit }: Pro
 
         <div className={'text-xs ' + (tooLarge ? 'text-accent-red' : 'text-fg-secondary')}>
           {tooLarge
-            ? `${totalCombos} combos exceeds cap of ${MAX_COMBOS}. Tighten a range or raise a step.`
-            : `${totalCombos} combo${totalCombos === 1 ? '' : 's'} will be run.`}
+            ? t('workspace.optimize.combos_too_large', { n: totalCombos, max: MAX_COMBOS })
+            : t('workspace.optimize.combos_ok', { n: totalCombos })}
         </div>
 
         <div className="flex items-center justify-end gap-2">
@@ -160,14 +161,14 @@ export function OptimizeModal({ paramsSchema, symbols, onCancel, onSubmit }: Pro
             onClick={onCancel}
             className="px-3 py-1.5 rounded-md text-fg-secondary text-xs"
           >
-            Cancel
+            {t('action.cancel')}
           </button>
           <button
             onClick={handleSubmit}
             disabled={tooLarge}
             className="px-3 py-1.5 rounded-md bg-accent-primary text-fg-inverse text-xs font-semibold disabled:opacity-50"
           >
-            Start Optimize
+            {t('action.start_optimize')}
           </button>
         </div>
       </div>

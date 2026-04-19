@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cremote, toErrorBody } from '@/services/remote/contract-client';
 import type { components } from '@/types/api';
 
@@ -6,6 +7,7 @@ type EngineStatus = components['schemas']['EngineStatus'];
 
 /** Polls `GET /api/engine/status` and renders the capability card. */
 export function RemoteEngineCard() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<EngineStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,7 +37,9 @@ export function RemoteEngineCard() {
   return (
     <div className="bg-surface-secondary rounded-lg p-3 space-y-2 border border-border-subtle">
       <div className="flex items-center justify-between">
-        <div className="font-heading font-semibold text-sm">Remote Backtest Engine</div>
+        <div className="font-heading font-semibold text-sm">
+          {t('settings.remote.engine_card_title')}
+        </div>
         <div className="flex items-center gap-2">
           <span
             className={
@@ -45,35 +49,35 @@ export function RemoteEngineCard() {
                 : 'bg-[color:var(--accent-red-dim)] text-accent-red')
             }
           >
-            {status && !error ? 'Connected' : 'Offline'}
+            {status && !error ? t('status.connected') : t('status.offline')}
           </span>
           <button
             onClick={() => void refresh()}
             disabled={loading}
             className="px-2 py-1 rounded-md bg-surface-tertiary text-xs hover:bg-surface-primary disabled:opacity-50"
           >
-            {loading ? '…' : 'Refresh'}
+            {loading ? '…' : t('action.refresh')}
           </button>
         </div>
       </div>
       {error && <div className="text-xs text-accent-red">{error}</div>}
       {status && (
         <dl className="grid grid-cols-2 gap-y-1.5 gap-x-4 text-xs">
-          <dt className="text-fg-muted">Version</dt>
+          <dt className="text-fg-muted">{t('settings.remote.version')}</dt>
           <dd className="font-mono">{status.version}</dd>
           {status.data_aggregator_version && (
             <>
-              <dt className="text-fg-muted">Aggregator</dt>
+              <dt className="text-fg-muted">{t('settings.remote.aggregator')}</dt>
               <dd className="font-mono">{status.data_aggregator_version}</dd>
             </>
           )}
-          <dt className="text-fg-muted">Markets</dt>
+          <dt className="text-fg-muted">{t('settings.remote.markets')}</dt>
           <dd className="font-mono">{status.supported_markets.join(', ') || '—'}</dd>
-          <dt className="text-fg-muted">Intervals</dt>
+          <dt className="text-fg-muted">{t('settings.remote.intervals')}</dt>
           <dd className="font-mono">{status.supported_intervals.join(', ') || '—'}</dd>
           {status.data_range && (
             <>
-              <dt className="text-fg-muted">Data range</dt>
+              <dt className="text-fg-muted">{t('settings.remote.data_range')}</dt>
               <dd className="font-mono">
                 {status.data_range.from != null
                   ? new Date(status.data_range.from * 1000).toISOString().slice(0, 10)
@@ -87,15 +91,15 @@ export function RemoteEngineCard() {
           )}
           {status.last_aggregator_sync_at != null && (
             <>
-              <dt className="text-fg-muted">Last sync</dt>
+              <dt className="text-fg-muted">{t('settings.remote.last_sync')}</dt>
               <dd className="font-mono">
                 {new Date(status.last_aggregator_sync_at * 1000).toLocaleString()}
               </dd>
             </>
           )}
-          <dt className="text-fg-muted">Active tasks</dt>
+          <dt className="text-fg-muted">{t('settings.remote.active_tasks')}</dt>
           <dd className="font-mono">{status.active_tasks}</dd>
-          <dt className="text-fg-muted">Uptime</dt>
+          <dt className="text-fg-muted">{t('settings.remote.uptime')}</dt>
           <dd className="font-mono">{Math.round(status.uptime_seconds / 60)}m</dd>
         </dl>
       )}

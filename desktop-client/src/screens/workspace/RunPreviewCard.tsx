@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
  * reachable without scrolling up.
  */
 export function RunPreviewCard({ onRunPreview, isRunning, lastError }: Props) {
+  const { t } = useTranslation();
   const hasDraft = useWorkspaceDraftStore((s) => !!s.code);
 
   if (!hasDraft) {
@@ -29,11 +31,10 @@ export function RunPreviewCard({ onRunPreview, isRunning, lastError }: Props) {
     >
       <div>
         <div className="text-xs uppercase tracking-wider text-accent-primary font-heading">
-          Ready for preview
+          {t('workspace.preview_card.ready')}
         </div>
         <div className="text-sm text-fg-secondary mt-1">
-          Run a 7-day backtest to validate the idea before committing to a deep
-          optimization sweep.
+          {t('workspace.preview_card.body')}
         </div>
       </div>
 
@@ -49,7 +50,7 @@ export function RunPreviewCard({ onRunPreview, isRunning, lastError }: Props) {
         disabled={isRunning}
         className="self-start px-3 py-1.5 rounded-md bg-accent-primary text-fg-inverse text-xs font-semibold disabled:opacity-60"
       >
-        {isRunning ? '…' : '▶ Run Preview'}
+        {isRunning ? '…' : '▶ ' + t('workspace.design.run_preview')}
       </button>
     </div>
   );

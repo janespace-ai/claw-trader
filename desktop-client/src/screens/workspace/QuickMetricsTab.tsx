@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { MetricsGrid, type Metric } from '@/components/primitives';
 import type { components } from '@/types/api';
 
@@ -15,20 +16,21 @@ function pctOrNull(v: number | null | undefined): number | null {
 /** Six headline tiles. The Preview screen keeps this list tight; the
  *  full Deep metric grid lives in the Deep workspace. */
 export function QuickMetricsTab({ metrics }: Props) {
+  const { t } = useTranslation();
   if (!metrics) {
     return (
       <div className="p-6 text-center text-fg-muted text-sm">
-        Metrics pending — waiting for backtest result.
+        {t('metric.pending_full')}
       </div>
     );
   }
   const tiles: Metric[] = [
-    { label: 'Return', value: pctOrNull(metrics.total_return), unit: '%' },
-    { label: 'Sharpe', value: metrics.sharpe ?? null },
-    { label: 'Max DD', value: pctOrNull(metrics.max_drawdown), unit: '%' },
-    { label: 'Win Rate', value: pctOrNull(metrics.win_rate), unit: '%' },
-    { label: 'Trades', value: metrics.total_trades ?? null },
-    { label: 'Profit Factor', value: metrics.profit_factor ?? null },
+    { label: t('metric.return'), value: pctOrNull(metrics.total_return), unit: '%' },
+    { label: t('metric.sharpe_ratio'), value: metrics.sharpe ?? null },
+    { label: t('metric.max_drawdown'), value: pctOrNull(metrics.max_drawdown), unit: '%' },
+    { label: t('metric.win_rate'), value: pctOrNull(metrics.win_rate), unit: '%' },
+    { label: t('metric.trades'), value: metrics.total_trades ?? null },
+    { label: t('metric.profit_factor'), value: metrics.profit_factor ?? null },
   ];
   return <MetricsGrid metrics={tiles} />;
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AIPersonaShell,
   ClawChart,
@@ -38,6 +39,7 @@ function readInitialTab(): Tab {
  * Pencil frame `3PSG8` (dark) / `PISBa` (light).
  */
 export function PreviewBacktest() {
+  const { t } = useTranslation();
   const focusedSymbol = useWorkspaceStore((s) => s.focusedSymbol) ?? 'BTC_USDT';
   const setFocus = useWorkspaceStore((s) => s.focus);
   const currentStrategyId = useWorkspaceStore((s) => s.currentStrategyId);
@@ -212,7 +214,7 @@ export function PreviewBacktest() {
 
   void navigate;
 
-  const windowLabel = 'last 7 days';
+  const windowLabel = t('workspace.preview.window_7d');
 
   return (
     <WorkspaceShell
@@ -277,8 +279,7 @@ export function PreviewBacktest() {
           )}
           {reviewEntry?.status === 'unavailable' && (
             <div className="text-[11px] text-fg-muted border border-border-subtle rounded-md px-3 py-2">
-              Signal Review backend not available yet — the screen still reflects
-              backend-produced trades and metrics.
+              {t('workspace.preview.review_unavailable')}
             </div>
           )}
           {deepError && (
@@ -287,9 +288,9 @@ export function PreviewBacktest() {
           <div className="flex items-center gap-2 border-b border-border-subtle">
             {(
               [
-                ['trades', 'Trades'],
-                ['metrics', 'Quick Metrics'],
-                ['review', 'AI Review'],
+                ['trades', t('workspace.preview.tab.trades')],
+                ['metrics', t('workspace.preview.tab.metrics')],
+                ['review', t('workspace.preview.tab.review')],
               ] as [Tab, string][]
             ).map(([key, label]) => (
               <button
@@ -337,14 +338,14 @@ export function PreviewBacktest() {
           <div className="flex flex-col gap-3 p-3 overflow-y-auto">
             <div className="text-[11px] text-fg-muted">
               {reviewEntry?.status === 'complete'
-                ? `${reviewEntry.verdicts.length} verdicts`
+                ? t('verdict.status.complete', { n: reviewEntry.verdicts.length })
                 : reviewEntry?.status === 'running' || reviewEntry?.status === 'pending'
-                  ? 'Scanning entries…'
+                  ? t('verdict.status.scanning')
                   : reviewEntry?.status === 'unavailable'
-                    ? 'Review backend unavailable'
+                    ? t('verdict.status.unavailable')
                     : reviewEntry?.status === 'failed'
-                      ? (reviewEntry.error ?? 'Review failed')
-                      : 'Idle'}
+                      ? (reviewEntry.error ?? t('verdict.status.failed'))
+                      : t('status.idle')}
             </div>
             <VerdictList
               verdicts={reviewEntry?.verdicts ?? []}

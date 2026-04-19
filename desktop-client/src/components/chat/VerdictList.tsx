@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { components } from '@/types/api';
 
 type SignalVerdict = components['schemas']['SignalVerdict'];
@@ -22,10 +23,11 @@ const PILL_CLASS: Record<SignalVerdict['verdict'], string> = {
  * `layout="table"` makes it stretch wider.
  */
 export function VerdictList({ verdicts, selectedId, onSelect, layout = 'compact' }: Props) {
+  const { t } = useTranslation();
   if (verdicts.length === 0) {
     return (
       <div className="text-xs text-fg-muted italic py-2">
-        No verdicts yet.
+        {t('verdict.empty')}
       </div>
     );
   }
@@ -35,11 +37,11 @@ export function VerdictList({ verdicts, selectedId, onSelect, layout = 'compact'
       <table className="w-full text-xs">
         <thead className="text-fg-muted text-[10px] uppercase">
           <tr>
-            <th className="text-left py-2 px-1 font-medium">Signal</th>
-            <th className="text-left py-2 px-1 font-medium">Symbol</th>
-            <th className="text-left py-2 px-1 font-medium">Entry</th>
-            <th className="text-left py-2 px-1 font-medium">Verdict</th>
-            <th className="text-left py-2 px-1 font-medium">Note</th>
+            <th className="text-left py-2 px-1 font-medium">{t('verdict.col.signal')}</th>
+            <th className="text-left py-2 px-1 font-medium">{t('verdict.col.symbol')}</th>
+            <th className="text-left py-2 px-1 font-medium">{t('verdict.col.entry')}</th>
+            <th className="text-left py-2 px-1 font-medium">{t('verdict.col.verdict')}</th>
+            <th className="text-left py-2 px-1 font-medium">{t('verdict.col.note')}</th>
           </tr>
         </thead>
         <tbody>

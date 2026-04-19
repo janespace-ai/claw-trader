@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cremote } from '@/services/remote/contract-client';
 import { useOptimLensStore } from '@/stores/optimlensStore';
 import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
@@ -19,6 +20,7 @@ interface Props {
  * Design) and Dismiss / Undismiss interactions with the store.
  */
 export function ImprovementList({ strategyId }: Props) {
+  const { t } = useTranslation();
   const entry = useOptimLensStore((s) => s.byStrategy[strategyId]);
   const dismiss = useOptimLensStore((s) => s.dismiss);
   const undismiss = useOptimLensStore((s) => s.undismiss);
@@ -56,7 +58,7 @@ export function ImprovementList({ strategyId }: Props) {
           setDraft({ strategyId, summary: draftSummary, code: patched });
         }
         enterDesign(strategyId);
-        setToast(`Version ${version.version} created — review in Design`);
+        setToast(t('workspace.optimlens.version_created', { n: version.version }));
         dismiss(strategyId, key);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -71,23 +73,26 @@ export function ImprovementList({ strategyId }: Props) {
   if (!entry || entry.status === 'idle') {
     return (
       <div className="text-xs text-fg-muted italic p-3">
-        Run Optimize to get parameter-sweep improvements.
+        {t('workspace.optimlens.idle')}
       </div>
     );
   }
   if (entry.status === 'pending' || entry.status === 'running') {
-    return <div className="text-xs text-fg-muted p-3">OptimLens running…</div>;
+    return <div className="text-xs text-fg-muted p-3">{t('workspace.optimlens.running')}</div>;
   }
   if (entry.status === 'unavailable') {
     return (
       <div className="text-xs text-fg-muted p-3 border border-border-subtle rounded-md">
-        OptimLens backend not available yet — improvement list will appear
-        once the analysis-endpoints change ships.
+        {t('workspace.optimlens.unavailable')}
       </div>
     );
   }
   if (entry.status === 'failed') {
-    return <div className="text-xs text-accent-red p-3">OptimLens failed: {entry.error}</div>;
+    return (
+      <div className="text-xs text-accent-red p-3">
+        {t('workspace.optimlens.failed', { err: entry.error ?? '' })}
+      </div>
+    );
   }
 
   const active: OptimLensImprovement[] = [];
@@ -112,7 +117,7 @@ export function ImprovementList({ strategyId }: Props) {
       )}
       {active.length === 0 && dismissed.length === 0 && (
         <div className="text-xs text-fg-muted italic">
-          No concrete improvements stood out beyond noise.
+          {t('workspace.optimlens.no_improvements')}
         </div>
       )}
       {active.map((im, i) => (
@@ -128,7 +133,7 @@ export function ImprovementList({ strategyId }: Props) {
       {dismissed.length > 0 && (
         <details>
           <summary className="text-xs text-fg-muted cursor-pointer">
-            Dismissed ({dismissed.length})
+            {t('workspace.improvement.dismissed_count', { n: dismissed.length })}
           </summary>
           <div className="space-y-3 mt-2">
             {dismissed.map((im, i) => (

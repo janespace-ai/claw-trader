@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAppStore } from '@/stores/appStore';
 import { useStrategyStore } from '@/stores/strategyStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
@@ -13,6 +14,7 @@ interface Props {
  * through the strategyStore.
  */
 export function StrategyHistoryPanel({ strategyId }: Props) {
+  const { t } = useTranslation();
   const versions = useStrategyStore((s) => (strategyId ? s.versions[strategyId] : undefined));
   const listVersions = useStrategyStore((s) => s.listVersions);
   const revertTo = useStrategyStore((s) => s.revertTo);
@@ -36,7 +38,7 @@ export function StrategyHistoryPanel({ strategyId }: Props) {
   if (!strategyId) {
     return (
       <div className="text-xs text-fg-muted italic p-3">
-        Select a strategy to see its version history.
+        {t('strategy.select_to_see_history')}
       </div>
     );
   }
@@ -65,19 +67,19 @@ export function StrategyHistoryPanel({ strategyId }: Props) {
   return (
     <div className="space-y-3 p-3">
       <div className="flex items-center justify-between">
-        <div className="text-[10px] uppercase text-fg-muted">Versions</div>
+        <div className="text-[10px] uppercase text-fg-muted">{t('strategy.versions_title')}</div>
         <button
           onClick={handleDuplicate}
           className="text-xs text-accent-primary hover:underline"
         >
-          Duplicate & improve
+          {t('strategy.duplicate_improve')}
         </button>
       </div>
 
       {error && <div className="text-xs text-accent-red">{error}</div>}
-      {loading && <div className="text-xs text-fg-muted">Loading versions…</div>}
+      {loading && <div className="text-xs text-fg-muted">{t('strategy.versions_loading')}</div>}
       {!loading && (!versions || versions.length === 0) && (
-        <div className="text-xs text-fg-muted italic">No versions recorded yet.</div>
+        <div className="text-xs text-fg-muted italic">{t('strategy.versions_empty')}</div>
       )}
 
       <div className="space-y-2">
@@ -91,7 +93,7 @@ export function StrategyHistoryPanel({ strategyId }: Props) {
                 v{v.version}
               </span>
               {v.parent_version != null && v.parent_version !== v.version - 1 && (
-                <span className="text-[10px] text-accent-yellow" title="Branched from older version">
+                <span className="text-[10px] text-accent-yellow" title={t('strategy.branched_from')}>
                   ⑂
                 </span>
               )}
@@ -107,13 +109,13 @@ export function StrategyHistoryPanel({ strategyId }: Props) {
                     onClick={() => void handleRevert(v.version)}
                     className="text-[11px] text-accent-red hover:underline"
                   >
-                    Confirm revert
+                    {t('strategy.revert_confirm')}
                   </button>
                   <button
                     onClick={() => setConfirmRevert(null)}
                     className="text-[11px] text-fg-muted hover:text-fg-primary"
                   >
-                    Cancel
+                    {t('action.cancel')}
                   </button>
                 </>
               ) : (
@@ -121,7 +123,7 @@ export function StrategyHistoryPanel({ strategyId }: Props) {
                   onClick={() => setConfirmRevert(v.version)}
                   className="text-[11px] text-fg-secondary hover:text-fg-primary"
                 >
-                  Revert to this
+                  {t('strategy.revert_to')}
                 </button>
               )}
             </div>
