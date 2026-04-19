@@ -8,6 +8,7 @@ import { SettingsModal } from '@/pages/SettingsPage';
 import { StrategyDesign } from '@/screens/workspace/StrategyDesign';
 import { PreviewBacktest } from '@/screens/workspace/PreviewBacktest';
 import { DeepBacktest } from '@/screens/workspace/DeepBacktest';
+import { SymbolDetailScreen } from '@/screens/SymbolDetailScreen';
 import { useAppStore } from '@/stores/appStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useStrategyStore } from '@/stores/strategyStore';
@@ -57,10 +58,11 @@ export default function App() {
           {route.kind === 'workspace' && workspaceMode === 'preview' && <PreviewBacktest />}
           {route.kind === 'workspace' && workspaceMode === 'deep' && <DeepBacktest />}
           {route.kind === 'symbol-detail' && (
-            <div className="p-6 text-fg-muted">
-              Symbol detail for {route.symbol} — coming in the{' '}
-              <code className="text-fg-primary">symbol-detail</code> change.
-            </div>
+            <SymbolDetailScreen
+              symbol={route.symbol}
+              returnTo={route.returnTo}
+              backtestTaskId={route.backtestTaskId}
+            />
           )}
           {route.kind === 'settings' && (
             <div className="p-6 text-fg-muted">

@@ -9,7 +9,11 @@ import { DrawdownCurve, computeDrawdown } from '@/components/charts/DrawdownCurv
 import { MonthlyHeatmap } from '@/components/charts/MonthlyHeatmap';
 import { SymbolRankingTable } from '@/components/backtest/SymbolRankingTable';
 import { TradeList } from '@/components/backtest/TradeList';
-import { SymbolDetailPage } from './SymbolDetailPage';
+// SymbolDetailPage was removed in the `symbol-detail` change — its
+// functionality lives in `screens/SymbolDetailScreen.tsx` behind the
+// `route.kind === "symbol-detail"` route. This legacy BacktestPage is
+// itself orphaned (not routed after workspace-* changes landed) but
+// kept compiling for safety until deletion in a follow-up.
 import { useAppStore } from '@/stores/appStore';
 import type { Trade, BacktestResultRecord } from '@/types/domain';
 
@@ -95,17 +99,12 @@ export function BacktestPage() {
 
   const setTab = useAppStore((s) => s.setTab);
 
-  // Symbol drill-down: show SymbolDetailPage with a working cached result.
-  if (drilldownSymbol && (latestCached || storeResult?.result)) {
-    const ref = (latestCached ?? storeResult?.result) as BacktestResultRecord;
-    return (
-      <SymbolDetailPage
-        result={ref}
-        symbol={drilldownSymbol}
-        onBack={() => setDrilldownSymbol(null)}
-      />
-    );
-  }
+  // Legacy drill-down: the dedicated `SymbolDetailScreen` now owns this
+  // experience. This branch is a no-op placeholder kept to avoid a
+  // larger refactor of BacktestPage (which is already orphaned).
+  void drilldownSymbol;
+  void latestCached;
+  void setDrilldownSymbol;
 
   return (
     <div className="p-6 space-y-4">

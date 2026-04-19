@@ -41,6 +41,8 @@ each screen change lands.
 | `bnwnL` / `iFmHp` | Screener (chart-first) screen (dark / light) | `screens/ScreenerScreen` | Shipped | `screener-chart-first` |
 | — | Strategy history panel | `components/strategy/StrategyHistoryPanel` | Shipped | `strategy-management-v2` |
 | `pGjNd` / `PLr19` | Strategy Management screen (dark / light) | `screens/StrategiesScreen` | Shipped | `strategy-management-v2` |
+| — | Trade Analysis card | `components/symbol/TradeAnalysisCard` | Shipped | `symbol-detail` |
+| `s9ooT` / `Aib9J` | Symbol Detail screen (dark / light) | `screens/SymbolDetailScreen` | Shipped | `symbol-detail` |
 
 ## Conventions
 

@@ -25,6 +25,8 @@ interface WorkspaceState {
   currentTaskId: string | null;
   /** Which symbol is focused in the main chart / watchlist highlight. */
   focusedSymbol: string | null;
+  /** Trade currently selected (drives Trade Analysis persona). */
+  focusedTradeId: string | null;
   /** Main area layout (chart vs grid). Persists to localStorage. */
   viewMode: ViewMode;
 
@@ -34,6 +36,7 @@ interface WorkspaceState {
   enterDeep: (taskId: string) => void;
   back: () => void;
   focus: (symbol: string | null) => void;
+  focusTrade: (tradeId: string | null) => void;
   setViewMode: (view: ViewMode) => void;
   reset: () => void;
 }
@@ -51,6 +54,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   currentStrategyId: null,
   currentTaskId: null,
   focusedSymbol: null,
+  focusedTradeId: null,
   viewMode: loadInitialViewMode(),
 
   enterDesign(strategyId) {
@@ -78,6 +82,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   focus(symbol) {
     set({ focusedSymbol: symbol });
   },
+  focusTrade(tradeId) {
+    set({ focusedTradeId: tradeId });
+  },
   setViewMode(view) {
     set({ viewMode: view });
     if (typeof localStorage !== 'undefined') {
@@ -90,6 +97,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       currentStrategyId: null,
       currentTaskId: null,
       focusedSymbol: null,
+      focusedTradeId: null,
     });
   },
 }));

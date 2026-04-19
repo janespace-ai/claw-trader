@@ -228,6 +228,12 @@ export function DeepBacktest() {
               selectedSymbol={focusedSymbol}
               onRowClick={(t) => {
                 if (t.symbol !== focusedSymbol) setFocus(t.symbol);
+                navigate({
+                  kind: 'symbol-detail',
+                  symbol: t.symbol,
+                  returnTo: { kind: 'workspace' },
+                  backtestTaskId: currentTaskId ?? undefined,
+                });
               }}
             />
           )}
