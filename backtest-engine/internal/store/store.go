@@ -121,29 +121,58 @@ func renderMigration(name, sql, schema string) (string, error) {
 
 // ---------------- Strategy CRUD ----------------
 
-// CreateStrategy inserts a new strategy row and returns the assigned ID.
+// CreateStrategy inserts a new strategy row + an initial v1 version
+// row atomically. Returns the assigned strategy ID.
+//
+// Post migration 003, `code` and `params_schema` live on
+// `strategy_versions`; this helper writes both in one transaction so
+// downstream code sees a consistent `current_version=1` record.
 func (s *Store) CreateStrategy(ctx context.Context, st model.Strategy) (string, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // best-effort on failure
+
 	var id string
-	sql := fmt.Sprintf(`
-		INSERT INTO %[1]s.strategies (name, code_type, code, params_schema)
-		VALUES ($1, $2, $3, $4)
+	sqlStr := fmt.Sprintf(`
+		INSERT INTO %[1]s.strategies (name, code_type, current_version)
+		VALUES ($1, $2, 1)
 		RETURNING id
 	`, s.schema)
-	err := s.pool.QueryRow(ctx, sql, st.Name, st.CodeType, st.Code, marshalJSONB(st.ParamsSchema)).Scan(&id)
-	return id, err
+	if err := tx.QueryRow(ctx, sqlStr, st.Name, st.CodeType).Scan(&id); err != nil {
+		return "", err
+	}
+
+	sqlV := fmt.Sprintf(`
+		INSERT INTO %[1]s.strategy_versions
+			(strategy_id, version, code, summary, params_schema, parent_version)
+		VALUES ($1, 1, $2, $3, $4, NULL)
+	`, s.schema)
+	if _, err := tx.Exec(ctx, sqlV, id, st.Code, "Initial version",
+		marshalJSONB(st.ParamsSchema)); err != nil {
+		return "", err
+	}
+	return id, tx.Commit(ctx)
 }
 
-// GetStrategy reads by ID, returning ok=false if missing.
+// GetStrategy reads by ID, joining `strategy_versions` for the row's
+// current version to populate `Code` + `ParamsSchema`.
 func (s *Store) GetStrategy(ctx context.Context, id string) (model.Strategy, bool, error) {
-	sql := fmt.Sprintf(`
-		SELECT id, name, code_type, code, COALESCE(params_schema, '{}'::jsonb),
-		       created_at, updated_at
-		FROM %[1]s.strategies WHERE id = $1
+	sqlStr := fmt.Sprintf(`
+		SELECT s.id, s.name, s.code_type, s.current_version,
+		       v.code, COALESCE(v.params_schema, '{}'::jsonb),
+		       s.created_at, s.updated_at
+		FROM %[1]s.strategies s
+		JOIN %[1]s.strategy_versions v
+		  ON v.strategy_id = s.id AND v.version = s.current_version
+		WHERE s.id = $1
 	`, s.schema)
 	var st model.Strategy
 	var params []byte
-	err := s.pool.QueryRow(ctx, sql, id).Scan(
-		&st.ID, &st.Name, &st.CodeType, &st.Code, &params,
+	err := s.pool.QueryRow(ctx, sqlStr, id).Scan(
+		&st.ID, &st.Name, &st.CodeType, &st.CurrentVersion,
+		&st.Code, &params,
 		&st.CreatedAt, &st.UpdatedAt,
 	)
 	if err != nil {
@@ -156,7 +185,8 @@ func (s *Store) GetStrategy(ctx context.Context, id string) (model.Strategy, boo
 	return st, true, nil
 }
 
-// ListStrategies returns the N most recent strategies, optionally filtered by type.
+// ListStrategies returns the N most recent strategies, joining each
+// row with its current version's code/params_schema.
 func (s *Store) ListStrategies(ctx context.Context, codeType string, limit int) ([]model.Strategy, error) {
 	if limit <= 0 {
 		limit = 50
@@ -165,17 +195,21 @@ func (s *Store) ListStrategies(ctx context.Context, codeType string, limit int) 
 	where := ""
 	if codeType != "" {
 		args = append(args, codeType)
-		where = fmt.Sprintf(" WHERE code_type = $%d", len(args))
+		where = fmt.Sprintf(" WHERE s.code_type = $%d", len(args))
 	}
-	sql := fmt.Sprintf(`
-		SELECT id, name, code_type, code, COALESCE(params_schema, '{}'::jsonb),
-		       created_at, updated_at
-		FROM %[1]s.strategies%[2]s
-		ORDER BY created_at DESC
+	sqlStr := fmt.Sprintf(`
+		SELECT s.id, s.name, s.code_type, s.current_version,
+		       v.code, COALESCE(v.params_schema, '{}'::jsonb),
+		       s.created_at, s.updated_at
+		FROM %[1]s.strategies s
+		JOIN %[1]s.strategy_versions v
+		  ON v.strategy_id = s.id AND v.version = s.current_version
+		%[2]s
+		ORDER BY s.created_at DESC
 		LIMIT $1
 	`, s.schema, where)
 
-	rows, err := s.pool.Query(ctx, sql, args...)
+	rows, err := s.pool.Query(ctx, sqlStr, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -185,14 +219,144 @@ func (s *Store) ListStrategies(ctx context.Context, codeType string, limit int) 
 	for rows.Next() {
 		var st model.Strategy
 		var params []byte
-		if err := rows.Scan(&st.ID, &st.Name, &st.CodeType, &st.Code,
-			&params, &st.CreatedAt, &st.UpdatedAt); err != nil {
+		if err := rows.Scan(&st.ID, &st.Name, &st.CodeType, &st.CurrentVersion,
+			&st.Code, &params, &st.CreatedAt, &st.UpdatedAt); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal(params, &st.ParamsSchema)
 		result = append(result, st)
 	}
 	return result, rows.Err()
+}
+
+// ListStrategyVersions returns versions newest-first for a strategy.
+func (s *Store) ListStrategyVersions(ctx context.Context, strategyID string, limit int) ([]model.StrategyVersion, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	sqlStr := fmt.Sprintf(`
+		SELECT strategy_id, version, code, COALESCE(summary, ''),
+		       COALESCE(params_schema, '{}'::jsonb),
+		       parent_version, created_at
+		FROM %[1]s.strategy_versions
+		WHERE strategy_id = $1
+		ORDER BY version DESC
+		LIMIT $2
+	`, s.schema)
+	rows, err := s.pool.Query(ctx, sqlStr, strategyID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := []model.StrategyVersion{}
+	for rows.Next() {
+		var v model.StrategyVersion
+		var params []byte
+		var createdAt time.Time
+		if err := rows.Scan(&v.StrategyID, &v.Version, &v.Code, &v.Summary,
+			&params, &v.ParentVersion, &createdAt); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal(params, &v.ParamsSchema)
+		v.CreatedAt = createdAt.Unix()
+		result = append(result, v)
+	}
+	return result, rows.Err()
+}
+
+// GetStrategyVersion reads one specific version.
+func (s *Store) GetStrategyVersion(ctx context.Context, strategyID string, version int) (model.StrategyVersion, bool, error) {
+	sqlStr := fmt.Sprintf(`
+		SELECT strategy_id, version, code, COALESCE(summary, ''),
+		       COALESCE(params_schema, '{}'::jsonb),
+		       parent_version, created_at
+		FROM %[1]s.strategy_versions
+		WHERE strategy_id = $1 AND version = $2
+	`, s.schema)
+	var v model.StrategyVersion
+	var params []byte
+	var createdAt time.Time
+	err := s.pool.QueryRow(ctx, sqlStr, strategyID, version).Scan(
+		&v.StrategyID, &v.Version, &v.Code, &v.Summary, &params,
+		&v.ParentVersion, &createdAt,
+	)
+	if err != nil {
+		if strings.Contains(err.Error(), "no rows") {
+			return model.StrategyVersion{}, false, nil
+		}
+		return model.StrategyVersion{}, false, err
+	}
+	_ = json.Unmarshal(params, &v.ParamsSchema)
+	v.CreatedAt = createdAt.Unix()
+	return v, true, nil
+}
+
+// CreateStrategyVersion appends a new version and advances
+// `strategies.current_version`. Takes a row-level lock to serialize
+// concurrent appenders.
+//
+// Returns (0, STRATEGY_NOT_FOUND) if the strategy row doesn't exist.
+// ParentVersion is validated to exist if non-nil.
+func (s *Store) CreateStrategyVersion(ctx context.Context, strategyID string, code, summary string, paramsSchema map[string]any, parentVersion *int) (model.StrategyVersion, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return model.StrategyVersion{}, err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+
+	// Lock the strategies row to serialize concurrent appenders.
+	var currentVersion int
+	if err := tx.QueryRow(ctx, fmt.Sprintf(
+		`SELECT current_version FROM %[1]s.strategies WHERE id = $1 FOR UPDATE`, s.schema,
+	), strategyID).Scan(&currentVersion); err != nil {
+		return model.StrategyVersion{}, err
+	}
+
+	// Validate parent_version if provided.
+	if parentVersion != nil {
+		var exists bool
+		if err := tx.QueryRow(ctx, fmt.Sprintf(
+			`SELECT EXISTS(SELECT 1 FROM %[1]s.strategy_versions WHERE strategy_id=$1 AND version=$2)`,
+			s.schema,
+		), strategyID, *parentVersion).Scan(&exists); err != nil {
+			return model.StrategyVersion{}, err
+		}
+		if !exists {
+			return model.StrategyVersion{}, fmt.Errorf("parent_version %d not found", *parentVersion)
+		}
+	}
+
+	nextVersion := currentVersion + 1
+	var createdAt time.Time
+	if err := tx.QueryRow(ctx, fmt.Sprintf(`
+		INSERT INTO %[1]s.strategy_versions
+			(strategy_id, version, code, summary, params_schema, parent_version)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING created_at
+	`, s.schema), strategyID, nextVersion, code, summary,
+		marshalJSONB(paramsSchema), parentVersion).Scan(&createdAt); err != nil {
+		return model.StrategyVersion{}, err
+	}
+
+	if _, err := tx.Exec(ctx, fmt.Sprintf(
+		`UPDATE %[1]s.strategies SET current_version = $2, updated_at = now() WHERE id = $1`,
+		s.schema,
+	), strategyID, nextVersion); err != nil {
+		return model.StrategyVersion{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return model.StrategyVersion{}, err
+	}
+	return model.StrategyVersion{
+		StrategyID:    strategyID,
+		Version:       nextVersion,
+		Code:          code,
+		Summary:       summary,
+		ParamsSchema:  paramsSchema,
+		ParentVersion: parentVersion,
+		CreatedAt:     createdAt.Unix(),
+	}, nil
 }
 
 // ---------------- BacktestRun CRUD ----------------
