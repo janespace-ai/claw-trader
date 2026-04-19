@@ -10,6 +10,7 @@ import { useWorkspaceStore, type WorkspaceMode } from '@/stores/workspaceStore';
 import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
 import { useSignalReviewStore } from '@/stores/signalReviewStore';
 import { useOptimLensStore } from '@/stores/optimlensStore';
+import { useScreenerRunStore } from '@/stores/screenerRunStore';
 import type { AppRoute } from '@/types/navigation';
 import type { StrategySummary } from '@/services/prompt/personas/parsers';
 import type { components } from '@/types/api';
@@ -48,6 +49,16 @@ export function installTestBridge(): void {
         strategyId: draft.strategyId,
         summary: draft.summary,
         code: draft.code,
+      });
+    },
+    /** Seed the screener run store with deterministic results. */
+    seedScreenerRun(seed: {
+      focusedSymbol?: string;
+      results: components['schemas']['ScreenerRowResult'][];
+    }) {
+      useScreenerRunStore.getState().seed({
+        results: seed.results,
+        focusedSymbol: seed.focusedSymbol ?? null,
       });
     },
     /** Seed an OptimLens entry for Deep screen visual specs. */
