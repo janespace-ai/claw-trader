@@ -2,12 +2,12 @@ package handler
 
 import (
 	"context"
-	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
 
+	apierr "github.com/janespace-ai/claw-trader/backtest-engine/internal/errors"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/store"
 )
 
@@ -24,8 +24,9 @@ func NewKlineHandler(st *store.Store) *KlineHandler {
 }
 
 // Query handles GET /api/klines?symbol=&interval=&from=&to=&market=&limit=.
-// Dates accept RFC3339, YYYY-MM-DD, or unix seconds. Response shape is 1:1
-// compatible with the old data-aggregator endpoint of the same path.
+// `from` / `to` accept Unix seconds (canonical) or YYYY-MM-DD / RFC3339
+// (still accepted one release for backward compat; the response adds
+// a `Warning` header on those inputs).
 func (h *KlineHandler) Query(ctx context.Context, c *app.RequestContext) {
 	symbol := string(c.Query("symbol"))
 	interval := string(c.Query("interval"))
@@ -33,27 +34,39 @@ func (h *KlineHandler) Query(ctx context.Context, c *app.RequestContext) {
 	if market == "" {
 		market = "futures"
 	}
-	if symbol == "" || interval == "" {
-		c.JSON(http.StatusBadRequest, map[string]string{"error": "symbol and interval are required"})
+	if symbol == "" {
+		RespondError(c, apierr.New(apierr.CodeInvalidSymbol, "symbol is required"))
+		return
+	}
+	if interval == "" {
+		RespondError(c, apierr.New(apierr.CodeInvalidInterval, "interval is required").
+			WithDetails(map[string]any{"allowed_intervals": store.SupportedIntervals}))
 		return
 	}
 	if !store.IsSupportedInterval(interval) {
-		c.JSON(http.StatusBadRequest, map[string]any{
-			"error":            "unsupported interval",
-			"allowed_intervals": store.SupportedIntervals,
-		})
+		RespondError(c, apierr.New(apierr.CodeInvalidInterval, "unsupported interval").
+			WithDetails(map[string]any{
+				"interval":          interval,
+				"allowed_intervals": store.SupportedIntervals,
+			}))
 		return
 	}
 
-	from, err := parseKlineTime(string(c.Query("from")))
+	from, fromLegacy, err := parseKlineTime(string(c.Query("from")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, map[string]string{"error": "bad 'from' param: " + err.Error()})
+		RespondError(c, apierr.New(apierr.CodeInvalidRange, "bad 'from' param: "+err.Error()))
 		return
 	}
-	to, err := parseKlineTime(string(c.Query("to")))
+	to, toLegacy, err := parseKlineTime(string(c.Query("to")))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, map[string]string{"error": "bad 'to' param: " + err.Error()})
+		RespondError(c, apierr.New(apierr.CodeInvalidRange, "bad 'to' param: "+err.Error()))
 		return
+	}
+	if fromLegacy || toLegacy {
+		c.Response.Header.Set(
+			"Warning",
+			`299 - "Deprecated: pass from/to as Unix seconds. String formats accepted for one release."`,
+		)
 	}
 	if from.IsZero() {
 		from = time.Now().UTC().Add(-30 * 24 * time.Hour)
@@ -61,10 +74,14 @@ func (h *KlineHandler) Query(ctx context.Context, c *app.RequestContext) {
 	if to.IsZero() {
 		to = time.Now().UTC()
 	}
+	if !to.After(from) {
+		RespondError(c, apierr.New(apierr.CodeInvalidRange, "'to' must be after 'from'"))
+		return
+	}
 
 	rows, err := h.store.QueryKlines(ctx, market, interval, symbol, from, to)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		RespondError(c, apierr.Wrap(err, apierr.CodeUpstreamUnreachable, err.Error()))
 		return
 	}
 
@@ -76,20 +93,25 @@ func (h *KlineHandler) Query(ctx context.Context, c *app.RequestContext) {
 		}
 	}
 
-	c.JSON(http.StatusOK, rows)
+	RespondOK(c, rows)
 }
 
-// parseKlineTime accepts empty, RFC3339, YYYY-MM-DD, or unix-second formats.
-func parseKlineTime(s string) (time.Time, error) {
+// parseKlineTime accepts empty, RFC3339, YYYY-MM-DD, or unix-second
+// formats. The `legacy` return is true when the input was a string
+// format (RFC3339 or YYYY-MM-DD) so callers can emit a Warning header.
+func parseKlineTime(s string) (t time.Time, legacy bool, err error) {
 	if s == "" {
-		return time.Time{}, nil
+		return time.Time{}, false, nil
 	}
 	if n, err := strconv.ParseInt(s, 10, 64); err == nil {
-		return time.Unix(n, 0).UTC(), nil
+		return time.Unix(n, 0).UTC(), false, nil
 	}
-	t, err := time.Parse(time.RFC3339, s)
-	if err != nil {
-		t, err = time.Parse("2006-01-02", s)
+	legacy = true
+	if t, err = time.Parse(time.RFC3339, s); err == nil {
+		return t.UTC(), true, nil
 	}
-	return t.UTC(), err
+	if t, err = time.Parse("2006-01-02", s); err == nil {
+		return t.UTC(), true, nil
+	}
+	return time.Time{}, true, err
 }

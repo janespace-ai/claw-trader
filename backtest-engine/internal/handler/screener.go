@@ -2,11 +2,11 @@ package handler
 
 import (
 	"context"
-	"errors"
-	"net/http"
+	stderrors "errors"
 
 	"github.com/cloudwego/hertz/pkg/app"
 
+	apierr "github.com/janespace-ai/claw-trader/backtest-engine/internal/errors"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/model"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/service"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/store"
@@ -33,11 +33,11 @@ type startScreenerReq struct {
 func (h *ScreenerHandler) Start(ctx context.Context, c *app.RequestContext) {
 	var req startScreenerReq
 	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		RespondError(c, apierr.Wrap(err, apierr.CodeInvalidRange, "bind request: "+err.Error()))
 		return
 	}
 	if req.Code == "" {
-		c.JSON(http.StatusBadRequest, map[string]string{"error": "code is required"})
+		RespondError(c, apierr.New(apierr.CodeInvalidRange, "code is required"))
 		return
 	}
 	if req.Config.Market == "" {
@@ -50,19 +50,18 @@ func (h *ScreenerHandler) Start(ctx context.Context, c *app.RequestContext) {
 	runID, err := h.svc.Submit(ctx, req.Code, req.Config, req.StrategyID)
 	if err != nil {
 		var compErr *service.ComplianceError
-		if errors.As(err, &compErr) {
-			c.JSON(http.StatusBadRequest, map[string]any{
-				"error":   "compliance_failed",
-				"details": compErr.Violations,
-			})
+		if stderrors.As(err, &compErr) {
+			RespondError(c, apierr.New(apierr.CodeComplianceFailed, "compliance failed").
+				WithDetails(map[string]any{"violations": compErr.Violations}))
 			return
 		}
-		c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, map[string]any{
-		"task_id": runID,
-		"status":  model.StatusPending,
+	RespondTask(c, model.TaskResponse{
+		TaskID:    runID,
+		Status:    model.TaskStatusPending,
+		StartedAt: unixNow(),
 	})
 }
 
@@ -71,19 +70,13 @@ func (h *ScreenerHandler) Result(ctx context.Context, c *app.RequestContext) {
 	taskID := c.Param("task_id")
 	run, ok, err := h.store.GetScreenerRun(ctx, taskID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
 		return
 	}
 	if !ok {
-		c.JSON(http.StatusNotFound, map[string]string{"error": "task_not_found"})
+		RespondError(c, apierr.New(apierr.CodeScreenerNotFound, "screener task not found").
+			WithDetails(map[string]any{"task_id": taskID}))
 		return
 	}
-	if run.Status == model.StatusRunning || run.Status == model.StatusPending {
-		c.JSON(http.StatusAccepted, map[string]any{
-			"task_id": run.ID, "status": run.Status,
-			"message": "task still in progress",
-		})
-		return
-	}
-	c.JSON(http.StatusOK, run)
+	RespondTask(c, toTaskResponseScreener(run))
 }
