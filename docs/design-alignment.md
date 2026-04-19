@@ -30,6 +30,12 @@ each screen change lands.
 | — | Signal Review verdict list | `components/chat/VerdictList` | Shipped | `workspace-preview-backtest` |
 | — | Quick metrics tab | `screens/workspace/QuickMetricsTab` | Shipped | `workspace-preview-backtest` |
 | `3PSG8` / `PISBa` | Preview Backtest screen (dark / light) | `screens/workspace/PreviewBacktest` | Shipped | `workspace-preview-backtest` |
+| — | Monthly returns heatmap | `components/primitives/MonthlyHeatmap` | Shipped | `workspace-deep-backtest` |
+| — | Deep Backtest topbar | `screens/workspace/DeepTopbar` | Shipped | `workspace-deep-backtest` |
+| — | OptimLens improvement card | `screens/workspace/ImprovementCard` | Shipped | `workspace-deep-backtest` |
+| — | OptimLens improvement list | `screens/workspace/ImprovementList` | Shipped | `workspace-deep-backtest` |
+| — | Optimize param-grid modal | `screens/workspace/OptimizeModal` | Shipped | `workspace-deep-backtest` |
+| `QdrlI` / `TR0Ib` | Deep Backtest screen (dark / light) | `screens/workspace/DeepBacktest` | Shipped | `workspace-deep-backtest` |
 
 ## Conventions
 

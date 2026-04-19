@@ -9,6 +9,7 @@ import { useAppStore } from '@/stores/appStore';
 import { useWorkspaceStore, type WorkspaceMode } from '@/stores/workspaceStore';
 import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
 import { useSignalReviewStore } from '@/stores/signalReviewStore';
+import { useOptimLensStore } from '@/stores/optimlensStore';
 import type { AppRoute } from '@/types/navigation';
 import type { StrategySummary } from '@/services/prompt/personas/parsers';
 import type { components } from '@/types/api';
@@ -48,6 +49,26 @@ export function installTestBridge(): void {
         summary: draft.summary,
         code: draft.code,
       });
+    },
+    /** Seed an OptimLens entry for Deep screen visual specs. */
+    seedOptimLens(seed: {
+      strategyId: string;
+      improvements?: components['schemas']['OptimLensImprovement'][];
+      baseMetrics?: components['schemas']['MetricsBlockExtended'];
+    }) {
+      useOptimLensStore.setState((prev) => ({
+        byStrategy: {
+          ...prev.byStrategy,
+          [seed.strategyId]: {
+            status: 'complete',
+            taskId: 'SEED-OPTIM',
+            improvements: seed.improvements ?? [],
+            baseMetrics: seed.baseMetrics,
+            dismissed: new Set(),
+            error: null,
+          },
+        },
+      }));
     },
     /** Seed a Preview Backtest context + verdicts for visual specs. */
     seedPreviewBacktest(seed: PreviewSeed) {
