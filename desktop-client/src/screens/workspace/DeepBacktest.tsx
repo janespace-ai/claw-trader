@@ -9,6 +9,7 @@ import {
   type MonthlyReturn,
 } from '@/components/primitives';
 import { TradesTab } from '@/components/workspace/TradesTab';
+import { CrossSymbolGrid } from '@/components/workspace/CrossSymbolGrid';
 import { cremote } from '@/services/remote/contract-client';
 import { useAppStore } from '@/stores/appStore';
 import { useOptimLensStore } from '@/stores/optimlensStore';
@@ -43,6 +44,8 @@ export function DeepBacktest() {
   const setFocus = useWorkspaceStore((s) => s.focus);
   const currentTaskId = useWorkspaceStore((s) => s.currentTaskId);
   const currentStrategyId = useWorkspaceStore((s) => s.currentStrategyId);
+  const viewMode = useWorkspaceStore((s) => s.viewMode);
+  const setViewMode = useWorkspaceStore((s) => s.setViewMode);
   const draftCode = useWorkspaceDraftStore((s) => s.code);
   const draftSummary = useWorkspaceDraftStore((s) => s.summary);
   const draftName = useWorkspaceDraftStore((s) => s.name);
@@ -184,6 +187,8 @@ export function DeepBacktest() {
           onOptimize={() => setModalOpen(true)}
           isOptimizing={isOptimizing}
           canOptimize={canOptimize}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
         />
       }
       leftRail={
@@ -197,7 +202,42 @@ export function DeepBacktest() {
       }
       main={
         <div className="flex flex-col gap-4 p-4">
-          <ClawChart.Equity data={equity} height={300} />
+          {viewMode === 'chart' ? (
+            <ClawChart.Equity data={equity} height={300} />
+          ) : (
+            <CrossSymbolGrid
+              cells={uniqueSymbols.map((sym) => {
+                const ts = allTrades.filter((t) => t.symbol === sym);
+                let cum = 1;
+                const eq = ts
+                  .slice()
+                  .sort((a, b) => (a.exit_ts ?? a.entry_ts) - (b.exit_ts ?? b.entry_ts))
+                  .map((t) => {
+                    cum *= 1 + (t.pnl_pct ?? 0);
+                    return { ts: t.exit_ts ?? t.entry_ts, value: cum };
+                  });
+                return {
+                  symbol: sym,
+                  equity: eq,
+                  returnPct: eq.length > 0 ? eq[eq.length - 1].value - 1 : 0,
+                  trades: ts.length,
+                };
+              })}
+              focusedSymbol={focusedSymbol}
+              onSingleClick={(s) => {
+                setFocus(s);
+                setViewMode('chart');
+              }}
+              onDoubleClick={(s) =>
+                navigate({
+                  kind: 'symbol-detail',
+                  symbol: s,
+                  returnTo: { kind: 'workspace' },
+                  backtestTaskId: currentTaskId ?? undefined,
+                })
+              }
+            />
+          )}
           <MetricsGrid metrics={headline} minColWidth={160} />
           <div className="flex items-center gap-2 border-b border-border-subtle">
             {(

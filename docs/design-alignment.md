@@ -14,7 +14,7 @@ each screen change lands.
 | `djIo5` | `PTradeRow` | `screens/workspace/TradesTab` row (same impl as `sZ3y6`, variant via `selectedSymbol` prop) | Shipped | `workspace-preview-backtest` |
 | `WN8ia` | `RailRow8` | `Watchlist` row (compact variant) | Shipped | `ui-foundation` |
 | `Nn13b` | `MetTile` | `MetricsGrid` tile (`src/components/primitives/MetricsGrid`) | Shipped | `ui-foundation` |
-| `8oiDW` | `GridCell` | TBD (`src/components/workspace/CrossSymbolGrid` cell) | Pending | `multi-symbol-grid` |
+| `8oiDW` | `GridCell` | `src/components/workspace/CrossSymbolGrid` cell | Shipped | `multi-symbol-grid` |
 | — | Workspace topbar | `WorkspaceShell.topbar` slot | Shipped | `ui-foundation` |
 | — | Workspace leftRail | `WorkspaceShell.leftRail` slot | Shipped | `ui-foundation` |
 | — | Workspace main | `WorkspaceShell.main` slot | Shipped | `ui-foundation` |
@@ -43,6 +43,8 @@ each screen change lands.
 | `pGjNd` / `PLr19` | Strategy Management screen (dark / light) | `screens/StrategiesScreen` | Shipped | `strategy-management-v2` |
 | — | Trade Analysis card | `components/symbol/TradeAnalysisCard` | Shipped | `symbol-detail` |
 | `s9ooT` / `Aib9J` | Symbol Detail screen (dark / light) | `screens/SymbolDetailScreen` | Shipped | `symbol-detail` |
+| — | View mode switcher (Chart/Grid) | `components/workspace/ViewModeSwitcher` | Shipped | `multi-symbol-grid` |
+| `nvBnq` / `wBWkN` | Multi-Symbol Grid view (dark / light) | `components/workspace/CrossSymbolGrid` (rendered inside PreviewBacktest + DeepBacktest when `viewMode === 'grid'`) | Shipped | `multi-symbol-grid` |
 
 ## Conventions
 
