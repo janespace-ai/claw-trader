@@ -3,28 +3,28 @@ import { useTranslation } from 'react-i18next';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 const INTERVALS = ['5m', '15m', '30m', '1h', '4h', '1d'] as const;
-const INDICATOR_CHIPS = ['SMA', 'EMA', 'BB', 'RSI'] as const;
 
 interface Props {
   symbol: string;
   onSymbolChange: (s: string) => void;
   interval: (typeof INTERVALS)[number];
   onIntervalChange: (iv: (typeof INTERVALS)[number]) => void;
-  indicators: string[];
-  onToggleIndicator: (ind: string) => void;
   onRunPreview: () => void;
   canRunPreview: boolean;
   isRunning: boolean;
 }
 
-/** Topbar for the Strategy Design workspace. */
+/** Topbar for the Strategy Design workspace.
+ *  Indicators (SMA/EMA/BB/RSI) were moved out of this bar and now live
+ *  in a `ChartIndicatorBar` rendered beneath the Candles chart, matching
+ *  the Pencil layout where the top bar is reserved for symbol/timeframe
+ *  + the primary Run Preview CTA.
+ */
 export function StrategyTopbar({
   symbol,
   onSymbolChange,
   interval,
   onIntervalChange,
-  indicators,
-  onToggleIndicator,
   onRunPreview,
   canRunPreview,
   isRunning,
@@ -59,26 +59,6 @@ export function StrategyTopbar({
               {iv}
             </button>
           ))}
-        </div>
-        <div className="flex gap-1 ml-2">
-          {INDICATOR_CHIPS.map((ind) => {
-            const on = indicators.includes(ind);
-            return (
-              <button
-                key={ind}
-                type="button"
-                onClick={() => onToggleIndicator(ind)}
-                className={[
-                  'text-xs px-2 py-1 rounded font-mono',
-                  on
-                    ? 'bg-accent-primary-dim text-accent-primary'
-                    : 'text-fg-muted hover:text-fg-primary',
-                ].join(' ')}
-              >
-                {ind}
-              </button>
-            );
-          })}
         </div>
       </div>
 

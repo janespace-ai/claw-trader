@@ -143,6 +143,8 @@
   "chart.symbol_equity": "币种权益",
   "chart.trade_click_hint": "点击某行跳转到图上该位置",
   "chart.no_monthly_data": "暂无月度收益数据。",
+  "chart.no_data_for_interval": "当前周期暂无 K 线数据。请尝试更长的时间周期（1h / 4h / 1d）。",
+  "chart.indicators": "指标",
   "chart.loss": "亏损",
   "chart.gain": "盈利",
   "trade.count": "{{count}} 笔交易",
