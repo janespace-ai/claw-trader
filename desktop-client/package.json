@@ -17,7 +17,10 @@
     "dev:mock": "VITE_USE_MOCKS=1 vite",
     "api:lint": "node scripts/api-lint.mjs",
     "api:types": "node scripts/gen-api-types.mjs",
-    "api:mocks": "node scripts/gen-msw-handlers.mjs"
+    "api:mocks": "node scripts/gen-msw-handlers.mjs",
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots",
+    "test:visual:ui": "playwright test --ui"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",
@@ -33,6 +36,9 @@
     "zustand": "^5.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/react": "^16.3.2",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.9.0",
     "@types/react": "^18.3.12",
