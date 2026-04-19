@@ -9,7 +9,7 @@ each screen change lands.
 | `o89E6` | `ScrRow` | `Watchlist` row (`screens/ScreenerScreen` passed/failed split) | Shipped | `screener-chart-first` |
 | `IQK4J` | `StrategyCard` | `src/components/strategy/StrategyCard.tsx` | Shipped | `strategy-management-v2` |
 | `sZ3y6` | `TradeRow` | `screens/workspace/TradesTab` row | Shipped | `workspace-preview-backtest` |
-| `IjMN8` | `ProviderCard` | TBD (`src/components/settings/ProviderCard.tsx`) | Pending | `settings-full-page` |
+| `IjMN8` | `ProviderCard` | `src/components/settings/ProviderCard.tsx` | Shipped | `settings-full-page` |
 | `Ysu4M` | `RailRow` | `Watchlist` row (`src/components/primitives/Watchlist`) | Shipped | `ui-foundation` |
 | `djIo5` | `PTradeRow` | `screens/workspace/TradesTab` row (same impl as `sZ3y6`, variant via `selectedSymbol` prop) | Shipped | `workspace-preview-backtest` |
 | `WN8ia` | `RailRow8` | `Watchlist` row (compact variant) | Shipped | `ui-foundation` |
@@ -45,6 +45,9 @@ each screen change lands.
 | `s9ooT` / `Aib9J` | Symbol Detail screen (dark / light) | `screens/SymbolDetailScreen` | Shipped | `symbol-detail` |
 | — | View mode switcher (Chart/Grid) | `components/workspace/ViewModeSwitcher` | Shipped | `multi-symbol-grid` |
 | `nvBnq` / `wBWkN` | Multi-Symbol Grid view (dark / light) | `components/workspace/CrossSymbolGrid` (rendered inside PreviewBacktest + DeepBacktest when `viewMode === 'grid'`) | Shipped | `multi-symbol-grid` |
+| — | Theme preview tile | `components/settings/ThemeTile` | Shipped | `settings-full-page` |
+| — | Remote engine status card | `screens/settings/RemoteEngineCard` | Shipped | `settings-full-page` |
+| `0qnH2` / `uWni9` | Settings full-page (dark / light) | `screens/SettingsScreen` | Shipped | `settings-full-page` |
 
 ## Conventions
 

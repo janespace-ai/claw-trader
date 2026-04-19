@@ -1,35 +1,28 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
 import { AIPanel } from '@/components/chat/AIPanel';
 import { ScreenerScreen } from '@/screens/ScreenerScreen';
 import { StrategiesScreen } from '@/screens/StrategiesScreen';
-import { BacktestPage } from '@/pages/BacktestPage';
-import { SettingsModal } from '@/pages/SettingsPage';
 import { StrategyDesign } from '@/screens/workspace/StrategyDesign';
 import { PreviewBacktest } from '@/screens/workspace/PreviewBacktest';
 import { DeepBacktest } from '@/screens/workspace/DeepBacktest';
 import { SymbolDetailScreen } from '@/screens/SymbolDetailScreen';
+import { SettingsScreen } from '@/screens/SettingsScreen';
 import { useAppStore } from '@/stores/appStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useStrategyStore } from '@/stores/strategyStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 /**
- * Top-level route renderer. Switches on `appStore.route.kind` (new,
- * canonical) while existing pages continue to consume `currentTab` as
- * a backward-compat string during the migration.
+ * Top-level route renderer. Switches on `appStore.route.kind`.
  *
- *   route.kind === 'screener'      → ScreenerPage (flat page; will be
- *                                    replaced by ScreenerScreen in
- *                                    `screener-chart-first`)
- *   route.kind === 'strategies'    → StrategiesPage (will become
- *                                    StrategiesScreen in
- *                                    `strategy-management-v2`)
- *   route.kind === 'workspace'     → BacktestPage today; becomes the
- *                                    3-mode Workspace across #4-#6
- *   route.kind === 'symbol-detail' → TBD (`symbol-detail` change)
- *   route.kind === 'settings'      → SettingsModal today; becomes
- *                                    SettingsScreen in #11
+ *   route.kind === 'screener'      → ScreenerScreen (chart-first)
+ *   route.kind === 'strategies'    → StrategiesScreen (card grid + history)
+ *   route.kind === 'workspace'     → StrategyDesign | PreviewBacktest |
+ *                                    DeepBacktest depending on
+ *                                    workspaceStore.mode
+ *   route.kind === 'symbol-detail' → SymbolDetailScreen
+ *   route.kind === 'settings'      → SettingsScreen (full-page)
  */
 export default function App() {
   const route = useAppStore((s) => s.route);
@@ -39,7 +32,7 @@ export default function App() {
 
   const loadSettings = useSettingsStore((s) => s.load);
   const loadStrategies = useStrategyStore((s) => s.load);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const navigate = useAppStore((s) => s.navigate);
 
   useEffect(() => {
     void loadSettings();
@@ -48,7 +41,7 @@ export default function App() {
 
   return (
     <div className="flex flex-col h-full w-full">
-      <TopBar onOpenSettings={() => setSettingsOpen(true)} />
+      <TopBar onOpenSettings={() => navigate({ kind: 'settings' })} />
 
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 overflow-y-auto">
@@ -65,15 +58,11 @@ export default function App() {
             />
           )}
           {route.kind === 'settings' && (
-            <div className="p-6 text-fg-muted">
-              Full Settings screen coming in{' '}
-              <code className="text-fg-primary">settings-full-page</code>.
-              Meanwhile the modal below handles it.
-            </div>
+            <SettingsScreen initialSection={route.section} />
           )}
         </main>
 
-        {!panelCollapsed && (
+        {!panelCollapsed && route.kind !== 'settings' && (
           <aside
             className="flex-shrink-0 border-l border-border-subtle bg-surface-secondary"
             style={{ width: panelW }}
@@ -82,8 +71,6 @@ export default function App() {
           </aside>
         )}
       </div>
-
-      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
