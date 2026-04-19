@@ -71,6 +71,8 @@ docker build -t claw-sandbox:latest backtest-engine/sandbox/
 
 **3. 啟動回測引擎:**
 
+與步驟 1 共用同一 TimescaleDB（共享 Docker 網路 `claw-net` / `claw-sandbox-net`）。若只啟動 `backtest-engine`，請先在儲存庫根目錄執行 `make db-up` 以啟動資料庫。
+
 ```bash
 cd ../backtest-engine
 docker compose up -d --build

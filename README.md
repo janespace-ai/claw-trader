@@ -73,6 +73,8 @@ docker build -t claw-sandbox:latest backtest-engine/sandbox/
 
 **3. Start the backtest engine:**
 
+Uses the same TimescaleDB as step 1 (shared Docker networks `claw-net` / `claw-sandbox-net`). If you only start `backtest-engine`, run `make db-up` from the repo root first so the database is up.
+
 ```bash
 cd ../backtest-engine
 docker compose up -d --build

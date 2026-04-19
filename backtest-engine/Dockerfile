@@ -5,10 +5,11 @@ FROM golang:1.25-alpine AS builder
 WORKDIR /src
 ENV GOPROXY=https://goproxy.cn,direct
 
-COPY go.mod go.sum* ./
-RUN go mod download || true
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
+RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w" \
     -o /out/backtest-engine ./cmd/server
