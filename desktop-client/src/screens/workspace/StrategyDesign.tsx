@@ -7,6 +7,7 @@ import {
   type CandlePoint,
   type OverlayLine,
   type VisibleTimeRange,
+  type PlotLayout,
 } from '@/components/primitives';
 import { cremote, toErrorBody } from '@/services/remote/contract-client';
 import { useAppStore } from '@/stores/appStore';
@@ -72,6 +73,10 @@ export function StrategyDesign() {
    *  from `ClawChart.Candles` and fed into each `IndicatorPane` so the
    *  panes stay in sync with the price chart on zoom/pan. */
   const [visibleRange, setVisibleRange] = useState<VisibleTimeRange | null>(null);
+  /** Horizontal plot measurements of the main chart; panes reserve the
+   *  same right-gutter so their SVG plot area lines up pixel-accurately
+   *  with the candle chart above. */
+  const [plotLayout, setPlotLayout] = useState<PlotLayout | null>(null);
 
   // --- Chart data ----------------------------------------------------------
   useEffect(() => {
@@ -260,6 +265,7 @@ export function StrategyDesign() {
                 height={360}
                 showVolume
                 onVisibleTimeRangeChange={setVisibleRange}
+                onPlotLayoutChange={setPlotLayout}
               />
 
               {activePanes.includes('RSI') && (
@@ -274,6 +280,7 @@ export function StrategyDesign() {
                     { value: 50, color: 'var(--border-subtle)', dashed: false },
                   ]}
                   visibleRange={visibleRange}
+                  rightInsetPx={plotLayout?.rightGutterPx ?? 0}
                 />
               )}
               {activePanes.includes('MACD') && macdData && (
@@ -287,6 +294,7 @@ export function StrategyDesign() {
                   guides={[{ value: 0, color: 'var(--border-subtle)', dashed: false }]}
                   histogram={macdData.histogram}
                   visibleRange={visibleRange}
+                  rightInsetPx={plotLayout?.rightGutterPx ?? 0}
                 />
               )}
               {activePanes.includes('STOCH') && stochData && (
@@ -303,6 +311,7 @@ export function StrategyDesign() {
                     { value: 20, color: 'var(--accent-green)' },
                   ]}
                   visibleRange={visibleRange}
+                  rightInsetPx={plotLayout?.rightGutterPx ?? 0}
                 />
               )}
               {activePanes.includes('ATR') && atrData.length > 0 && (
@@ -311,6 +320,7 @@ export function StrategyDesign() {
                   latestLabel={atrData.at(-1)?.value.toFixed(2) ?? '—'}
                   lines={[{ data: atrData, color: 'var(--accent-yellow)' }]}
                   visibleRange={visibleRange}
+                  rightInsetPx={plotLayout?.rightGutterPx ?? 0}
                 />
               )}
               {activePanes.includes('OBV') && obvData.length > 0 && (
@@ -319,6 +329,7 @@ export function StrategyDesign() {
                   latestLabel={obvData.at(-1)?.value.toFixed(0) ?? '—'}
                   lines={[{ data: obvData, color: 'var(--accent-primary)' }]}
                   visibleRange={visibleRange}
+                  rightInsetPx={plotLayout?.rightGutterPx ?? 0}
                 />
               )}
             </>

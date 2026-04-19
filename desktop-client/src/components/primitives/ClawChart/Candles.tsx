@@ -44,6 +44,18 @@ export interface VisibleTimeRange {
   to: number;
 }
 
+/** Measurements of the chart's drawable area so panes rendered below
+ *  can inset their SVG to the same plot region (exclude the right
+ *  price-axis gutter). All values in CSS pixels. */
+export interface PlotLayout {
+  /** Total container width. */
+  totalWidthPx: number;
+  /** Width of the time-scale / plot area — excludes the right axis. */
+  plotWidthPx: number;
+  /** Width of the right price axis gutter (`totalWidthPx - plotWidthPx`). */
+  rightGutterPx: number;
+}
+
 interface Props {
   data: CandlePoint[];
   overlays?: OverlayLine[];
@@ -56,6 +68,10 @@ interface Props {
   /** Fired whenever the user zooms / pans the chart so pane-indicators
    *  rendered below can clip their data to the visible range. */
   onVisibleTimeRangeChange?: (range: VisibleTimeRange | null) => void;
+  /** Fired after mount and whenever the chart resizes or its right
+   *  price-axis gutter changes (e.g. when a wider number moves into
+   *  view). Panes use this to match horizontal alignment. */
+  onPlotLayoutChange?: (layout: PlotLayout) => void;
 }
 
 /**
@@ -72,11 +88,14 @@ export function Candles({
   className,
   convention = 'green-up',
   onVisibleTimeRangeChange,
+  onPlotLayoutChange,
 }: Props) {
-  // Latest callback in a ref so the subscribe effect below doesn't
-  // have to re-subscribe every time the parent rebinds it.
+  // Latest callbacks in refs so the subscribe effect below doesn't
+  // have to re-subscribe every time the parent rebinds them.
   const onVisibleRef = useRef(onVisibleTimeRangeChange);
   onVisibleRef.current = onVisibleTimeRangeChange;
+  const onLayoutRef = useRef(onPlotLayoutChange);
+  onLayoutRef.current = onPlotLayoutChange;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -121,18 +140,38 @@ export function Candles({
       volumeSeriesRef.current = vol;
     }
 
-    // Resize observer
+    // Layout measurement — emit plot width + right-axis gutter so pane
+    // indicators below can inset their SVG to the same plot area.
+    // Guarded against duplicate emits with a small "last" cache so
+    // the callback fires only when measurements actually change.
+    let lastLayoutJson = '';
+    const emitLayout = () => {
+      if (!chartRef.current || !containerRef.current) return;
+      const totalWidthPx = containerRef.current.clientWidth;
+      const plotWidthPx = chartRef.current.timeScale().width();
+      const rightGutterPx = Math.max(0, totalWidthPx - plotWidthPx);
+      const next = { totalWidthPx, plotWidthPx, rightGutterPx };
+      const json = `${next.totalWidthPx}|${next.plotWidthPx}`;
+      if (json === lastLayoutJson) return;
+      lastLayoutJson = json;
+      onLayoutRef.current?.(next);
+    };
+    // Resize observer — also re-measures plot layout whenever the
+    // container changes size.
     const ro = new ResizeObserver((entries) => {
       for (const e of entries) {
         chart.resize(e.contentRect.width, height);
       }
+      emitLayout();
     });
     ro.observe(containerRef.current);
 
     // Visible-range sync. We read the `Time` union as unix seconds —
     // our chart always uses `UTCTimestamp` (number) times, so the
     // `typeof === 'number'` branch always hits in practice. A defensive
-    // fallback handles the rare edge case.
+    // fallback handles the rare edge case. Also re-measures layout
+    // because the right-axis gutter can widen/narrow when different
+    // numbers come into view (e.g. zooming into 80000s vs 1M).
     const rangeHandler = (
       range: { from: Time; to: Time } | null,
     ) => {
@@ -143,8 +182,12 @@ export function Candles({
       const from = typeof range.from === 'number' ? range.from : 0;
       const to = typeof range.to === 'number' ? range.to : 0;
       onVisibleRef.current?.({ from, to });
+      emitLayout();
     };
     chart.timeScale().subscribeVisibleTimeRangeChange(rangeHandler);
+
+    // Initial layout emit (next microtask so the chart has laid out).
+    const initialLayoutT = setTimeout(emitLayout, 0);
 
     // Theme redraw
     const stopTheme = observeThemeChanges(() => {
@@ -161,6 +204,7 @@ export function Candles({
     });
 
     return () => {
+      clearTimeout(initialLayoutT);
       ro.disconnect();
       chart.timeScale().unsubscribeVisibleTimeRangeChange(rangeHandler);
       stopTheme();
