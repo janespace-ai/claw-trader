@@ -1,9 +1,11 @@
 import { app, BrowserWindow, ipcMain, nativeTheme } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadAppConfig } from './config';
 import { registerDBHandlers, initDB, closeDB } from './ipc/db';
 import { registerLLMHandlers } from './ipc/llm';
 import { registerRemoteHandlers } from './ipc/remote';
+import { registerConfigHandlers } from './ipc/config';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -38,10 +40,18 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  initDB(path.join(app.getPath('userData'), 'claw-data.sqlite'));
+  const userData = app.getPath('userData');
+  const appConfig = loadAppConfig(userData);
+  // eslint-disable-next-line no-console
+  console.log(
+    `[config] remoteBaseURL=${appConfig.remoteBaseURL} (source=${appConfig.source}, path=${appConfig.configPath})`,
+  );
+
+  initDB(path.join(userData, 'claw-data.sqlite'));
   registerDBHandlers(ipcMain);
   registerLLMHandlers(ipcMain);
-  registerRemoteHandlers(ipcMain);
+  registerRemoteHandlers(ipcMain, appConfig.remoteBaseURL);
+  registerConfigHandlers(ipcMain, appConfig);
 
   createWindow();
 

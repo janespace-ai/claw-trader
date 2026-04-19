@@ -5,6 +5,8 @@ release/
 *.log
 .env
 .env.*
+# Commit the example template so new developers know what can be set.
+!.env.example
 .DS_Store
 .vscode/
 claw-data.sqlite
