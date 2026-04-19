@@ -1,0 +1,9 @@
+{
+  "strategy_id": "00000000-0000-0000-0000-000000000001",
+  "version": 4,
+  "code": "# v4\nfrom claw.strategy import Strategy\nclass MyStrategy(Strategy):\n    pass\n",
+  "summary": "OptimLens applied: fast=8",
+  "params_schema": { "fast": { "type": "int", "default": 8 } },
+  "parent_version": 3,
+  "created_at": 1744416120
+}

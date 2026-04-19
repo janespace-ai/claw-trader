@@ -134,6 +134,76 @@ export const handlers: RequestHandler[] = [
     if (chaos) return chaos;
     return HttpResponse.json({"task_id":"00000000-0000-0000-0000-000000000020","status":"done","started_at":1744416000,"finished_at":1744416045,"result":{"results":[{"symbol":"BTC_USDT","passed":true,"score":0.95,"rank":1,"volume_24h_quote":5128061921},{"symbol":"ETH_USDT","passed":true,"score":0.88,"rank":2,"volume_24h_quote":2940715000},{"symbol":"SOL_USDT","passed":true,"score":0.76,"rank":3,"volume_24h_quote":1620550000},{"symbol":"XRP_USDT","passed":false,"score":0.12,"rank":15,"volume_24h_quote":210000000},{"symbol":"LOW_USDT","passed":false,"score":0.02,"rank":280,"volume_24h_quote":450000}]}});
   }),
+  // getSymbolMetadata
+  http.get('*/api/symbols/:symbol/metadata', async () => {
+    await maybeDelay();
+    const chaos = maybeError();
+    if (chaos) return chaos;
+    return HttpResponse.json({"symbol":"BTC_USDT","name":"BTC","market":"futures","rank":1,"volume_24h_quote":5128061921,"last_price":64750,"change_24h_pct":1.35,"first_kline_at":1672531200,"last_kline_at":1744416000,"status":"active"});
+  }),
+  // listStrategyVersions
+  http.get('*/api/strategies/:id/versions', async () => {
+    await maybeDelay();
+    const chaos = maybeError();
+    if (chaos) return chaos;
+    return HttpResponse.json({"items":[{"strategy_id":"00000000-0000-0000-0000-000000000001","version":3,"code":"# v3: tightened stop\nfrom claw.strategy import Strategy\nclass MyStrategy(Strategy):\n    pass\n","summary":"Tightened stop loss to 2ATR","params_schema":{"fast":{"type":"int","default":10}},"parent_version":2,"created_at":1744416000},{"strategy_id":"00000000-0000-0000-0000-000000000001","version":2,"code":"# v2\nfrom claw.strategy import Strategy\nclass MyStrategy(Strategy):\n    pass\n","summary":"Added RSI filter","params_schema":null,"parent_version":1,"created_at":1744330000},{"strategy_id":"00000000-0000-0000-0000-000000000001","version":1,"code":"# v1 initial\nfrom claw.strategy import Strategy\nclass MyStrategy(Strategy):\n    pass\n","summary":"Initial version","params_schema":null,"parent_version":null,"created_at":1743768000}],"next_cursor":null});
+  }),
+  // createStrategyVersion
+  http.post('*/api/strategies/:id/versions', async () => {
+    await maybeDelay();
+    const chaos = maybeError();
+    if (chaos) return chaos;
+    return HttpResponse.json({"strategy_id":"00000000-0000-0000-0000-000000000001","version":4,"code":"# v4\nfrom claw.strategy import Strategy\nclass MyStrategy(Strategy):\n    pass\n","summary":"OptimLens applied: fast=8","params_schema":{"fast":{"type":"int","default":8}},"parent_version":3,"created_at":1744416120});
+  }),
+  // getStrategyVersion
+  http.get('*/api/strategies/:id/versions/:version', async () => {
+    await maybeDelay();
+    const chaos = maybeError();
+    if (chaos) return chaos;
+    return HttpResponse.json({"strategy_id":"00000000-0000-0000-0000-000000000001","version":2,"code":"# v2\nfrom claw.strategy import Strategy\nclass MyStrategy(Strategy):\n    pass\n","summary":"Added RSI filter","params_schema":null,"parent_version":1,"created_at":1744330000});
+  }),
+  // startOptimLens
+  http.post('*/api/analysis/optimlens', async () => {
+    await maybeDelay();
+    const chaos = maybeError();
+    if (chaos) return chaos;
+    return HttpResponse.json({"task_id":"00000000-0000-0000-0000-000000000030","status":"pending","started_at":1744416000});
+  }),
+  // getOptimLensResult
+  http.get('*/api/analysis/optimlens/:task_id', async () => {
+    await maybeDelay();
+    const chaos = maybeError();
+    if (chaos) return chaos;
+    return HttpResponse.json({"task_id":"00000000-0000-0000-0000-000000000030","status":"done","started_at":1744416000,"finished_at":1744416240,"result":{"base_metrics":{"total_return":12.5,"sharpe":1.42,"sortino":1.85,"calmar":1.12,"profit_factor":1.78,"win_rate":56,"avg_trade":2.1,"avg_hours_in_trade":4.5,"positive_days_ratio":0.56,"max_drawdown":-8.2,"total_trades":48},"grid_results":[{"combo":{"fast":5,"slow":20},"metrics":{"total_return":10.2,"sharpe":1.28,"max_drawdown":-9.1,"win_rate":52,"profit_factor":1.55,"avg_trade":1.8,"avg_hours_in_trade":3.9,"positive_days_ratio":0.53,"sortino":1.61,"calmar":0.98,"total_trades":62}},{"combo":{"fast":10,"slow":30},"metrics":{"total_return":12.5,"sharpe":1.42,"max_drawdown":-8.2,"win_rate":56,"profit_factor":1.78,"avg_trade":2.1,"avg_hours_in_trade":4.5,"positive_days_ratio":0.56,"sortino":1.85,"calmar":1.12,"total_trades":48}},{"combo":{"fast":8,"slow":25},"metrics":{"total_return":15.1,"sharpe":1.65,"max_drawdown":-6.5,"win_rate":59,"profit_factor":2.02,"avg_trade":2.4,"avg_hours_in_trade":4.2,"positive_days_ratio":0.61,"sortino":2.12,"calmar":1.4,"total_trades":54}}],"improvements":[{"title":"Tighten fast SMA to 8","category":"params","rationale":"Grid results show fast=8 with slow=25 outperforms the base (fast=10, slow=30) on Sharpe (+0.23) and reduces max drawdown to -6.5%. The tighter fast moving average captures early momentum shifts in the recent sideways regime.","expected_delta":{"sharpe":0.23,"max_drawdown":1.7,"win_rate":3},"suggested_change":{"kind":"param_update","payload":{"param_name":"fast","current":10,"suggested":8}}},{"title":"Add 1h volume filter to entry","category":"filter","rationale":"Over half of losing entries occurred when volume was < 0.5× its 20-bar average. Filtering those out should preserve ~95% of winning trades while cutting ~60% of the losers.","expected_delta":{"sharpe":0.15,"max_drawdown":0.8,"win_rate":4.5},"suggested_change":{"kind":"code_edit","payload":{"unified_diff":"@@ on_bar(self, bar): @@\n+        if bar.volume < self.indicator('SMA', period=20).iloc[-1] * 0.5:\n+            return\n"}}}]}});
+  }),
+  // startSignalReview
+  http.post('*/api/analysis/signals', async () => {
+    await maybeDelay();
+    const chaos = maybeError();
+    if (chaos) return chaos;
+    return HttpResponse.json({"task_id":"00000000-0000-0000-0000-000000000040","status":"pending","started_at":1744416000});
+  }),
+  // getSignalReviewResult
+  http.get('*/api/analysis/signals/:task_id', async () => {
+    await maybeDelay();
+    const chaos = maybeError();
+    if (chaos) return chaos;
+    return HttpResponse.json({"task_id":"00000000-0000-0000-0000-000000000040","status":"done","started_at":1744416000,"finished_at":1744416060,"result":{"signals_total":12,"verdicts":[{"signal_id":"s1","symbol":"BTC_USDT","entry_ts":1744340000,"verdict":"good","note":"Clean breakout on rising volume; trend filter aligned."},{"signal_id":"s2","symbol":"BTC_USDT","entry_ts":1744351000,"verdict":"good","note":"Pullback entry in established uptrend."},{"signal_id":"s3","symbol":"ETH_USDT","entry_ts":1744360000,"verdict":"questionable","note":"Entered late after a vertical move; limited room for further upside."},{"signal_id":"s4","symbol":"LINK_USDT","entry_ts":1744365000,"verdict":"bad","note":"Chop zone; BB squeeze suggested false breakout, still entered."},{"signal_id":"s5","symbol":"NEAR_USDT","entry_ts":1744370000,"verdict":"questionable","note":"Mid-day consolidation entry; lower conviction period."}],"summary":{"good":2,"questionable":2,"bad":1}}});
+  }),
+  // explainTrade
+  http.post('*/api/analysis/trade', async () => {
+    await maybeDelay();
+    const chaos = maybeError();
+    if (chaos) return chaos;
+    return HttpResponse.json({"trade_id":"#4","narrative":"Trade #4 entered long on BTC_USDT at $64,750 on 2025-10-18 08:00 after SMA(10) crossed above SMA(30) with a widening spread — a strong trend-onset signal. RSI(14) at 42 from oversold gave room to run. Exited at $65,810 (+1.63%) when the fast SMA rolled back below slow, a textbook trail-stop pattern.","entry_context":{"indicators":{"sma_10":64650,"sma_30":64480,"rsi_14":42.1,"atr_14":520},"regime":"trending_up"},"exit_context":{"reason":"trail_stop","indicators":{"sma_10":65790,"sma_30":65820,"rsi_14":58.3}}});
+  }),
+  // getEngineStatus
+  http.get('*/api/engine/status', async () => {
+    await maybeDelay();
+    const chaos = maybeError();
+    if (chaos) return chaos;
+    return HttpResponse.json({"version":"0.1.0","data_aggregator_version":"0.1.0","supported_markets":["futures"],"supported_intervals":["5m","15m","30m","1h","4h","1d"],"data_range":{"from":1672531200,"to":1744416000},"last_aggregator_sync_at":1744415400,"active_tasks":2,"uptime_seconds":45620});
+  }),
 ];
 
-export const operationIds = ["getHealth","getKlines","listSymbols","listGaps","createStrategy","listStrategies","getStrategy","startBacktest","getBacktestStatus","getBacktestResult","listBacktestHistory","startScreener","getScreenerResult"] as const;
+export const operationIds = ["getHealth","getKlines","listSymbols","listGaps","createStrategy","listStrategies","getStrategy","startBacktest","getBacktestStatus","getBacktestResult","listBacktestHistory","startScreener","getScreenerResult","getSymbolMetadata","listStrategyVersions","createStrategyVersion","getStrategyVersion","startOptimLens","getOptimLensResult","startSignalReview","getSignalReviewResult","explainTrade","getEngineStatus"] as const;

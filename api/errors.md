@@ -152,3 +152,36 @@ generic "Something went wrong" message.
 - HTTP: `500`
 - `details.legacy_payload: any` — if this is an adapter-translated legacy
   error, the raw payload is attached for debugging
+
+## `STRATEGY_VERSION_NOT_FOUND`
+
+Referenced strategy version does not exist (out of range or `parent_version`
+refers to a non-existent version on create).
+
+- HTTP: `404` (or `400` on create-time validation)
+- `details.strategy_id: string`, `details.version: integer`
+- `details.current_version: integer`
+
+## `PARAM_GRID_TOO_LARGE`
+
+OptimLens request's `param_grid` cross-product exceeds the server-side cap
+(default 50).
+
+- HTTP: `400`
+- `details.submitted: integer`, `details.max: integer`
+
+## `LLM_PROVIDER_FAILED`
+
+Upstream LLM provider failed (timeout, invalid JSON output, provider-side
+rate limit). Emitted by analysis endpoints.
+
+- HTTP: `504` for sync, or `TaskResponse.status=failed` for async
+- `details.provider: string`, `details.reason: string`
+
+## `LLM_BUDGET_EXCEEDED`
+
+Per-user / per-session / per-request token budget exceeded. Reserved; not
+enforced yet.
+
+- HTTP: `402` or `429`
+- `details.budget_remaining: integer`, `details.estimated_cost: integer`

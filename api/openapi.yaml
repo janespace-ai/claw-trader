@@ -93,6 +93,7 @@ components:
         - INVALID_RANGE
         - SYMBOL_NOT_FOUND
         - STRATEGY_NOT_FOUND
+        - STRATEGY_VERSION_NOT_FOUND
         - BACKTEST_NOT_FOUND
         - SCREENER_NOT_FOUND
         - TASK_NOT_FOUND
@@ -103,6 +104,9 @@ components:
         - RATE_LIMITED
         - UPSTREAM_UNREACHABLE
         - INTERNAL_ERROR
+        - PARAM_GRID_TOO_LARGE
+        - LLM_PROVIDER_FAILED
+        - LLM_BUDGET_EXCEEDED
 
     ErrorBody:
       type: object
@@ -358,6 +362,290 @@ components:
         results:
           type: array
           items: { $ref: "#/components/schemas/ScreenerRowResult" }
+
+    # --- New capability schemas (api-contract-new-capabilities) ---------
+
+    BacktestMode:
+      type: string
+      enum: [preview, deep]
+      description: Mode drives default lookback (preview=7d, deep=180d).
+
+    MonthlyPoint:
+      type: object
+      required: [month, return_pct]
+      properties:
+        month: { type: string, description: "YYYY-MM" }
+        return_pct: { type: number }
+
+    Signal:
+      type: object
+      required: [signal_id, symbol, ts, kind]
+      properties:
+        signal_id: { type: string }
+        symbol: { type: string }
+        ts: { type: integer }
+        kind: { type: string, enum: [long, short, flat] }
+        indicators:
+          type: object
+          additionalProperties: { type: number }
+
+    SymbolResult:
+      type: object
+      description: Per-symbol breakdown of a multi-symbol backtest.
+      properties:
+        metrics: { $ref: "#/components/schemas/MetricsBlockExtended" }
+        equity_curve:
+          type: array
+          items: { $ref: "#/components/schemas/EquityPoint" }
+        trades:
+          type: array
+          items: { $ref: "#/components/schemas/Trade" }
+        signals:
+          type: array
+          items: { $ref: "#/components/schemas/Signal" }
+
+    SummaryBlock:
+      type: object
+      description: Aggregated across symbols (equal-weighted).
+      properties:
+        metrics: { $ref: "#/components/schemas/MetricsBlockExtended" }
+        equity_curve:
+          type: array
+          items: { $ref: "#/components/schemas/EquityPoint" }
+        drawdown_curve:
+          type: array
+          items: { $ref: "#/components/schemas/EquityPoint" }
+        monthly_returns:
+          type: array
+          items: { $ref: "#/components/schemas/MonthlyPoint" }
+
+    MetricsBlockExtended:
+      type: object
+      description: Extended metrics superset used by Deep Backtest + OptimLens.
+      properties:
+        total_return: { type: number, nullable: true }
+        sharpe: { type: number, nullable: true }
+        sortino: { type: number, nullable: true }
+        calmar: { type: number, nullable: true }
+        profit_factor: { type: number, nullable: true }
+        win_rate: { type: number, nullable: true }
+        avg_trade: { type: number, nullable: true }
+        avg_hours_in_trade: { type: number, nullable: true }
+        positive_days_ratio: { type: number, nullable: true }
+        max_drawdown: { type: number, nullable: true }
+        total_trades: { type: integer }
+
+    BacktestResultExtended:
+      type: object
+      description: |
+        New multi-symbol + preview/deep backtest result shape. Replaces
+        the single-mode `BacktestResult` for `startBacktest` + `getBacktestResult`.
+      required: [summary, per_symbol]
+      properties:
+        summary: { $ref: "#/components/schemas/SummaryBlock" }
+        per_symbol:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/SymbolResult"
+
+    # --- Strategy versions -----------------------------------------------
+
+    StrategyVersion:
+      type: object
+      required: [strategy_id, version, code, created_at]
+      properties:
+        strategy_id: { type: string, format: uuid }
+        version: { type: integer, minimum: 1 }
+        code: { type: string }
+        summary: { type: string, nullable: true }
+        params_schema:
+          type: object
+          additionalProperties: true
+          nullable: true
+        parent_version:
+          type: integer
+          nullable: true
+        created_at: { type: integer }
+
+    # --- Analysis: OptimLens ---------------------------------------------
+
+    OptimLensRequest:
+      type: object
+      required: [strategy_id, symbols, param_grid]
+      properties:
+        strategy_id: { type: string, format: uuid }
+        symbols:
+          type: array
+          items: { type: string }
+          minItems: 1
+          maxItems: 50
+        lookback_days: { type: integer }
+        param_grid:
+          type: object
+          description: >
+            Map of param-name → list of values. Server computes the
+            cross-product; rejected with PARAM_GRID_TOO_LARGE if > 50.
+          additionalProperties:
+            type: array
+            items: {}
+
+    OptimLensImprovement:
+      type: object
+      required: [title, category, rationale]
+      properties:
+        title: { type: string }
+        category:
+          type: string
+          enum: [entry, exit, params, filter, risk_mgmt]
+        rationale: { type: string }
+        expected_delta:
+          type: object
+          properties:
+            sharpe: { type: number, nullable: true }
+            max_drawdown: { type: number, nullable: true }
+            win_rate: { type: number, nullable: true }
+        suggested_change:
+          type: object
+          description: Either a param_update or a code_edit.
+          properties:
+            kind: { type: string, enum: [param_update, code_edit] }
+            payload:
+              type: object
+              additionalProperties: true
+
+    OptimLensResult:
+      type: object
+      required: [improvements]
+      properties:
+        base_metrics: { $ref: "#/components/schemas/MetricsBlockExtended" }
+        grid_results:
+          type: array
+          description: Per-combo metrics (one row per sub-backtest that ran).
+          items:
+            type: object
+            properties:
+              combo:
+                type: object
+                additionalProperties: true
+              metrics: { $ref: "#/components/schemas/MetricsBlockExtended" }
+        improvements:
+          type: array
+          items: { $ref: "#/components/schemas/OptimLensImprovement" }
+
+    # --- Analysis: SignalReview ------------------------------------------
+
+    SignalReviewRequest:
+      type: object
+      required: [backtest_task_id]
+      properties:
+        backtest_task_id: { type: string, format: uuid }
+
+    SignalVerdict:
+      type: object
+      required: [signal_id, symbol, entry_ts, verdict]
+      properties:
+        signal_id: { type: string }
+        symbol: { type: string }
+        entry_ts: { type: integer }
+        verdict: { type: string, enum: [good, questionable, bad] }
+        note: { type: string }
+
+    SignalReviewResult:
+      type: object
+      required: [signals_total, verdicts, summary]
+      properties:
+        signals_total: { type: integer }
+        verdicts:
+          type: array
+          items: { $ref: "#/components/schemas/SignalVerdict" }
+        summary:
+          type: object
+          properties:
+            good: { type: integer }
+            questionable: { type: integer }
+            bad: { type: integer }
+
+    # --- Analysis: TradeExplain (synchronous) ----------------------------
+
+    TradeExplainRequest:
+      oneOf:
+        - type: object
+          required: [backtest_task_id, symbol, trade_id]
+          properties:
+            backtest_task_id: { type: string, format: uuid }
+            symbol: { type: string }
+            trade_id: { type: string }
+        - type: object
+          required: [trade, klines_context]
+          properties:
+            trade: { $ref: "#/components/schemas/Trade" }
+            klines_context:
+              type: array
+              items: { $ref: "#/components/schemas/Kline" }
+
+    TradeExplainResult:
+      type: object
+      required: [trade_id, narrative]
+      properties:
+        trade_id: { type: string }
+        narrative: { type: string }
+        entry_context:
+          type: object
+          properties:
+            indicators:
+              type: object
+              additionalProperties: { type: number }
+            regime: { type: string }
+        exit_context:
+          type: object
+          properties:
+            reason: { type: string }
+            indicators:
+              type: object
+              additionalProperties: { type: number }
+
+    # --- Engine status ---------------------------------------------------
+
+    EngineStatus:
+      type: object
+      required: [version, supported_markets, supported_intervals, uptime_seconds, active_tasks]
+      properties:
+        version: { type: string }
+        data_aggregator_version: { type: string, nullable: true }
+        supported_markets:
+          type: array
+          items: { $ref: "#/components/schemas/Market" }
+        supported_intervals:
+          type: array
+          items: { $ref: "#/components/schemas/Interval" }
+        data_range:
+          type: object
+          nullable: true
+          properties:
+            from: { type: integer, nullable: true }
+            to: { type: integer, nullable: true }
+        last_aggregator_sync_at:
+          type: integer
+          nullable: true
+        active_tasks: { type: integer }
+        uptime_seconds: { type: integer }
+
+    # --- Symbol metadata -------------------------------------------------
+
+    SymbolMetadata:
+      type: object
+      required: [symbol, market, status]
+      properties:
+        symbol: { type: string }
+        name: { type: string }
+        market: { $ref: "#/components/schemas/Market" }
+        rank: { type: integer, nullable: true }
+        volume_24h_quote: { type: number, nullable: true }
+        last_price: { type: number, nullable: true }
+        change_24h_pct: { type: number, nullable: true }
+        first_kline_at: { type: integer, nullable: true }
+        last_kline_at: { type: integer, nullable: true }
+        status: { type: string, enum: [active, inactive] }
 
 # =============================================================================
 # Paths
@@ -684,3 +972,235 @@ paths:
                   - type: object
                     properties:
                       result: { $ref: "#/components/schemas/ScreenerResult" }
+
+  # --- New: symbol metadata -------------------------------------------------
+
+  /api/symbols/{symbol}/metadata:
+    get:
+      operationId: getSymbolMetadata
+      summary: Get metadata for a single symbol
+      parameters:
+        - in: path
+          name: symbol
+          required: true
+          schema: { type: string, pattern: "^[A-Z0-9_]+$" }
+      responses:
+        "200":
+          description: Symbol metadata
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SymbolMetadata" }
+        "404":
+          description: Symbol not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  # --- New: strategy versions -----------------------------------------------
+
+  /api/strategies/{id}/versions:
+    get:
+      operationId: listStrategyVersions
+      summary: List all versions of a strategy (newest first)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        "200":
+          description: Paginated versions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Pagination"
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/StrategyVersion" }
+    post:
+      operationId: createStrategyVersion
+      summary: Append a new version to a strategy
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+                summary: { type: string }
+                params_schema:
+                  type: object
+                  additionalProperties: true
+                parent_version: { type: integer }
+      responses:
+        "200":
+          description: New version
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StrategyVersion" }
+        "400":
+          description: Bad parent_version
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/strategies/{id}/versions/{version}:
+    get:
+      operationId: getStrategyVersion
+      summary: Get one specific version
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+        - in: path
+          name: version
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Version payload
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/StrategyVersion" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  # --- New: analysis/optimlens ----------------------------------------------
+
+  /api/analysis/optimlens:
+    post:
+      operationId: startOptimLens
+      summary: Submit an OptimLens parameter-sweep + synthesis task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OptimLensRequest" }
+      responses:
+        "200":
+          description: Task accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+        "400":
+          description: param_grid too large
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/analysis/optimlens/{task_id}:
+    get:
+      operationId: getOptimLensResult
+      summary: Poll / fetch OptimLens task
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Task envelope (result present when done)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TaskResponse"
+                  - type: object
+                    properties:
+                      result: { $ref: "#/components/schemas/OptimLensResult" }
+
+  # --- New: analysis/signals ------------------------------------------------
+
+  /api/analysis/signals:
+    post:
+      operationId: startSignalReview
+      summary: Submit a signal-review task for a backtest's signals
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SignalReviewRequest" }
+      responses:
+        "200":
+          description: Task accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+
+  /api/analysis/signals/{task_id}:
+    get:
+      operationId: getSignalReviewResult
+      summary: Poll / fetch SignalReview task
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Task envelope
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TaskResponse"
+                  - type: object
+                    properties:
+                      result: { $ref: "#/components/schemas/SignalReviewResult" }
+
+  # --- New: analysis/trade (synchronous) ------------------------------------
+
+  /api/analysis/trade:
+    post:
+      operationId: explainTrade
+      summary: Synchronous per-trade explanation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TradeExplainRequest" }
+      responses:
+        "200":
+          description: Trade explanation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TradeExplainResult" }
+        "504":
+          description: LLM provider failed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  # --- New: engine status ---------------------------------------------------
+
+  /api/engine/status:
+    get:
+      operationId: getEngineStatus
+      summary: Backend self-description for the Settings page
+      responses:
+        "200":
+          description: Engine status
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EngineStatus" }

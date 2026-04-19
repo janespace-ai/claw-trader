@@ -1,0 +1,32 @@
+{
+  "items": [
+    {
+      "strategy_id": "00000000-0000-0000-0000-000000000001",
+      "version": 3,
+      "code": "# v3: tightened stop\nfrom claw.strategy import Strategy\nclass MyStrategy(Strategy):\n    pass\n",
+      "summary": "Tightened stop loss to 2ATR",
+      "params_schema": { "fast": { "type": "int", "default": 10 } },
+      "parent_version": 2,
+      "created_at": 1744416000
+    },
+    {
+      "strategy_id": "00000000-0000-0000-0000-000000000001",
+      "version": 2,
+      "code": "# v2\nfrom claw.strategy import Strategy\nclass MyStrategy(Strategy):\n    pass\n",
+      "summary": "Added RSI filter",
+      "params_schema": null,
+      "parent_version": 1,
+      "created_at": 1744330000
+    },
+    {
+      "strategy_id": "00000000-0000-0000-0000-000000000001",
+      "version": 1,
+      "code": "# v1 initial\nfrom claw.strategy import Strategy\nclass MyStrategy(Strategy):\n    pass\n",
+      "summary": "Initial version",
+      "params_schema": null,
+      "parent_version": null,
+      "created_at": 1743768000
+    }
+  ],
+  "next_cursor": null
+}

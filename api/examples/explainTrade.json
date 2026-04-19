@@ -1,0 +1,12 @@
+{
+  "trade_id": "#4",
+  "narrative": "Trade #4 entered long on BTC_USDT at $64,750 on 2025-10-18 08:00 after SMA(10) crossed above SMA(30) with a widening spread — a strong trend-onset signal. RSI(14) at 42 from oversold gave room to run. Exited at $65,810 (+1.63%) when the fast SMA rolled back below slow, a textbook trail-stop pattern.",
+  "entry_context": {
+    "indicators": { "sma_10": 64650.0, "sma_30": 64480.0, "rsi_14": 42.1, "atr_14": 520.0 },
+    "regime": "trending_up"
+  },
+  "exit_context": {
+    "reason": "trail_stop",
+    "indicators": { "sma_10": 65790.0, "sma_30": 65820.0, "rsi_14": 58.3 }
+  }
+}

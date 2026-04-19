@@ -168,6 +168,108 @@ export const cremote = {
     );
     return adaptTaskResponse(res) as TaskResponse & { result?: ScreenerResult };
   },
+
+  // ======================================================================
+  // New capabilities (api-contract-new-capabilities)
+  // ======================================================================
+
+  // --- Symbol metadata ---
+
+  async getSymbolMetadata(params: { symbol: string }): Promise<Schemas['SymbolMetadata']> {
+    return iface().fetch(
+      `/api/symbols/${encodeURIComponent(params.symbol)}/metadata`,
+      { method: 'GET' },
+    );
+  },
+
+  // --- Strategy versions ---
+
+  async listStrategyVersions(params: {
+    strategy_id: string;
+    limit?: number;
+    cursor?: string;
+  }): Promise<Paginated<Schemas['StrategyVersion']>> {
+    const res = await iface().fetch(
+      `/api/strategies/${encodeURIComponent(params.strategy_id)}/versions`,
+      { method: 'GET', query: { limit: params.limit, cursor: params.cursor } },
+    );
+    return adaptPaginated<Schemas['StrategyVersion']>(res);
+  },
+
+  async createStrategyVersion(params: {
+    strategy_id: string;
+    body: {
+      code: string;
+      summary?: string;
+      params_schema?: Record<string, unknown>;
+      parent_version?: number;
+    };
+  }): Promise<Schemas['StrategyVersion']> {
+    return iface().fetch(
+      `/api/strategies/${encodeURIComponent(params.strategy_id)}/versions`,
+      { method: 'POST', body: params.body },
+    );
+  },
+
+  async getStrategyVersion(params: {
+    strategy_id: string;
+    version: number;
+  }): Promise<Schemas['StrategyVersion']> {
+    return iface().fetch(
+      `/api/strategies/${encodeURIComponent(params.strategy_id)}/versions/${params.version}`,
+      { method: 'GET' },
+    );
+  },
+
+  // --- Analysis: OptimLens ---
+
+  async startOptimLens(body: Schemas['OptimLensRequest']): Promise<TaskResponse> {
+    const res = await iface().fetch('/api/analysis/optimlens', { method: 'POST', body });
+    return adaptTaskResponse(res);
+  },
+
+  async getOptimLensResult(params: { task_id: string }): Promise<
+    TaskResponse & { result?: Schemas['OptimLensResult'] }
+  > {
+    const res = await iface().fetch(
+      `/api/analysis/optimlens/${encodeURIComponent(params.task_id)}`,
+      { method: 'GET' },
+    );
+    return adaptTaskResponse(res) as TaskResponse & { result?: Schemas['OptimLensResult'] };
+  },
+
+  // --- Analysis: SignalReview ---
+
+  async startSignalReview(body: Schemas['SignalReviewRequest']): Promise<TaskResponse> {
+    const res = await iface().fetch('/api/analysis/signals', { method: 'POST', body });
+    return adaptTaskResponse(res);
+  },
+
+  async getSignalReviewResult(params: { task_id: string }): Promise<
+    TaskResponse & { result?: Schemas['SignalReviewResult'] }
+  > {
+    const res = await iface().fetch(
+      `/api/analysis/signals/${encodeURIComponent(params.task_id)}`,
+      { method: 'GET' },
+    );
+    return adaptTaskResponse(res) as TaskResponse & {
+      result?: Schemas['SignalReviewResult'];
+    };
+  },
+
+  // --- Analysis: TradeExplain (synchronous) ---
+
+  async explainTrade(
+    body: Schemas['TradeExplainRequest'],
+  ): Promise<Schemas['TradeExplainResult']> {
+    return iface().fetch('/api/analysis/trade', { method: 'POST', body });
+  },
+
+  // --- Engine status ---
+
+  async getEngineStatus(): Promise<Schemas['EngineStatus']> {
+    return iface().fetch('/api/engine/status', { method: 'GET' });
+  },
 };
 
 // ---- Error unwrapping ------------------------------------------------------
