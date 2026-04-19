@@ -1,4 +1,6 @@
 import { useTranslation } from 'react-i18next';
+import { ViewModeSwitcher } from '@/components/workspace/ViewModeSwitcher';
+import type { ViewMode } from '@/stores/workspaceStore';
 
 interface Props {
   symbol: string;
@@ -7,6 +9,8 @@ interface Props {
   symbolsTotal: number;
   onConfirmDeep: () => void;
   isRunningDeep: boolean;
+  viewMode: ViewMode;
+  onViewModeChange: (m: ViewMode) => void;
 }
 
 export function PreviewTopbar({
@@ -16,6 +20,8 @@ export function PreviewTopbar({
   symbolsTotal,
   onConfirmDeep,
   isRunningDeep,
+  viewMode,
+  onViewModeChange,
 }: Props) {
   const { t } = useTranslation();
   return (
@@ -32,6 +38,7 @@ export function PreviewTopbar({
         </span>
       </div>
       <div className="flex items-center gap-2">
+        <ViewModeSwitcher viewMode={viewMode} onChange={onViewModeChange} />
         <button
           onClick={onConfirmDeep}
           disabled={isRunningDeep}

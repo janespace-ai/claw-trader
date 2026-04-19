@@ -51,6 +51,10 @@ export function installTestBridge(): void {
         code: draft.code,
       });
     },
+    /** Flip the Workspace view mode (Chart ↔ Grid). */
+    setWorkspaceViewMode(mode: 'chart' | 'grid') {
+      useWorkspaceStore.getState().setViewMode(mode);
+    },
     /** Seed the screener run store with deterministic results. */
     seedScreenerRun(seed: {
       focusedSymbol?: string;

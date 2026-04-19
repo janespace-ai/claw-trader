@@ -16,6 +16,7 @@ import { useAutoSignalReview } from '@/stores/useAutoSignalReview';
 import { VerdictList } from '@/components/chat/VerdictList';
 import { PreviewTopbar } from './PreviewTopbar';
 import { TradesTab } from '@/components/workspace/TradesTab';
+import { CrossSymbolGrid } from '@/components/workspace/CrossSymbolGrid';
 import { QuickMetricsTab } from './QuickMetricsTab';
 import type { components } from '@/types/api';
 
@@ -42,6 +43,8 @@ export function PreviewBacktest() {
   const currentStrategyId = useWorkspaceStore((s) => s.currentStrategyId);
   const currentTaskId = useWorkspaceStore((s) => s.currentTaskId);
   const enterDeep = useWorkspaceStore((s) => s.enterDeep);
+  const viewMode = useWorkspaceStore((s) => s.viewMode);
+  const setViewMode = useWorkspaceStore((s) => s.setViewMode);
   const navigate = useAppStore((s) => s.navigate);
 
   // Auto-start Signal Review once per taskId.
@@ -221,6 +224,8 @@ export function PreviewBacktest() {
           symbolsTotal={uniqueSymbols.length}
           onConfirmDeep={handleConfirmDeep}
           isRunningDeep={isRunningDeep}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
         />
       }
       leftRail={
@@ -234,7 +239,42 @@ export function PreviewBacktest() {
       }
       main={
         <div className="flex flex-col gap-4 p-4">
-          <ClawChart.Candles data={klines} markers={markers} height={340} showVolume />
+          {viewMode === 'chart' ? (
+            <ClawChart.Candles data={klines} markers={markers} height={340} showVolume />
+          ) : (
+            <CrossSymbolGrid
+              cells={uniqueSymbols.map((sym) => {
+                const ts = allTrades.filter((t) => t.symbol === sym);
+                let cum = 1;
+                const equity = ts
+                  .slice()
+                  .sort((a, b) => (a.exit_ts ?? a.entry_ts) - (b.exit_ts ?? b.entry_ts))
+                  .map((t) => {
+                    cum *= 1 + (t.pnl_pct ?? 0);
+                    return { ts: t.exit_ts ?? t.entry_ts, value: cum };
+                  });
+                return {
+                  symbol: sym,
+                  equity,
+                  returnPct: equity.length > 0 ? equity[equity.length - 1].value - 1 : 0,
+                  trades: ts.length,
+                };
+              })}
+              focusedSymbol={focusedSymbol}
+              onSingleClick={(s) => {
+                setFocus(s);
+                setViewMode('chart');
+              }}
+              onDoubleClick={(s) =>
+                navigate({
+                  kind: 'symbol-detail',
+                  symbol: s,
+                  returnTo: { kind: 'workspace' },
+                  backtestTaskId: currentTaskId ?? undefined,
+                })
+              }
+            />
+          )}
           {reviewEntry?.status === 'unavailable' && (
             <div className="text-[11px] text-fg-muted border border-border-subtle rounded-md px-3 py-2">
               Signal Review backend not available yet — the screen still reflects
