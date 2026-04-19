@@ -5,9 +5,11 @@ import { ScreenerPage } from '@/pages/ScreenerPage';
 import { StrategiesPage } from '@/pages/StrategiesPage';
 import { BacktestPage } from '@/pages/BacktestPage';
 import { SettingsModal } from '@/pages/SettingsPage';
+import { StrategyDesign } from '@/screens/workspace/StrategyDesign';
 import { useAppStore } from '@/stores/appStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useStrategyStore } from '@/stores/strategyStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 /**
  * Top-level route renderer. Switches on `appStore.route.kind` (new,
@@ -30,6 +32,7 @@ export default function App() {
   const route = useAppStore((s) => s.route);
   const panelW = useAppStore((s) => s.aiPanelWidth);
   const panelCollapsed = useAppStore((s) => s.aiPanelCollapsed);
+  const workspaceMode = useWorkspaceStore((s) => s.mode);
 
   const loadSettings = useSettingsStore((s) => s.load);
   const loadStrategies = useStrategyStore((s) => s.load);
@@ -48,7 +51,8 @@ export default function App() {
         <main className="flex-1 overflow-y-auto">
           {route.kind === 'screener' && <ScreenerPage />}
           {route.kind === 'strategies' && <StrategiesPage />}
-          {route.kind === 'workspace' && <BacktestPage />}
+          {route.kind === 'workspace' && workspaceMode === 'design' && <StrategyDesign />}
+          {route.kind === 'workspace' && workspaceMode !== 'design' && <BacktestPage />}
           {route.kind === 'symbol-detail' && (
             <div className="p-6 text-fg-muted">
               Symbol detail for {route.symbol} — coming in the{' '}

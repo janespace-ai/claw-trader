@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { useAppStore, type Tab } from '@/stores/appStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 interface Props {
   onOpenSettings: () => void;
@@ -10,7 +11,18 @@ export function TopBar({ onOpenSettings }: Props) {
   const { t } = useTranslation();
   const tab = useAppStore((s) => s.currentTab);
   const setTab = useAppStore((s) => s.setTab);
+  const enterDesign = useWorkspaceStore((s) => s.enterDesign);
   const remoteConnected = useSettingsStore((s) => s.remoteConnected);
+
+  // "Backtest" tab maps to the workspace route. Clicking it from any
+  // other tab should land on the Strategy Design sub-mode rather than
+  // whatever mode the user left behind previously.
+  const handleTabClick = (key: Tab) => {
+    setTab(key);
+    if (key === 'backtest') {
+      enterDesign();
+    }
+  };
 
   const tabs: { key: Tab; labelKey: string }[] = [
     { key: 'screener', labelKey: 'nav.screener' },
@@ -31,7 +43,7 @@ export function TopBar({ onOpenSettings }: Props) {
         {tabs.map((x) => (
           <button
             key={x.key}
-            onClick={() => setTab(x.key)}
+            onClick={() => handleTabClick(x.key)}
             className={
               'px-4 py-2 rounded-md text-xs font-medium transition-colors ' +
               (tab === x.key

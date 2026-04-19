@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStrategyStore } from '@/stores/strategyStore';
+import { useAppStore } from '@/stores/appStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 type FilterKind = 'all' | 'favorites' | 'active' | 'archived';
 
@@ -10,6 +12,17 @@ export function StrategiesPage() {
   const setCurrent = useStrategyStore((s) => s.setCurrent);
   const toggleFav = useStrategyStore((s) => s.toggleFavorite);
   const setStatus = useStrategyStore((s) => s.setStatus);
+  const navigate = useAppStore((s) => s.navigate);
+  const enterDesign = useWorkspaceStore((s) => s.enterDesign);
+
+  // Opening a strategy takes the user to the Workspace / Strategy Design
+  // screen with this strategy as the current context, so the AI panel
+  // in strategist mode picks up params + code.
+  const openStrategy = (s: (typeof list)[number]) => {
+    setCurrent(s);
+    enterDesign(s.id);
+    navigate({ kind: 'workspace' });
+  };
 
   const [filter, setFilter] = useState<FilterKind>('all');
   const [query, setQuery] = useState('');
@@ -76,7 +89,7 @@ export function StrategiesPage() {
                 </div>
               </div>
               <button
-                onClick={() => setCurrent(s)}
+                onClick={() => openStrategy(s)}
                 className="text-xs text-accent-primary hover:underline"
               >
                 Open

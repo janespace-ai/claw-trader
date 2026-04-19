@@ -10,7 +10,11 @@ installBrowserStub();
 
 import './services/i18n';
 import { applyTheme, initThemeWatcher } from './services/theme';
+import { installTestBridge } from './services/test-bridge';
 import App from './App';
+
+// DEV-only test bridge for Playwright visual-regression specs.
+installTestBridge();
 
 // Apply the persisted theme as early as possible to avoid a flash.
 initThemeWatcher().then(applyTheme);
