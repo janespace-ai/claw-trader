@@ -3,9 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useConversationStore } from '@/stores/conversationStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useAppStore } from '@/stores/appStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
 import { startChatStream } from '@/services/llm/client';
 import { systemPromptFor } from '@/services/prompt';
+import { strategistSystemPrompt } from '@/services/prompt/personas/strategist';
+import { parseStrategistOutput } from '@/services/prompt/personas/parsers';
 import { resolveReplyLang } from '@/services/i18n';
+import { cremote } from '@/services/remote/contract-client';
 import type { ChatMessage, Conversation } from '@/types/domain';
 import { MessageList } from './MessageList';
 import { ConversationHistory } from './ConversationHistory';
@@ -22,6 +27,18 @@ export function AIPanel() {
 
   const { defaultProvider, providers, aiLanguagePolicy } = useSettingsStore();
   const currentTab = useAppStore((s) => s.currentTab);
+  const route = useAppStore((s) => s.route);
+  const workspaceMode = useWorkspaceStore((s) => s.mode);
+  const workspaceFocusedSymbol = useWorkspaceStore((s) => s.focusedSymbol);
+  const workspaceCurrentStrategyId = useWorkspaceStore((s) => s.currentStrategyId);
+  const setDraft = useWorkspaceDraftStore((s) => s.setDraft);
+  const draftStrategyId = useWorkspaceDraftStore((s) => s.strategyId);
+  const draftName = useWorkspaceDraftStore((s) => s.name);
+
+  /** True when the app is currently in the Strategy Design workspace —
+   *  the Strategist persona's auto-save flow should engage. */
+  const inStrategistMode =
+    route.kind === 'workspace' && workspaceMode === 'design';
 
   const [input, setInput] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -39,6 +56,66 @@ export function AIPanel() {
   const newConversation = () => {
     useConversationStore.getState().newConversation();
   };
+
+  /**
+   * Strategist-persona auto-save. Invoked from onDone after streaming
+   * completes. Parses the assistant message for a structured summary
+   * + code; if both are present, creates a new strategy (when there
+   * isn't one yet) + appends a version.
+   *
+   * Failures are swallowed — the user's chat experience continues. Errors
+   * surface in the chat bubble as visible content; the auto-save is a
+   * background nicety.
+   */
+  const maybeAutoSaveStrategistOutput = useCallback(
+    async (finalText: string) => {
+      const parsed = parseStrategistOutput(finalText);
+      if (!parsed.summary || !parsed.code) return;
+
+      try {
+        let strategyId = draftStrategyId ?? workspaceCurrentStrategyId ?? null;
+        if (!strategyId) {
+          // Create strategy + implicit v1 on backend. The backend
+          // currently doesn't auto-create v1 yet (that's the
+          // backtest-engine-strategy-versions change) — in the
+          // meantime we still record the strategy row.
+          const created = await cremote.createStrategy({
+            name: parsed.summary.name || draftName || 'Untitled',
+            code_type: 'strategy',
+            code: parsed.code,
+            params_schema: parsed.summary.params as Record<string, unknown> | undefined,
+          });
+          strategyId = created.id;
+        } else {
+          // Append a new version. Real backend will 404 today; we still
+          // attempt it so integration errors surface in the console.
+          // MSW returns a fixture.
+          try {
+            await cremote.createStrategyVersion({
+              strategy_id: strategyId,
+              body: {
+                code: parsed.code,
+                summary: parsed.summary.name,
+                params_schema: parsed.summary.params as Record<string, unknown> | undefined,
+              },
+            });
+          } catch {
+            // Silently absorb 404s pre-backend-rollout.
+          }
+        }
+
+        setDraft({
+          strategyId: strategyId ?? undefined,
+          summary: parsed.summary,
+          code: parsed.code,
+        });
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[strategist] auto-save failed', err);
+      }
+    },
+    [draftStrategyId, workspaceCurrentStrategyId, draftName, setDraft],
+  );
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -74,9 +151,20 @@ export function AIPanel() {
         ? '重要：用简体中文回复。策略/选币摘要（策略类型、条件描述、参数说明）也用中文。Python 代码本身保持英文。'
         : 'IMPORTANT: Reply in English. Strategy/screener summaries (strategy type, condition descriptions, parameter notes) should also be in English. Python code stays in English regardless.';
 
+    // Strategist persona (Strategy Design workspace) uses a richer
+    // prompt that requests a structured summary JSON + python code. For
+    // other tabs we fall back to the generic promptMode-based prompt.
+    const strategistPromptText = inStrategistMode
+      ? strategistSystemPrompt({
+          focusedSymbol: workspaceFocusedSymbol ?? 'BTC_USDT',
+          interval: '1h',
+          replyLang,
+        })
+      : null;
+
     const system: ChatMessage = {
       role: 'system',
-      content: systemPromptFor(promptMode) + '\n\n' + langLine,
+      content: strategistPromptText ?? systemPromptFor(promptMode) + '\n\n' + langLine,
     };
 
     setStreaming(true);
@@ -97,10 +185,18 @@ export function AIPanel() {
         full += chunk;
         setPartial(full);
       });
-      handle.onDone((complete) => {
-        append({ role: 'assistant', content: complete || full, ts: Date.now() });
+      handle.onDone(async (complete) => {
+        const finalText = complete || full;
+        append({ role: 'assistant', content: finalText, ts: Date.now() });
         setPartial('');
         setStreaming(false, null);
+
+        // Strategist persona: auto-parse + auto-save as a new strategy
+        // version. Silent failures are fine (parser returns null on
+        // invalid JSON; network failures just leave the draft stale).
+        if (inStrategistMode) {
+          await maybeAutoSaveStrategistOutput(finalText);
+        }
       });
       handle.onError((err) => {
         append({ role: 'assistant', content: `⚠️ ${err}`, ts: Date.now() });

@@ -22,6 +22,10 @@ each screen change lands.
 | — | Candle chart | `ClawChart.Candles` | Shipped | `ui-foundation` |
 | — | Mini sparkline | `ClawChart.Mini` | Shipped | `ui-foundation` |
 | — | Equity / drawdown curves | `ClawChart.Equity` (stacked variant for Deep) | Shipped | `ui-foundation` |
+| — | Strategy Design topbar | `screens/workspace/StrategyTopbar` | Shipped | `workspace-strategy-design` |
+| — | Strategy draft card | `screens/workspace/StrategyDraftCard` | Shipped | `workspace-strategy-design` |
+| — | Run Preview CTA card | `screens/workspace/RunPreviewCard` | Shipped | `workspace-strategy-design` |
+| `Q6cKp` / `MZuaq` | Strategy Design screen (dark / light) | `screens/workspace/StrategyDesign` | Shipped | `workspace-strategy-design` |
 
 ## Conventions
 
