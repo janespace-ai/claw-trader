@@ -5,12 +5,19 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useAppStore } from '@/stores/appStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
+import { useCoinListStore } from '@/stores/coinListStore';
+import { useAutoRunStore } from '@/stores/autoRunStore';
 import { startChatStream } from '@/services/llm/client';
 import { systemPromptFor } from '@/services/prompt';
 import { strategistSystemPrompt } from '@/services/prompt/personas/strategist';
 import { parseStrategistOutput } from '@/services/prompt/personas/parsers';
 import { resolveReplyLang } from '@/services/i18n';
 import { cremote } from '@/services/remote/contract-client';
+import {
+  extractPythonCode,
+  looksLikeScreener,
+  runScreenerFromCode,
+} from '@/services/chat/screenerRunner';
 import type { ChatMessage, Conversation } from '@/types/domain';
 import { MessageList } from './MessageList';
 import { ConversationHistory } from './ConversationHistory';
@@ -34,6 +41,8 @@ export function AIPanel() {
   const setDraft = useWorkspaceDraftStore((s) => s.setDraft);
   const draftStrategyId = useWorkspaceDraftStore((s) => s.strategyId);
   const draftName = useWorkspaceDraftStore((s) => s.name);
+  const setSymbols = useCoinListStore((s) => s.set);
+  const setAutoRunStatus = useAutoRunStore((s) => s.setStatus);
 
   /** True when the app is currently in the Strategy Design workspace —
    *  the Strategist persona's auto-save flow should engage. */
@@ -43,6 +52,29 @@ export function AIPanel() {
   const [input, setInput] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Kick the backend screener from within the chat flow. Non-blocking:
+  // the chat stays responsive while results trickle in.
+  const maybeAutoRunScreener = useCallback(
+    async (finalAssistantText: string) => {
+      if (currentTab !== 'screener') return;
+      const code = extractPythonCode(finalAssistantText);
+      if (!code || !looksLikeScreener(code)) return;
+
+      const messageIndex = useConversationStore.getState().messages.length - 1;
+      setAutoRunStatus({ phase: 'running', taskId: '' }, messageIndex);
+
+      await runScreenerFromCode(code, {
+        onUpdate: (state) => {
+          setAutoRunStatus(state, messageIndex);
+          if (state.phase === 'done') {
+            setSymbols(state.symbols);
+          }
+        },
+      });
+    },
+    [currentTab, setAutoRunStatus, setSymbols],
+  );
 
   const loadConversation = (c: Conversation) => {
     useConversationStore.setState({
@@ -197,6 +229,11 @@ export function AIPanel() {
         if (inStrategistMode) {
           await maybeAutoSaveStrategistOutput(finalText);
         }
+
+        // Auto-run hook: if we're on the screener tab and the assistant
+        // just emitted Python that looks like a screener, fire the
+        // backend directly and populate the left panel. No button needed.
+        void maybeAutoRunScreener(finalText);
       });
       handle.onError((err) => {
         append({ role: 'assistant', content: `⚠️ ${err}`, ts: Date.now() });
@@ -207,7 +244,7 @@ export function AIPanel() {
       append({ role: 'assistant', content: `⚠️ ${err?.message ?? String(err)}`, ts: Date.now() });
       setStreaming(false, null);
     }
-  }, [input, streaming, providers, defaultProvider, aiLanguagePolicy, messages, append, setStreaming, setPartial, t]);
+  }, [input, streaming, providers, defaultProvider, aiLanguagePolicy, messages, append, setStreaming, setPartial, t, currentTab, maybeAutoRunScreener]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
