@@ -7,6 +7,12 @@ release/
 .env.*
 # Commit the example template so new developers know what can be set.
 !.env.example
+
+# Per-install runtime override — if you drop a claw-config.json in the
+# project root for testing, don't accidentally commit your personal
+# backend URL. (The real location is <userData>/claw-config.json.)
+claw-config.json
+
 .DS_Store
 .vscode/
 claw-data.sqlite

@@ -2,7 +2,7 @@
   "name": "claw-trader-desktop",
   "version": "0.1.0",
   "description": "Claw Trader desktop client — AI-driven crypto strategy design and backtesting",
-  "main": "dist-electron/main.cjs",
+  "main": "dist-electron/main.mjs",
   "private": true,
   "type": "module",
   "scripts": {
