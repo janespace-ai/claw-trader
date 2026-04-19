@@ -16,8 +16,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    # Shared with backtest-engine (claw-net) and sandbox containers (claw-sandbox-net).
     networks:
       - claw-net
+      - claw-sandbox-net
 
   data-aggregator:
     # 对外映射 18080，避免与宿主机其它服务占用 8080 冲突；容器内服务监听 8080。
@@ -53,5 +55,11 @@ volumes:
   timescale-data:
 
 networks:
+  # Fixed names so backtest-engine/docker-compose.yml can attach as external networks.
   claw-net:
+    name: claw-net
     driver: bridge
+  claw-sandbox-net:
+    name: claw-sandbox-net
+    driver: bridge
+    internal: true

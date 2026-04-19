@@ -1,3 +1,5 @@
+# Shares TimescaleDB with data-aggregator: start data-aggregator first (or `make db-up`)
+# so networks `claw-net` / `claw-sandbox-net` and container `timescaledb` exist.
 services:
   backtest-engine:
     build:
@@ -6,8 +8,6 @@ services:
     image: claw-backtest-engine:latest
     container_name: claw-backtest-engine
     restart: unless-stopped
-    depends_on:
-      - timescaledb
     environment:
       BACKTEST_DATABASE_HOST: timescaledb
       BACKTEST_DATABASE_PORT: 5432
@@ -30,34 +30,10 @@ services:
       - claw-net
       - claw-sandbox-net
 
-  timescaledb:
-    image: timescale/timescaledb:latest-pg16
-    container_name: claw-timescaledb
-    environment:
-      POSTGRES_DB: claw
-      POSTGRES_USER: claw
-      POSTGRES_PASSWORD: claw
-    ports:
-      - "5432:5432"
-    volumes:
-      - timescale-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U claw -d claw"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - claw-net
-      - claw-sandbox-net
-
-volumes:
-  timescale-data:
-
 networks:
   claw-net:
-    driver: bridge
+    external: true
+    name: claw-net
   claw-sandbox-net:
-    # Sandbox containers attach here; only TimescaleDB + backtest-engine share this network.
-    # Sandbox itself has --network=none for external access and only joins this net.
-    driver: bridge
-    internal: true
+    external: true
+    name: claw-sandbox-net
