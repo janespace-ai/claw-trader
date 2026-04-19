@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
 import { AIPanel } from '@/components/chat/AIPanel';
 import { ScreenerScreen } from '@/screens/ScreenerScreen';
-import { StrategiesPage } from '@/pages/StrategiesPage';
+import { StrategiesScreen } from '@/screens/StrategiesScreen';
 import { BacktestPage } from '@/pages/BacktestPage';
 import { SettingsModal } from '@/pages/SettingsPage';
 import { StrategyDesign } from '@/screens/workspace/StrategyDesign';
@@ -52,7 +52,7 @@ export default function App() {
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 overflow-y-auto">
           {route.kind === 'screener' && <ScreenerScreen />}
-          {route.kind === 'strategies' && <StrategiesPage />}
+          {route.kind === 'strategies' && <StrategiesScreen />}
           {route.kind === 'workspace' && workspaceMode === 'design' && <StrategyDesign />}
           {route.kind === 'workspace' && workspaceMode === 'preview' && <PreviewBacktest />}
           {route.kind === 'workspace' && workspaceMode === 'deep' && <DeepBacktest />}

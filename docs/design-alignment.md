@@ -7,7 +7,7 @@ each screen change lands.
 | Pencil ID | Pencil name | Code component | Status | Change |
 |---|---|---|---|---|
 | `o89E6` | `ScrRow` | `Watchlist` row (`screens/ScreenerScreen` passed/failed split) | Shipped | `screener-chart-first` |
-| `IQK4J` | `StrategyCard` | TBD (`src/components/strategy/StrategyCard.tsx`) | Pending | `strategy-management-v2` |
+| `IQK4J` | `StrategyCard` | `src/components/strategy/StrategyCard.tsx` | Shipped | `strategy-management-v2` |
 | `sZ3y6` | `TradeRow` | `screens/workspace/TradesTab` row | Shipped | `workspace-preview-backtest` |
 | `IjMN8` | `ProviderCard` | TBD (`src/components/settings/ProviderCard.tsx`) | Pending | `settings-full-page` |
 | `Ysu4M` | `RailRow` | `Watchlist` row (`src/components/primitives/Watchlist`) | Shipped | `ui-foundation` |
@@ -39,6 +39,8 @@ each screen change lands.
 | — | Screener topbar | `screens/screener/ScreenerTopbar` | Shipped | `screener-chart-first` |
 | — | Saved lists overlay | `screens/screener/SavedListsOverlay` | Shipped | `screener-chart-first` |
 | `bnwnL` / `iFmHp` | Screener (chart-first) screen (dark / light) | `screens/ScreenerScreen` | Shipped | `screener-chart-first` |
+| — | Strategy history panel | `components/strategy/StrategyHistoryPanel` | Shipped | `strategy-management-v2` |
+| `pGjNd` / `PLr19` | Strategy Management screen (dark / light) | `screens/StrategiesScreen` | Shipped | `strategy-management-v2` |
 
 ## Conventions
 
