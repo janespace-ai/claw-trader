@@ -16,3 +16,8 @@ claw-config.json
 .DS_Store
 .vscode/
 claw-data.sqlite
+
+# Playwright runtime outputs (not baselines — those live under
+# e2e/visual/__screenshots__/ and ARE tracked).
+test-results/
+playwright-report/
