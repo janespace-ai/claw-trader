@@ -41,11 +41,13 @@ export default defineConfig({
           },
         },
       },
-      // Electron preload. Preload scripts must be CommonJS when
-      // contextIsolation=true + sandbox=false unless the calling window
-      // opts into ESM preload. We keep this one as `.cjs` and pin the
-      // format to the Vite `lib` mode so the emitted CJS is real
-      // (no stray `import` statements).
+      // Electron preload. Also ESM (`.mjs`) — Electron 28+ supports ESM
+      // preload scripts, and keeping both main and preload as ESM avoids
+      // the format-mixing problem Vite's `lib: { formats: ['cjs'] }`
+      // fell into (it appended `export default require_preload()` to a
+      // `.cjs` file, which Electron then silently rejected — leaving
+      // `window.claw` unset and the renderer falling through to the
+      // browser-only stub's seeded fixtures).
       {
         entry: 'electron/preload.ts',
         onstart(opt) {
@@ -55,12 +57,12 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             emptyOutDir: false,
-            lib: {
-              entry: 'electron/preload.ts',
-              formats: ['cjs'],
-              fileName: () => 'preload.cjs',
-            },
             rollupOptions: {
+              output: {
+                entryFileNames: 'preload.mjs',
+                format: 'es',
+                inlineDynamicImports: true,
+              },
               external: ['electron'],
             },
           },
