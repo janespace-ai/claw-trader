@@ -1,14 +1,15 @@
 # syntax=docker/dockerfile:1
 
 # --- Build stage ---
-FROM golang:1.25-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 WORKDIR /src
-ENV GOPROXY=https://goproxy.cn,direct
+# goproxy.cn 优先，避免国内/受限网络下 proxy.golang.org 超时
+ENV GOPROXY=https://goproxy.cn,https://proxy.golang.org,direct
 
 # Cache modules independently of source for faster rebuilds
-COPY go.mod go.sum* ./
-RUN go mod download || true
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
 
@@ -19,7 +20,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # --- Runtime stage ---
 FROM alpine:3.19
 
-RUN apk --no-cache add ca-certificates tzdata && \
+RUN apk --no-cache add ca-certificates tzdata wget && \
     adduser -D -u 10001 app
 
 WORKDIR /app

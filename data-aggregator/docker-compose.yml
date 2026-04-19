@@ -20,10 +20,7 @@ services:
       - claw-net
 
   data-aggregator:
-    # Headless worker: no published port. /healthz binds to 127.0.0.1 inside
-    # the container so only the Docker healthcheck (which runs inside the
-    # container) can reach it. Nothing on the host or in sibling containers
-    # can talk to the aggregator — by design.
+    # 对外映射 18080，避免与宿主机其它服务占用 8080 冲突；容器内服务监听 8080。
     build:
       context: .
       dockerfile: Dockerfile
@@ -44,6 +41,9 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    # 与 server-relay（8080）错开，本机访问: http://127.0.0.1:18080
+    ports:
+      - "18080:8080"
     networks:
       - claw-net
 
