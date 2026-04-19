@@ -6,15 +6,28 @@
 // a no-op outside DEV).
 
 import { useAppStore } from '@/stores/appStore';
-import { useWorkspaceStore } from '@/stores/workspaceStore';
+import { useWorkspaceStore, type WorkspaceMode } from '@/stores/workspaceStore';
 import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
+import { useSignalReviewStore } from '@/stores/signalReviewStore';
 import type { AppRoute } from '@/types/navigation';
 import type { StrategySummary } from '@/services/prompt/personas/parsers';
+import type { components } from '@/types/api';
+
+type SignalVerdict = components['schemas']['SignalVerdict'];
+type SignalSummary = components['schemas']['SignalReviewResult']['summary'];
 
 interface StrategistDraftSeed {
   strategyId?: string;
   summary: StrategySummary;
   code: string;
+}
+
+interface PreviewSeed {
+  taskId: string;
+  mode?: WorkspaceMode;
+  verdicts?: SignalVerdict[];
+  summary?: SignalSummary;
+  focusedSymbol?: string;
 }
 
 export function installTestBridge(): void {
@@ -35,6 +48,31 @@ export function installTestBridge(): void {
         summary: draft.summary,
         code: draft.code,
       });
+    },
+    /** Seed a Preview Backtest context + verdicts for visual specs. */
+    seedPreviewBacktest(seed: PreviewSeed) {
+      const ws = useWorkspaceStore.getState();
+      ws.enterPreview(ws.currentStrategyId ?? 'SEED-STRAT', seed.taskId);
+      if (seed.focusedSymbol) ws.focus(seed.focusedSymbol);
+      if (seed.mode && seed.mode !== 'preview') {
+        if (seed.mode === 'deep') ws.enterDeep(seed.taskId);
+        if (seed.mode === 'design') ws.enterDesign();
+      }
+      // Bypass the network by writing directly into the review store.
+      useSignalReviewStore.setState((prev) => ({
+        byBacktestTask: {
+          ...prev.byBacktestTask,
+          [seed.taskId]: {
+            status: 'complete',
+            reviewTaskId: 'SEED-REVIEW',
+            verdicts: seed.verdicts ?? [],
+            summary: seed.summary ?? {},
+            error: null,
+            selectedSignalId: null,
+            pulseSignalId: null,
+          },
+        },
+      }));
     },
   };
   (window as unknown as { __claw?: typeof api }).__claw = api;
