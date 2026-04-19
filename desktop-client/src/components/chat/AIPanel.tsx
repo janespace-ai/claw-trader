@@ -259,34 +259,28 @@ export function AIPanel() {
 
   return (
     <div className="relative flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-accent-primary-dim grid place-items-center">
-            <span className="text-accent-primary text-xs">✦</span>
-          </div>
-          <div className="leading-tight">
-            <div className="font-heading font-semibold text-sm">{t('ai.strategist')}</div>
-            <div className="text-[10px] text-fg-muted">{providers[defaultProvider]?.model ?? ''}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setHistoryOpen((v) => !v)}
-            className="text-fg-secondary hover:text-fg-primary text-sm"
-            aria-label="history"
-            title="History"
-          >
-            ⟲
-          </button>
-          <button
-            onClick={newConversation}
-            className="text-fg-secondary hover:text-fg-primary text-sm"
-            aria-label="new"
-            title="New conversation"
-          >
-            +
-          </button>
-        </div>
+      {/* AIPanel is always embedded inside an `AIPersonaShell` which
+          already renders the persona title + model subtitle at the top
+          of the right rail. Instead of duplicating that chrome, this
+          panel only surfaces its conversation actions (history + new)
+          as a compact top-right button bar. */}
+      <div className="flex items-center justify-end gap-2 px-4 py-2 border-b border-border-subtle">
+        <button
+          onClick={() => setHistoryOpen((v) => !v)}
+          className="text-fg-secondary hover:text-fg-primary text-sm"
+          aria-label="history"
+          title="History"
+        >
+          ⟲
+        </button>
+        <button
+          onClick={newConversation}
+          className="text-fg-secondary hover:text-fg-primary text-sm"
+          aria-label="new"
+          title="New conversation"
+        >
+          +
+        </button>
       </div>
 
       <ConversationHistory
