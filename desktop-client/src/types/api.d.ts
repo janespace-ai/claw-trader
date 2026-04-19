@@ -214,6 +214,160 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/symbols/{symbol}/metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get metadata for a single symbol */
+        get: operations["getSymbolMetadata"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/strategies/{id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List all versions of a strategy (newest first) */
+        get: operations["listStrategyVersions"];
+        put?: never;
+        /** Append a new version to a strategy */
+        post: operations["createStrategyVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/strategies/{id}/versions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one specific version */
+        get: operations["getStrategyVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analysis/optimlens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit an OptimLens parameter-sweep + synthesis task */
+        post: operations["startOptimLens"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analysis/optimlens/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Poll / fetch OptimLens task */
+        get: operations["getOptimLensResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analysis/signals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Submit a signal-review task for a backtest's signals */
+        post: operations["startSignalReview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analysis/signals/{task_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Poll / fetch SignalReview task */
+        get: operations["getSignalReviewResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/analysis/trade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Synchronous per-trade explanation */
+        post: operations["explainTrade"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/engine/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Backend self-description for the Settings page */
+        get: operations["getEngineStatus"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -249,7 +403,7 @@ export interface components {
          *     is safe.
          * @enum {string}
          */
-        ErrorCode: "INVALID_INTERVAL" | "INVALID_SYMBOL" | "INVALID_RANGE" | "SYMBOL_NOT_FOUND" | "STRATEGY_NOT_FOUND" | "BACKTEST_NOT_FOUND" | "SCREENER_NOT_FOUND" | "TASK_NOT_FOUND" | "COMPLIANCE_FAILED" | "SANDBOX_ERROR" | "SANDBOX_TIMEOUT" | "DATA_UNAVAILABLE" | "RATE_LIMITED" | "UPSTREAM_UNREACHABLE" | "INTERNAL_ERROR";
+        ErrorCode: "INVALID_INTERVAL" | "INVALID_SYMBOL" | "INVALID_RANGE" | "SYMBOL_NOT_FOUND" | "STRATEGY_NOT_FOUND" | "STRATEGY_VERSION_NOT_FOUND" | "BACKTEST_NOT_FOUND" | "SCREENER_NOT_FOUND" | "TASK_NOT_FOUND" | "COMPLIANCE_FAILED" | "SANDBOX_ERROR" | "SANDBOX_TIMEOUT" | "DATA_UNAVAILABLE" | "RATE_LIMITED" | "UPSTREAM_UNREACHABLE" | "INTERNAL_ERROR" | "PARAM_GRID_TOO_LARGE" | "LLM_PROVIDER_FAILED" | "LLM_BUDGET_EXCEEDED";
         ErrorBody: {
             code: components["schemas"]["ErrorCode"];
             /** @description Human-readable; not the identifier. Use `code` for branching. */
@@ -393,6 +547,188 @@ export interface components {
         };
         ScreenerResult: {
             results: components["schemas"]["ScreenerRowResult"][];
+        };
+        /**
+         * @description Mode drives default lookback (preview=7d, deep=180d).
+         * @enum {string}
+         */
+        BacktestMode: "preview" | "deep";
+        MonthlyPoint: {
+            /** @description YYYY-MM */
+            month: string;
+            return_pct: number;
+        };
+        Signal: {
+            signal_id: string;
+            symbol: string;
+            ts: number;
+            /** @enum {string} */
+            kind: "long" | "short" | "flat";
+            indicators?: {
+                [key: string]: number;
+            };
+        };
+        /** @description Per-symbol breakdown of a multi-symbol backtest. */
+        SymbolResult: {
+            metrics?: components["schemas"]["MetricsBlockExtended"];
+            equity_curve?: components["schemas"]["EquityPoint"][];
+            trades?: components["schemas"]["Trade"][];
+            signals?: components["schemas"]["Signal"][];
+        };
+        /** @description Aggregated across symbols (equal-weighted). */
+        SummaryBlock: {
+            metrics?: components["schemas"]["MetricsBlockExtended"];
+            equity_curve?: components["schemas"]["EquityPoint"][];
+            drawdown_curve?: components["schemas"]["EquityPoint"][];
+            monthly_returns?: components["schemas"]["MonthlyPoint"][];
+        };
+        /** @description Extended metrics superset used by Deep Backtest + OptimLens. */
+        MetricsBlockExtended: {
+            total_return?: number | null;
+            sharpe?: number | null;
+            sortino?: number | null;
+            calmar?: number | null;
+            profit_factor?: number | null;
+            win_rate?: number | null;
+            avg_trade?: number | null;
+            avg_hours_in_trade?: number | null;
+            positive_days_ratio?: number | null;
+            max_drawdown?: number | null;
+            total_trades?: number;
+        };
+        /**
+         * @description New multi-symbol + preview/deep backtest result shape. Replaces
+         *     the single-mode `BacktestResult` for `startBacktest` + `getBacktestResult`.
+         */
+        BacktestResultExtended: {
+            summary: components["schemas"]["SummaryBlock"];
+            per_symbol: {
+                [key: string]: components["schemas"]["SymbolResult"];
+            };
+        };
+        StrategyVersion: {
+            /** Format: uuid */
+            strategy_id: string;
+            version: number;
+            code: string;
+            summary?: string | null;
+            params_schema?: {
+                [key: string]: unknown;
+            } | null;
+            parent_version?: number | null;
+            created_at: number;
+        };
+        OptimLensRequest: {
+            /** Format: uuid */
+            strategy_id: string;
+            symbols: string[];
+            lookback_days?: number;
+            /** @description Map of param-name → list of values. Server computes the cross-product; rejected with PARAM_GRID_TOO_LARGE if > 50. */
+            param_grid: {
+                [key: string]: unknown[];
+            };
+        };
+        OptimLensImprovement: {
+            title: string;
+            /** @enum {string} */
+            category: "entry" | "exit" | "params" | "filter" | "risk_mgmt";
+            rationale: string;
+            expected_delta?: {
+                sharpe?: number | null;
+                max_drawdown?: number | null;
+                win_rate?: number | null;
+            };
+            /** @description Either a param_update or a code_edit. */
+            suggested_change?: {
+                /** @enum {string} */
+                kind?: "param_update" | "code_edit";
+                payload?: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        OptimLensResult: {
+            base_metrics?: components["schemas"]["MetricsBlockExtended"];
+            /** @description Per-combo metrics (one row per sub-backtest that ran). */
+            grid_results?: {
+                combo?: {
+                    [key: string]: unknown;
+                };
+                metrics?: components["schemas"]["MetricsBlockExtended"];
+            }[];
+            improvements: components["schemas"]["OptimLensImprovement"][];
+        };
+        SignalReviewRequest: {
+            /** Format: uuid */
+            backtest_task_id: string;
+        };
+        SignalVerdict: {
+            signal_id: string;
+            symbol: string;
+            entry_ts: number;
+            /** @enum {string} */
+            verdict: "good" | "questionable" | "bad";
+            note?: string;
+        };
+        SignalReviewResult: {
+            signals_total: number;
+            verdicts: components["schemas"]["SignalVerdict"][];
+            summary: {
+                good?: number;
+                questionable?: number;
+                bad?: number;
+            };
+        };
+        TradeExplainRequest: {
+            /** Format: uuid */
+            backtest_task_id: string;
+            symbol: string;
+            trade_id: string;
+        } | {
+            trade: components["schemas"]["Trade"];
+            klines_context: components["schemas"]["Kline"][];
+        };
+        TradeExplainResult: {
+            trade_id: string;
+            narrative: string;
+            entry_context?: {
+                indicators?: {
+                    [key: string]: number;
+                };
+                regime?: string;
+            };
+            exit_context?: {
+                reason?: string;
+                indicators?: {
+                    [key: string]: number;
+                };
+            };
+        };
+        EngineStatus: {
+            version: string;
+            data_aggregator_version?: string | null;
+            supported_markets: components["schemas"]["Market"][];
+            supported_intervals: components["schemas"]["Interval"][];
+            data_range?: {
+                from?: number | null;
+                to?: number | null;
+            } | null;
+            last_aggregator_sync_at?: number | null;
+            active_tasks: number;
+            uptime_seconds: number;
+        };
+        SymbolMetadata: {
+            symbol: string;
+            name?: string;
+            market: components["schemas"]["Market"];
+            rank?: number | null;
+            volume_24h_quote?: number | null;
+            last_price?: number | null;
+            change_24h_pct?: number | null;
+            first_kline_at?: number | null;
+            last_kline_at?: number | null;
+            /** @enum {string} */
+            status: "active" | "inactive";
         };
     };
     responses: never;
@@ -768,6 +1104,296 @@ export interface operations {
                     "application/json": components["schemas"]["TaskResponse"] & {
                         result?: components["schemas"]["ScreenerResult"];
                     };
+                };
+            };
+        };
+    };
+    getSymbolMetadata: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Symbol metadata */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SymbolMetadata"];
+                };
+            };
+            /** @description Symbol not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listStrategyVersions: {
+        parameters: {
+            query?: {
+                limit?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated versions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pagination"] & {
+                        items: components["schemas"]["StrategyVersion"][];
+                    };
+                };
+            };
+        };
+    };
+    createStrategyVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    code: string;
+                    summary?: string;
+                    params_schema?: {
+                        [key: string]: unknown;
+                    };
+                    parent_version?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description New version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVersion"];
+                };
+            };
+            /** @description Bad parent_version */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getStrategyVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Version payload */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVersion"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    startOptimLens: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OptimLensRequest"];
+            };
+        };
+        responses: {
+            /** @description Task accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description param_grid too large */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getOptimLensResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Task envelope (result present when done) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"] & {
+                        result?: components["schemas"]["OptimLensResult"];
+                    };
+                };
+            };
+        };
+    };
+    startSignalReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignalReviewRequest"];
+            };
+        };
+        responses: {
+            /** @description Task accepted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+        };
+    };
+    getSignalReviewResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Task envelope */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskResponse"] & {
+                        result?: components["schemas"]["SignalReviewResult"];
+                    };
+                };
+            };
+        };
+    };
+    explainTrade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TradeExplainRequest"];
+            };
+        };
+        responses: {
+            /** @description Trade explanation */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeExplainResult"];
+                };
+            };
+            /** @description LLM provider failed */
+            504: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getEngineStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Engine status */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EngineStatus"];
                 };
             };
         };

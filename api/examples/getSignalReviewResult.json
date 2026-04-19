@@ -1,0 +1,17 @@
+{
+  "task_id": "00000000-0000-0000-0000-000000000040",
+  "status": "done",
+  "started_at": 1744416000,
+  "finished_at": 1744416060,
+  "result": {
+    "signals_total": 12,
+    "verdicts": [
+      { "signal_id": "s1", "symbol": "BTC_USDT", "entry_ts": 1744340000, "verdict": "good", "note": "Clean breakout on rising volume; trend filter aligned." },
+      { "signal_id": "s2", "symbol": "BTC_USDT", "entry_ts": 1744351000, "verdict": "good", "note": "Pullback entry in established uptrend." },
+      { "signal_id": "s3", "symbol": "ETH_USDT", "entry_ts": 1744360000, "verdict": "questionable", "note": "Entered late after a vertical move; limited room for further upside." },
+      { "signal_id": "s4", "symbol": "LINK_USDT", "entry_ts": 1744365000, "verdict": "bad", "note": "Chop zone; BB squeeze suggested false breakout, still entered." },
+      { "signal_id": "s5", "symbol": "NEAR_USDT", "entry_ts": 1744370000, "verdict": "questionable", "note": "Mid-day consolidation entry; lower conviction period." }
+    ],
+    "summary": { "good": 2, "questionable": 2, "bad": 1 }
+  }
+}

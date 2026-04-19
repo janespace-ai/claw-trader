@@ -1,0 +1,12 @@
+{
+  "symbol": "BTC_USDT",
+  "name": "BTC",
+  "market": "futures",
+  "rank": 1,
+  "volume_24h_quote": 5128061921,
+  "last_price": 64750.00,
+  "change_24h_pct": 1.35,
+  "first_kline_at": 1672531200,
+  "last_kline_at": 1744416000,
+  "status": "active"
+}
