@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import type { ChatMessage } from '@/types/domain';
 import { CodeBlock } from './CodeBlock';
+import { AutoRunStatus } from './AutoRunStatus';
 
 interface Props {
   messages: ChatMessage[];
@@ -41,9 +42,9 @@ export function MessageList({ messages, partial }: Props) {
   return (
     <div ref={scrollerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
       {messages.map((m, i) => (
-        <Bubble key={i} role={m.role} content={m.content} />
+        <Bubble key={i} role={m.role} content={m.content} messageIndex={i} />
       ))}
-      {partial && <Bubble role="assistant" content={partial} pulsing />}
+      {partial && <Bubble role="assistant" content={partial} pulsing messageIndex={-1} />}
     </div>
   );
 }
@@ -52,10 +53,15 @@ function Bubble({
   role,
   content,
   pulsing,
+  messageIndex,
 }: {
   role: ChatMessage['role'];
   content: string;
   pulsing?: boolean;
+  /** Stable index of this message in the conversation. Used by
+   *  AutoRunStatus to render only under the message that actually
+   *  triggered a backend run. `-1` for the streaming partial bubble. */
+  messageIndex: number;
 }) {
   const segments = useMemo(() => parseSegments(content), [content]);
 
@@ -83,6 +89,7 @@ function Bubble({
             </div>
           ),
         )}
+        <AutoRunStatus messageIndex={messageIndex} />
       </div>
     </div>
   );
