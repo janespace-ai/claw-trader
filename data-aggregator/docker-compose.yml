@@ -30,6 +30,8 @@ services:
       timescaledb:
         condition: service_healthy
     environment:
+      # 监听 0.0.0.0 以便宿主机端口映射（如 18080:8080）可访问 /healthz
+      DATA_AGGREGATOR_SERVER_ADDRESS: "0.0.0.0"
       DATA_AGGREGATOR_DATABASE_HOST: timescaledb
       DATA_AGGREGATOR_DATABASE_PORT: 5432
       DATA_AGGREGATOR_DATABASE_USER: claw
