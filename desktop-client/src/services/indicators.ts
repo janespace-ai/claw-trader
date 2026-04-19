@@ -138,3 +138,183 @@ export function rsi(candles: CandleLike[], period = 14): IndicatorPoint[] {
   }
   return out;
 }
+
+// ---- MACD ------------------------------------------------------------------
+
+export interface MacdSeries {
+  macd: IndicatorPoint[];
+  signal: IndicatorPoint[];
+  histogram: IndicatorPoint[];
+}
+
+/** MACD = EMA(fast) − EMA(slow); signal = EMA(MACD, signalPeriod);
+ *  histogram = MACD − signal. Classic defaults: 12/26/9. */
+export function macd(
+  candles: CandleLike[],
+  fastPeriod = 12,
+  slowPeriod = 26,
+  signalPeriod = 9,
+): MacdSeries {
+  const fast = ema(candles, fastPeriod);
+  const slow = ema(candles, slowPeriod);
+  if (fast.length === 0 || slow.length === 0) {
+    return { macd: [], signal: [], histogram: [] };
+  }
+  // Align: slow starts later; restrict to timestamps where both exist.
+  const fastMap = new Map(fast.map((p) => [p.ts, p.value]));
+  const macdLine: IndicatorPoint[] = [];
+  for (const p of slow) {
+    const f = fastMap.get(p.ts);
+    if (f == null) continue;
+    macdLine.push({ ts: p.ts, value: f - p.value });
+  }
+  // Signal = EMA of macdLine. Build pseudo-candles so we can reuse ema().
+  const pseudo: CandleLike[] = macdLine.map((p) => ({
+    ts: p.ts,
+    o: p.value,
+    h: p.value,
+    l: p.value,
+    c: p.value,
+  }));
+  const signalLine = ema(pseudo, signalPeriod);
+  const signalMap = new Map(signalLine.map((p) => [p.ts, p.value]));
+  const histogram: IndicatorPoint[] = macdLine
+    .map((p) => {
+      const s = signalMap.get(p.ts);
+      if (s == null) return null;
+      return { ts: p.ts, value: p.value - s };
+    })
+    .filter((x): x is IndicatorPoint => x != null);
+  return { macd: macdLine, signal: signalLine, histogram };
+}
+
+// ---- Stochastic Oscillator -------------------------------------------------
+
+export interface StochSeries {
+  k: IndicatorPoint[];
+  d: IndicatorPoint[];
+}
+
+/** %K = 100·(close − lowN)/(highN − lowN); %D = SMA(%K, dPeriod).
+ *  Defaults: kPeriod=14, dPeriod=3. */
+export function stochastic(
+  candles: CandleLike[],
+  kPeriod = 14,
+  dPeriod = 3,
+): StochSeries {
+  if (candles.length < kPeriod) return { k: [], d: [] };
+  const k: IndicatorPoint[] = [];
+  for (let i = kPeriod - 1; i < candles.length; i++) {
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let j = i - kPeriod + 1; j <= i; j++) {
+      if (candles[j].h > hi) hi = candles[j].h;
+      if (candles[j].l < lo) lo = candles[j].l;
+    }
+    const range = hi - lo;
+    const val = range === 0 ? 50 : (100 * (candles[i].c - lo)) / range;
+    k.push({ ts: candles[i].ts, value: val });
+  }
+  // %D = SMA of %K.
+  const d: IndicatorPoint[] = [];
+  if (k.length >= dPeriod) {
+    let sum = 0;
+    for (let i = 0; i < k.length; i++) {
+      sum += k[i].value;
+      if (i >= dPeriod) sum -= k[i - dPeriod].value;
+      if (i >= dPeriod - 1) d.push({ ts: k[i].ts, value: sum / dPeriod });
+    }
+  }
+  return { k, d };
+}
+
+// ---- Average True Range ----------------------------------------------------
+
+/** ATR via Wilder's smoothing over true-range values. */
+export function atr(candles: CandleLike[], period = 14): IndicatorPoint[] {
+  if (candles.length <= period) return [];
+  // True range for each bar.
+  const tr: number[] = [0];
+  for (let i = 1; i < candles.length; i++) {
+    const h = candles[i].h;
+    const l = candles[i].l;
+    const pc = candles[i - 1].c;
+    tr.push(Math.max(h - l, Math.abs(h - pc), Math.abs(l - pc)));
+  }
+  // Seed: SMA of first `period` TRs (skipping TR[0]=0).
+  let prev = 0;
+  for (let i = 1; i <= period; i++) prev += tr[i];
+  prev /= period;
+  const out: IndicatorPoint[] = [{ ts: candles[period].ts, value: prev }];
+  for (let i = period + 1; i < candles.length; i++) {
+    prev = (prev * (period - 1) + tr[i]) / period;
+    out.push({ ts: candles[i].ts, value: prev });
+  }
+  return out;
+}
+
+// ---- On-Balance Volume -----------------------------------------------------
+
+/** OBV accumulates signed volume based on close-to-close direction. */
+export function obv(candles: CandleLike[]): IndicatorPoint[] {
+  if (candles.length === 0) return [];
+  let acc = 0;
+  const out: IndicatorPoint[] = [{ ts: candles[0].ts, value: 0 }];
+  for (let i = 1; i < candles.length; i++) {
+    const v = candles[i].v ?? 0;
+    const dir = candles[i].c > candles[i - 1].c ? 1 : candles[i].c < candles[i - 1].c ? -1 : 0;
+    acc += dir * v;
+    out.push({ ts: candles[i].ts, value: acc });
+  }
+  return out;
+}
+
+// ---- Volume-Weighted Average Price (intraday) ------------------------------
+
+/** Session-reset VWAP is noisy without session boundaries; we use a
+ *  rolling N-bar VWAP which is good enough for an overlay. */
+export function vwap(candles: CandleLike[], window = 20): IndicatorPoint[] {
+  if (candles.length < window) return [];
+  const out: IndicatorPoint[] = [];
+  for (let i = window - 1; i < candles.length; i++) {
+    let pv = 0;
+    let vv = 0;
+    for (let j = i - window + 1; j <= i; j++) {
+      const typical = (candles[j].h + candles[j].l + candles[j].c) / 3;
+      const v = candles[j].v ?? 0;
+      pv += typical * v;
+      vv += v;
+    }
+    out.push({ ts: candles[i].ts, value: vv === 0 ? candles[i].c : pv / vv });
+  }
+  return out;
+}
+
+// ---- Donchian Channels -----------------------------------------------------
+
+export interface Donchian {
+  upper: IndicatorPoint[];
+  lower: IndicatorPoint[];
+  middle: IndicatorPoint[];
+}
+
+/** Highest high / lowest low over `period` bars, plus the midline. */
+export function donchian(candles: CandleLike[], period = 20): Donchian {
+  if (candles.length < period) return { upper: [], lower: [], middle: [] };
+  const upper: IndicatorPoint[] = [];
+  const lower: IndicatorPoint[] = [];
+  const middle: IndicatorPoint[] = [];
+  for (let i = period - 1; i < candles.length; i++) {
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let j = i - period + 1; j <= i; j++) {
+      if (candles[j].h > hi) hi = candles[j].h;
+      if (candles[j].l < lo) lo = candles[j].l;
+    }
+    const ts = candles[i].ts;
+    upper.push({ ts, value: hi });
+    lower.push({ ts, value: lo });
+    middle.push({ ts, value: (hi + lo) / 2 });
+  }
+  return { upper, lower, middle };
+}

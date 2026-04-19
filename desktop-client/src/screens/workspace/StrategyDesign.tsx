@@ -11,17 +11,41 @@ import { cremote, toErrorBody } from '@/services/remote/contract-client';
 import { useAppStore } from '@/stores/appStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
-import { sma, ema, bollinger, rsi, type IndicatorPoint } from '@/services/indicators';
+import {
+  sma,
+  ema,
+  bollinger,
+  rsi,
+  macd,
+  stochastic,
+  atr,
+  obv,
+  vwap,
+  donchian,
+} from '@/services/indicators';
 import { StrategyTopbar } from './StrategyTopbar';
 import { StrategyDraftCard } from './StrategyDraftCard';
 import { RunPreviewCard } from './RunPreviewCard';
-import { ChartIndicatorBar, type IndicatorId } from './ChartIndicatorBar';
-import { RSIPane } from './RSIPane';
+import {
+  ChartIndicatorBar,
+  type IndicatorId,
+  type OverlayIndicatorId,
+  type PaneIndicatorId,
+} from './ChartIndicatorBar';
+import { IndicatorPane } from './IndicatorPane';
 import { AIPanel } from '@/components/chat/AIPanel';
 
 type Interval = '5m' | '15m' | '30m' | '1h' | '4h' | '1d';
 
 type FetchState = 'loading' | 'empty' | 'ready';
+
+const OVERLAY_SET: ReadonlySet<string> = new Set<OverlayIndicatorId>([
+  'SMA20', 'SMA50', 'SMA200', 'EMA12', 'EMA26', 'BB', 'VWAP', 'DONCHIAN',
+]);
+
+function isPane(id: IndicatorId): id is PaneIndicatorId {
+  return !OVERLAY_SET.has(id);
+}
 
 /**
  * Workspace — Strategy Design screen.
@@ -81,25 +105,24 @@ export function StrategyDesign() {
     };
   }, [focusedSymbol, interval]);
 
-  // --- Indicator overlays (SMA / EMA / BB) and RSI pane --------------------
+  // --- Indicator overlays --------------------------------------------------
   const overlayLines: OverlayLine[] = useMemo(() => {
     if (klines.length === 0) return [];
     const out: OverlayLine[] = [];
-    if (indicators.includes('SMA')) {
-      out.push({
-        id: 'sma-20',
-        data: sma(klines, 20),
-        color: 'var(--accent-primary)',
-        lineWidth: 2,
-      });
+    if (indicators.includes('SMA20')) {
+      out.push({ id: 'sma-20', data: sma(klines, 20), color: 'var(--accent-primary)', lineWidth: 2 });
     }
-    if (indicators.includes('EMA')) {
-      out.push({
-        id: 'ema-20',
-        data: ema(klines, 20),
-        color: 'var(--accent-yellow)',
-        lineWidth: 2,
-      });
+    if (indicators.includes('SMA50')) {
+      out.push({ id: 'sma-50', data: sma(klines, 50), color: 'var(--accent-yellow)', lineWidth: 2 });
+    }
+    if (indicators.includes('SMA200')) {
+      out.push({ id: 'sma-200', data: sma(klines, 200), color: 'var(--accent-red)', lineWidth: 2 });
+    }
+    if (indicators.includes('EMA12')) {
+      out.push({ id: 'ema-12', data: ema(klines, 12), color: 'var(--accent-green)', lineWidth: 2 });
+    }
+    if (indicators.includes('EMA26')) {
+      out.push({ id: 'ema-26', data: ema(klines, 26), color: 'var(--accent-primary)', lineWidth: 2 });
     }
     if (indicators.includes('BB')) {
       const { upper, middle, lower } = bollinger(klines, 20, 2);
@@ -109,13 +132,43 @@ export function StrategyDesign() {
         { id: 'bb-lower', data: lower, color: 'var(--accent-green)', lineWidth: 1 },
       );
     }
+    if (indicators.includes('VWAP')) {
+      out.push({ id: 'vwap', data: vwap(klines, 20), color: 'var(--accent-yellow)', lineWidth: 2 });
+    }
+    if (indicators.includes('DONCHIAN')) {
+      const d = donchian(klines, 20);
+      out.push(
+        { id: 'dc-upper', data: d.upper, color: 'var(--accent-primary)', lineWidth: 1 },
+        { id: 'dc-mid', data: d.middle, color: 'var(--fg-muted)', lineWidth: 1 },
+        { id: 'dc-lower', data: d.lower, color: 'var(--accent-primary)', lineWidth: 1 },
+      );
+    }
     return out;
   }, [klines, indicators]);
 
-  const rsiData: IndicatorPoint[] = useMemo(() => {
-    if (!indicators.includes('RSI') || klines.length === 0) return [];
-    return rsi(klines, 14);
-  }, [klines, indicators]);
+  // --- Separate panes (RSI / MACD / STOCH / ATR / OBV) --------------------
+  const activePanes = indicators.filter(isPane);
+
+  const rsiData = useMemo(
+    () => (indicators.includes('RSI') && klines.length ? rsi(klines, 14) : []),
+    [klines, indicators],
+  );
+  const macdData = useMemo(
+    () => (indicators.includes('MACD') && klines.length ? macd(klines, 12, 26, 9) : null),
+    [klines, indicators],
+  );
+  const stochData = useMemo(
+    () => (indicators.includes('STOCH') && klines.length ? stochastic(klines, 14, 3) : null),
+    [klines, indicators],
+  );
+  const atrData = useMemo(
+    () => (indicators.includes('ATR') && klines.length ? atr(klines, 14) : []),
+    [klines, indicators],
+  );
+  const obvData = useMemo(
+    () => (indicators.includes('OBV') && klines.length ? obv(klines) : []),
+    [klines, indicators],
+  );
 
   // --- Run Preview ---------------------------------------------------------
   const draftCode = useWorkspaceDraftStore((s) => s.code);
@@ -180,7 +233,7 @@ export function StrategyDesign() {
         />
       }
       main={
-        <div className="flex flex-col gap-4 p-4">
+        <div className="flex flex-col gap-3 p-4">
           {fetchState === 'empty' ? (
             <div
               className="flex flex-col items-center justify-center gap-2 border border-dashed border-border-subtle rounded-md text-fg-muted text-xs"
@@ -202,13 +255,69 @@ export function StrategyDesign() {
                 height={360}
                 showVolume
               />
-              {indicators.includes('RSI') && <RSIPane data={rsiData} />}
+
+              {activePanes.includes('RSI') && (
+                <IndicatorPane
+                  title="RSI (14)"
+                  latestLabel={rsiData.at(-1)?.value.toFixed(1) ?? '—'}
+                  lines={[{ data: rsiData, color: 'var(--accent-primary)' }]}
+                  domain={{ min: 0, max: 100 }}
+                  guides={[
+                    { value: 70, color: 'var(--accent-red)' },
+                    { value: 30, color: 'var(--accent-green)' },
+                    { value: 50, color: 'var(--border-subtle)', dashed: false },
+                  ]}
+                />
+              )}
+              {activePanes.includes('MACD') && macdData && (
+                <IndicatorPane
+                  title="MACD (12, 26, 9)"
+                  latestLabel={macdData.macd.at(-1)?.value.toFixed(2) ?? '—'}
+                  lines={[
+                    { data: macdData.macd, color: 'var(--accent-primary)' },
+                    { data: macdData.signal, color: 'var(--accent-yellow)' },
+                  ]}
+                  guides={[{ value: 0, color: 'var(--border-subtle)', dashed: false }]}
+                  histogram={macdData.histogram}
+                />
+              )}
+              {activePanes.includes('STOCH') && stochData && (
+                <IndicatorPane
+                  title="Stochastic (14, 3)"
+                  latestLabel={stochData.k.at(-1)?.value.toFixed(1) ?? '—'}
+                  lines={[
+                    { data: stochData.k, color: 'var(--accent-primary)' },
+                    { data: stochData.d, color: 'var(--accent-yellow)' },
+                  ]}
+                  domain={{ min: 0, max: 100 }}
+                  guides={[
+                    { value: 80, color: 'var(--accent-red)' },
+                    { value: 20, color: 'var(--accent-green)' },
+                  ]}
+                />
+              )}
+              {activePanes.includes('ATR') && atrData.length > 0 && (
+                <IndicatorPane
+                  title="ATR (14)"
+                  latestLabel={atrData.at(-1)?.value.toFixed(2) ?? '—'}
+                  lines={[{ data: atrData, color: 'var(--accent-yellow)' }]}
+                />
+              )}
+              {activePanes.includes('OBV') && obvData.length > 0 && (
+                <IndicatorPane
+                  title="OBV"
+                  latestLabel={obvData.at(-1)?.value.toFixed(0) ?? '—'}
+                  lines={[{ data: obvData, color: 'var(--accent-primary)' }]}
+                />
+              )}
             </>
           )}
+
           <ChartIndicatorBar
             selected={indicators}
             onToggle={handleToggleIndicator}
           />
+
           <div className="grid grid-cols-2 gap-4">
             <StrategyDraftCard />
             <RunPreviewCard
