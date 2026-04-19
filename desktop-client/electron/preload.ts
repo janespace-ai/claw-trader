@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { AppConfig } from './config';
 
 type Channel = string;
 
@@ -14,6 +15,13 @@ function on(channel: Channel, listener: (...args: unknown[]) => void) {
 
 // Full surface exposed to the renderer. Grouped by namespace for clarity.
 const bridge = {
+  config: {
+    /** Resolved startup config (remote URL + where it came from). The
+     *  Settings store queries this once during load() to seed its
+     *  initial value in priority order:
+     *    SQLite user setting > this > hardcoded fallback. */
+    get: () => invoke<AppConfig>('config:get'),
+  },
   db: {
     strategies: {
       create: (s: unknown) => invoke('db:strategies:create', s),

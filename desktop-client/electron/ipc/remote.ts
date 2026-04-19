@@ -1,9 +1,14 @@
 import type { IpcMain } from 'electron';
 
 /** Remote backtest-engine API client. Runs in main process so renderer
- *  doesn't have to deal with CORS / cookies / connection retries. */
+ *  doesn't have to deal with CORS / cookies / connection retries.
+ *
+ *  The baseURL is seeded by registerRemoteHandlers() from the resolved
+ *  AppConfig (see electron/config.ts) so there is no hardcoded URL left
+ *  in this file. The renderer can still override it at any time by
+ *  invoking `remote:setBaseURL` from Settings. */
 
-let baseURL = 'http://localhost:8081';
+let baseURL = '';
 
 async function fetchJSON(url: string, init?: RequestInit) {
   const resp = await fetch(url, init);
@@ -19,7 +24,9 @@ async function fetchJSON(url: string, init?: RequestInit) {
   return body;
 }
 
-export function registerRemoteHandlers(ipcMain: IpcMain): void {
+export function registerRemoteHandlers(ipcMain: IpcMain, initialBaseURL: string): void {
+  baseURL = initialBaseURL.replace(/\/+$/, '');
+
   ipcMain.handle('remote:setBaseURL', (_e, url: string) => {
     if (typeof url === 'string' && url) baseURL = url.replace(/\/+$/, '');
   });
