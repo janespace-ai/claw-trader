@@ -17,6 +17,7 @@ func Register(h *server.Hertz, st *store.Store, bs *service.BacktestService, ss 
 	bh := handler.NewBacktestHandler(bs, st)
 	sh := handler.NewScreenerHandler(ss, st)
 	th := handler.NewStrategyHandler(st)
+	svh := handler.NewStrategyVersionsHandler(st)
 	ch := handler.NewCallbackHandler(bs, ss)
 
 	// Market-data gateway: these replace the data-aggregator endpoints of
@@ -43,6 +44,10 @@ func Register(h *server.Hertz, st *store.Store, bs *service.BacktestService, ss 
 		api.POST("/strategies", th.Create)
 		api.GET("/strategies", th.List)
 		api.GET("/strategies/:id", th.Get)
+
+		api.GET("/strategies/:id/versions", svh.List)
+		api.POST("/strategies/:id/versions", svh.Create)
+		api.GET("/strategies/:id/versions/:version", svh.Get)
 
 		// Market-data reads (sourced from shared TimescaleDB)
 		api.GET("/klines", klH.Query)
