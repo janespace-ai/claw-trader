@@ -117,6 +117,9 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("DATA_AGGREGATOR_DATABASE_NAME"); v != "" {
 		cfg.Database.Name = v
 	}
+	if v := os.Getenv("DATA_AGGREGATOR_SERVER_ADDRESS"); v != "" {
+		cfg.Server.Address = v
+	}
 	if v := os.Getenv("DATA_AGGREGATOR_SERVER_PORT"); v != "" {
 		if p, err := strconv.Atoi(v); err == nil {
 			cfg.Server.Port = p

@@ -57,16 +57,74 @@ func NewAPIFetcher(gcfg config.GateioConfig, scfg config.SyncConfig, st *store.S
 // Progress exposes the running counters.
 func (f *APIFetcher) Progress() model.Counter { return f.progress.Snapshot() }
 
-// gateioCandle mirrors the Gate.io candlesticks response format.
-// Fields come back as strings; "t" is unix seconds.
-type gateioCandle struct {
-	T string `json:"t"`
-	V string `json:"v"`  // contract volume
-	C string `json:"c"`
-	H string `json:"h"`
-	L string `json:"l"`
-	O string `json:"o"`
-	SumValue string `json:"sum"` // optional: quote volume on some endpoints
+// decodeGateioCandlesticks parses Gate.io futures candlestick JSON.
+// The live API sometimes returns OHLCV and "t" as JSON numbers and sometimes as strings.
+func decodeGateioCandlesticks(symbol string, body []byte) ([]model.Candlestick, error) {
+	var raw []map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("decode candles: %w", err)
+	}
+
+	result := make([]model.Candlestick, 0, len(raw))
+	for _, m := range raw {
+		tsSec, ok := flexInt64(m["t"])
+		if !ok {
+			continue
+		}
+		o, okO := flexFloat64(m["o"])
+		h, okH := flexFloat64(m["h"])
+		l, okL := flexFloat64(m["l"])
+		c, okC := flexFloat64(m["c"])
+		v, okV := flexFloat64(m["v"])
+		if !okO || !okH || !okL || !okC || !okV {
+			continue
+		}
+
+		candle := model.Candlestick{
+			Ts:     time.Unix(tsSec, 0).UTC(),
+			Symbol: symbol,
+			Open:   o,
+			High:   h,
+			Low:    l,
+			Close:  c,
+			Volume: v,
+		}
+		if sv, ok := flexFloat64(m["sum"]); ok {
+			candle.QuoteVolume = &sv
+		}
+		result = append(result, candle)
+	}
+	return result, nil
+}
+
+func flexInt64(v any) (int64, bool) {
+	switch x := v.(type) {
+	case string:
+		i, err := strconv.ParseInt(x, 10, 64)
+		return i, err == nil
+	case float64:
+		return int64(x), true
+	case json.Number:
+		i, err := x.Int64()
+		return i, err == nil
+	default:
+		return 0, false
+	}
+}
+
+func flexFloat64(v any) (float64, bool) {
+	switch x := v.(type) {
+	case string:
+		f, err := strconv.ParseFloat(x, 64)
+		return f, err == nil
+	case float64:
+		return x, true
+	case json.Number:
+		f, err := x.Float64()
+		return f, err == nil
+	default:
+		return 0, false
+	}
 }
 
 // FillSymbol fills the gap between the most recent DB timestamp and now() for
@@ -159,40 +217,11 @@ func (f *APIFetcher) fetchPage(ctx context.Context, symbol, interval string, fro
 		return nil, fmt.Errorf("api GET candles -> %d: %s", resp.StatusCode, string(body))
 	}
 
-	var raw []gateioCandle
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return nil, fmt.Errorf("decode candles: %w", err)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
 	}
-
-	result := make([]model.Candlestick, 0, len(raw))
-	for _, r := range raw {
-		tsSec, err := strconv.ParseInt(r.T, 10, 64)
-		if err != nil {
-			continue
-		}
-		o, _ := strconv.ParseFloat(r.O, 64)
-		h, _ := strconv.ParseFloat(r.H, 64)
-		l, _ := strconv.ParseFloat(r.L, 64)
-		c, _ := strconv.ParseFloat(r.C, 64)
-		v, _ := strconv.ParseFloat(r.V, 64)
-
-		candle := model.Candlestick{
-			Ts:     time.Unix(tsSec, 0).UTC(),
-			Symbol: symbol,
-			Open:   o,
-			High:   h,
-			Low:    l,
-			Close:  c,
-			Volume: v,
-		}
-		if r.SumValue != "" {
-			if sv, err := strconv.ParseFloat(r.SumValue, 64); err == nil {
-				candle.QuoteVolume = &sv
-			}
-		}
-		result = append(result, candle)
-	}
-	return result, nil
+	return decodeGateioCandlesticks(symbol, body)
 }
 
 // FillAll runs FillSymbol across the cross product of given symbols and configured API intervals.
