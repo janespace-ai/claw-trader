@@ -15,8 +15,20 @@ import App from './App';
 // Apply the persisted theme as early as possible to avoid a flash.
 initThemeWatcher().then(applyTheme);
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+async function bootstrap() {
+  // Opt-in MSW. `VITE_USE_MOCKS=1 pnpm dev` (or `pnpm dev:mock`) makes
+  // the renderer intercept `/api/*` from committed fixtures. Failures
+  // here are non-fatal — the app continues to hit the real backend.
+  if (import.meta.env.VITE_USE_MOCKS === '1') {
+    const { startMockWorker } = await import('./mocks/browser');
+    await startMockWorker();
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+}
+
+void bootstrap();

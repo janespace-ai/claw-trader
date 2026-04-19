@@ -1,0 +1,15 @@
+{
+  "task_id": "00000000-0000-0000-0000-000000000020",
+  "status": "done",
+  "started_at": 1744416000,
+  "finished_at": 1744416045,
+  "result": {
+    "results": [
+      { "symbol": "BTC_USDT", "passed": true, "score": 0.95, "rank": 1, "volume_24h_quote": 5128061921 },
+      { "symbol": "ETH_USDT", "passed": true, "score": 0.88, "rank": 2, "volume_24h_quote": 2940715000 },
+      { "symbol": "SOL_USDT", "passed": true, "score": 0.76, "rank": 3, "volume_24h_quote": 1620550000 },
+      { "symbol": "XRP_USDT", "passed": false, "score": 0.12, "rank": 15, "volume_24h_quote": 210000000 },
+      { "symbol": "LOW_USDT", "passed": false, "score": 0.02, "rank": 280, "volume_24h_quote": 450000 }
+    ]
+  }
+}

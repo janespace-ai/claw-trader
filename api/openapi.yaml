@@ -1,0 +1,686 @@
+openapi: 3.1.0
+info:
+  title: Claw Trader backend API
+  version: 1.0.0
+  description: |
+    Contract between `desktop-client` (consumer) and `backtest-engine`
+    (producer). Frozen canonical shapes; backend alignment is tracked
+    as follow-up work. See `api/README.md` for workflow and
+    `api/errors.md` for the error-code dictionary.
+  contact:
+    name: claw-trader
+    url: https://github.com/janespace-ai/claw-trader
+
+servers:
+  - url: http://localhost:8081
+    description: Local backtest-engine (default)
+  - url: http://{host}:{port}
+    description: Custom
+    variables:
+      host:
+        default: localhost
+      port:
+        default: "8081"
+
+# -----------------------------------------------------------------------------
+# Cross-cutting components. Operations (paths) come in subsequent task groups.
+# -----------------------------------------------------------------------------
+components:
+  schemas:
+
+    # --- Task envelope ------------------------------------------------------
+
+    TaskStatus:
+      type: string
+      enum: [pending, running, done, failed, cancelled]
+      description: Canonical lifecycle state for any long-running server task.
+
+    TaskProgress:
+      type: object
+      description: >
+        Optional progress hint on a running task. Phase values are
+        operation-specific (e.g. "sweep", "synthesize", "sandbox",
+        "aggregate", "backtest", "fetch", "llm").
+      properties:
+        phase:
+          type: string
+        done:
+          type: integer
+          minimum: 0
+        total:
+          type: integer
+          minimum: 0
+
+    TaskResponse:
+      type: object
+      description: >
+        Canonical envelope for every long-running operation. `result`
+        is present only when `status === "done"`; `error` only when
+        `status === "failed"`. Concrete operations narrow `result` via
+        `allOf` + per-operation schema.
+      required: [task_id, status, started_at]
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        progress:
+          $ref: "#/components/schemas/TaskProgress"
+        result:
+          description: Operation-specific result; narrowed by concrete endpoint.
+        error:
+          $ref: "#/components/schemas/ErrorBody"
+        started_at:
+          type: integer
+          description: Unix seconds when the task was accepted.
+        finished_at:
+          type: integer
+          nullable: true
+          description: Unix seconds when the task reached a terminal state.
+
+    # --- Error envelope -----------------------------------------------------
+
+    ErrorCode:
+      type: string
+      description: |
+        Predefined error-code dictionary (see `api/errors.md`). Keep
+        additions conservative — removing a code is breaking; adding
+        is safe.
+      enum:
+        - INVALID_INTERVAL
+        - INVALID_SYMBOL
+        - INVALID_RANGE
+        - SYMBOL_NOT_FOUND
+        - STRATEGY_NOT_FOUND
+        - BACKTEST_NOT_FOUND
+        - SCREENER_NOT_FOUND
+        - TASK_NOT_FOUND
+        - COMPLIANCE_FAILED
+        - SANDBOX_ERROR
+        - SANDBOX_TIMEOUT
+        - DATA_UNAVAILABLE
+        - RATE_LIMITED
+        - UPSTREAM_UNREACHABLE
+        - INTERNAL_ERROR
+
+    ErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        message:
+          type: string
+          description: Human-readable; not the identifier. Use `code` for branching.
+        details:
+          type: object
+          additionalProperties: true
+          description: Code-specific payload. See errors.md for per-code keys.
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          $ref: "#/components/schemas/ErrorBody"
+
+    # --- Pagination ---------------------------------------------------------
+
+    Pagination:
+      type: object
+      description: >
+        Opaque cursor-based pagination envelope. Server encodes an
+        internal cursor as base64 JSON; clients treat it as a string.
+      required: [next_cursor]
+      properties:
+        next_cursor:
+          type: string
+          nullable: true
+
+    # --- Shared market-data types ------------------------------------------
+
+    Interval:
+      type: string
+      enum: [5m, 15m, 30m, 1h, 4h, 1d]
+
+    Market:
+      type: string
+      enum: [futures]
+
+    Kline:
+      type: object
+      required: [ts, o, h, l, c, v]
+      properties:
+        ts:
+          type: integer
+          description: Unix seconds at the open of the bar.
+        o:
+          type: number
+        h:
+          type: number
+        l:
+          type: number
+        c:
+          type: number
+        v:
+          type: number
+        qv:
+          type: number
+          nullable: true
+          description: Quote volume (USDT). Null when unavailable.
+
+    Symbol:
+      type: object
+      required: [symbol, market, status]
+      properties:
+        symbol:
+          type: string
+        market:
+          $ref: "#/components/schemas/Market"
+        rank:
+          type: integer
+          nullable: true
+        volume_24h_quote:
+          type: number
+          nullable: true
+        status:
+          type: string
+          enum: [active, inactive]
+        updated_at:
+          type: integer
+          description: Unix seconds.
+
+    Gap:
+      type: object
+      required: [symbol, market, interval, gap_from, gap_to, missing_bars, status]
+      properties:
+        id:
+          type: integer
+        symbol:
+          type: string
+        market:
+          $ref: "#/components/schemas/Market"
+        interval:
+          $ref: "#/components/schemas/Interval"
+        gap_from:
+          type: integer
+          description: Unix seconds.
+        gap_to:
+          type: integer
+          description: Unix seconds.
+        missing_bars:
+          type: integer
+        status:
+          type: string
+          enum: [detected, repairing, repaired, unrecoverable, skipped]
+        retry_count:
+          type: integer
+        error:
+          type: string
+          nullable: true
+
+    # --- Strategy ----------------------------------------------------------
+
+    Strategy:
+      type: object
+      required: [id, name, code_type, code, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        code_type:
+          type: string
+          enum: [strategy, screener]
+        code:
+          type: string
+        params_schema:
+          type: object
+          additionalProperties: true
+          nullable: true
+        current_version:
+          type: integer
+          minimum: 1
+          description: Latest version number (filled after `strategy-versions` capability lands).
+        created_at:
+          type: integer
+        updated_at:
+          type: integer
+
+    # --- Backtest -----------------------------------------------------------
+
+    BacktestConfig:
+      type: object
+      required: [symbols, interval, from, to]
+      properties:
+        symbols:
+          type: array
+          items: { type: string }
+          minItems: 1
+          maxItems: 50
+        interval:
+          $ref: "#/components/schemas/Interval"
+        from:
+          type: integer
+          description: Unix seconds.
+        to:
+          type: integer
+          description: Unix seconds.
+        initial_capital:
+          type: number
+          description: Optional. Backend defaults to 10000 when omitted.
+        commission:
+          type: number
+          description: Optional. Backend defaults to 0.0006.
+        slippage:
+          type: number
+          description: Optional. Backend defaults to 0.0001.
+
+    MetricsBlock:
+      type: object
+      description: Summary metrics derived from an equity curve.
+      properties:
+        total_return: { type: number, nullable: true }
+        sharpe: { type: number, nullable: true }
+        max_drawdown: { type: number, nullable: true }
+        win_rate: { type: number, nullable: true }
+        profit_factor: { type: number, nullable: true }
+        avg_trade: { type: number, nullable: true }
+        total_trades: { type: integer }
+
+    EquityPoint:
+      type: object
+      required: [ts, value]
+      properties:
+        ts: { type: integer, description: Unix seconds }
+        value: { type: number }
+
+    Trade:
+      type: object
+      required: [id, symbol, side, entry_ts, entry_price]
+      properties:
+        id: { type: string }
+        symbol: { type: string }
+        side: { type: string, enum: [long, short] }
+        entry_ts: { type: integer }
+        entry_price: { type: number }
+        exit_ts: { type: integer, nullable: true }
+        exit_price: { type: number, nullable: true }
+        pnl_pct: { type: number, nullable: true }
+        duration_hours: { type: number, nullable: true }
+
+    BacktestResult:
+      type: object
+      description: |
+        Result payload for a done backtest task. The current contract
+        describes the single-mode shape. Multi-symbol + preview/deep
+        extensions live in the follow-up `api-contract-new-capabilities`.
+      properties:
+        metrics:
+          $ref: "#/components/schemas/MetricsBlock"
+        equity_curve:
+          type: array
+          items: { $ref: "#/components/schemas/EquityPoint" }
+        trades:
+          type: array
+          items: { $ref: "#/components/schemas/Trade" }
+
+    BacktestHistoryItem:
+      type: object
+      required: [id, status, started_at]
+      properties:
+        id: { type: string, format: uuid }
+        strategy_id: { type: string, format: uuid, nullable: true }
+        status: { $ref: "#/components/schemas/TaskStatus" }
+        mode: { type: string, default: "single" }
+        started_at: { type: integer }
+        finished_at: { type: integer, nullable: true }
+        summary_return: { type: number, nullable: true }
+
+    # --- Screener ----------------------------------------------------------
+
+    ScreenerRowResult:
+      type: object
+      required: [symbol, passed, score]
+      properties:
+        symbol: { type: string }
+        passed: { type: boolean }
+        score: { type: number }
+        rank: { type: integer, nullable: true }
+        volume_24h_quote: { type: number, nullable: true }
+
+    ScreenerResult:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items: { $ref: "#/components/schemas/ScreenerRowResult" }
+
+# =============================================================================
+# Paths
+# =============================================================================
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Liveness probe
+      responses:
+        "200":
+          description: Service reachable
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, example: ok }
+
+  /api/klines:
+    get:
+      operationId: getKlines
+      summary: Fetch K-lines for a symbol
+      parameters:
+        - in: query
+          name: symbol
+          required: true
+          schema: { type: string }
+        - in: query
+          name: interval
+          required: true
+          schema: { $ref: "#/components/schemas/Interval" }
+        - in: query
+          name: from
+          schema: { type: integer, description: "Unix seconds" }
+        - in: query
+          name: to
+          schema: { type: integer, description: "Unix seconds" }
+        - in: query
+          name: market
+          schema: { $ref: "#/components/schemas/Market" }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 5000 }
+      responses:
+        "200":
+          description: Ordered K-lines (ascending by ts)
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Kline" }
+        "400":
+          description: Invalid parameters
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/symbols:
+    get:
+      operationId: listSymbols
+      summary: List symbols (paginated)
+      parameters:
+        - in: query
+          name: market
+          schema: { $ref: "#/components/schemas/Market" }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        "200":
+          description: Paginated symbols
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Pagination"
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/Symbol" }
+
+  /api/gaps:
+    get:
+      operationId: listGaps
+      summary: List detected data gaps
+      parameters:
+        - in: query
+          name: symbol
+          schema: { type: string }
+        - in: query
+          name: interval
+          schema: { $ref: "#/components/schemas/Interval" }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        "200":
+          description: Matching gaps
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Gap" }
+
+  /api/strategies:
+    post:
+      operationId: createStrategy
+      summary: Create a strategy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, code_type, code]
+              properties:
+                name: { type: string }
+                code_type: { type: string, enum: [strategy, screener] }
+                code: { type: string }
+                params_schema: { type: object, additionalProperties: true }
+      responses:
+        "200":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, name]
+                properties:
+                  id: { type: string, format: uuid }
+                  name: { type: string }
+    get:
+      operationId: listStrategies
+      summary: List strategies (paginated)
+      parameters:
+        - in: query
+          name: code_type
+          schema: { type: string, enum: [strategy, screener] }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50, maximum: 200 }
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        "200":
+          description: Paginated strategies
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Pagination"
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/Strategy" }
+
+  /api/strategies/{id}:
+    get:
+      operationId: getStrategy
+      summary: Get a strategy by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Strategy
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Strategy" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/backtest/start:
+    post:
+      operationId: startBacktest
+      summary: Submit a backtest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, config]
+              properties:
+                code: { type: string }
+                config: { $ref: "#/components/schemas/BacktestConfig" }
+                strategy_id: { type: string, format: uuid, nullable: true }
+      responses:
+        "200":
+          description: Task accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/backtest/status/{task_id}:
+    get:
+      operationId: getBacktestStatus
+      summary: Poll backtest status
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Status envelope
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+
+  /api/backtest/result/{task_id}:
+    get:
+      operationId: getBacktestResult
+      summary: Fetch backtest result
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Full result (embedded when status=done)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TaskResponse"
+                  - type: object
+                    properties:
+                      result: { $ref: "#/components/schemas/BacktestResult" }
+
+  /api/backtest/history:
+    get:
+      operationId: listBacktestHistory
+      summary: List past backtests (paginated)
+      parameters:
+        - in: query
+          name: strategy_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: limit
+          schema: { type: integer, default: 50 }
+        - in: query
+          name: cursor
+          schema: { type: string }
+      responses:
+        "200":
+          description: Paginated history
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Pagination"
+                  - type: object
+                    required: [items]
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: "#/components/schemas/BacktestHistoryItem" }
+
+  /api/screener/start:
+    post:
+      operationId: startScreener
+      summary: Run a screener
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+                config:
+                  type: object
+                  properties:
+                    market: { $ref: "#/components/schemas/Market" }
+                    lookback_days: { type: integer, default: 365 }
+                strategy_id: { type: string, format: uuid, nullable: true }
+      responses:
+        "200":
+          description: Task accepted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaskResponse" }
+
+  /api/screener/result/{task_id}:
+    get:
+      operationId: getScreenerResult
+      summary: Poll / fetch screener result
+      parameters:
+        - in: path
+          name: task_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Task envelope (result present when done)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/TaskResponse"
+                  - type: object
+                    properties:
+                      result: { $ref: "#/components/schemas/ScreenerResult" }

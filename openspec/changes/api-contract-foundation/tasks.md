@@ -1,102 +1,102 @@
 ## 1. Pre-flight spike: MSW inside Electron renderer
 
-- [ ] 1.1 Create a throwaway branch `spike/msw-in-electron` off this change's branch. In `desktop-client`, install `msw`, scaffold a minimal handler that intercepts `fetch('/__msw_ping')` and returns `{"ok": true}`.
-- [ ] 1.2 Register the worker from `src/mocks/browser.ts` at the top of `src/main.tsx` guarded by `import.meta.env.DEV`. Start the renderer with `pnpm dev`.
-- [ ] 1.3 From DevTools console, run `await fetch('/__msw_ping').then(r => r.json())`. Assert `{ ok: true }` comes back. If it does NOT (typical failure: service-worker scope / `vite-plugin-electron` interaction), fall back to Node-only mode: MSW in Vitest + renderer talks to a localhost Prism mock spun up by `pnpm dev:mock`.
-- [ ] 1.4 Document the outcome of the spike at the top of `design.md` under a new "Spike results" section — kept as historical record even after the change archives.
-- [ ] 1.5 Discard the spike branch regardless of outcome; real work picks up on the change branch.
+- [x] 1.1 Create a throwaway branch `spike/msw-in-electron` off this change's branch. In `desktop-client`, install `msw`, scaffold a minimal handler that intercepts `fetch('/__msw_ping')` and returns `{"ok": true}`.
+- [x] 1.2 Register the worker from `src/mocks/browser.ts` at the top of `src/main.tsx` guarded by `import.meta.env.DEV`. Start the renderer with `pnpm dev`.
+- [x] 1.3 From DevTools console, run `await fetch('/__msw_ping').then(r => r.json())`. Assert `{ ok: true }` comes back. If it does NOT (typical failure: service-worker scope / `vite-plugin-electron` interaction), fall back to Node-only mode: MSW in Vitest + renderer talks to a localhost Prism mock spun up by `pnpm dev:mock`.
+- [x] 1.4 Document the outcome of the spike at the top of `design.md` under a new "Spike results" section — kept as historical record even after the change archives.
+- [x] 1.5 Discard the spike branch regardless of outcome; real work picks up on the change branch.
 
 ## 2. `api/` directory + OpenAPI skeleton
 
-- [ ] 2.1 Create `api/` at repo root with `openapi.yaml`, `README.md`, `errors.md`, `examples/` subdir.
-- [ ] 2.2 Write `api/openapi.yaml` skeleton: `openapi: 3.1.0`, `info`, empty `paths`, and the cross-cutting `components.schemas` (`TaskResponse`, `TaskStatus`, `ErrorResponse`, `ErrorBody`, `ErrorCode`, `PaginatedList<T>`, `Pagination`).
-- [ ] 2.3 Write `api/errors.md`: one section per `ErrorCode` value. Each section: when it fires, shape of `details`, suggested UI presentation. 15 codes total.
-- [ ] 2.4 Write `api/README.md`: contract workflow (edit → `pnpm api:lint` → `pnpm api:types` → commit), how examples map to operations, how MSW generation works, how to add a new endpoint.
+- [x] 2.1 Create `api/` at repo root with `openapi.yaml`, `README.md`, `errors.md`, `examples/` subdir.
+- [x] 2.2 Write `api/openapi.yaml` skeleton: `openapi: 3.1.0`, `info`, empty `paths`, and the cross-cutting `components.schemas` (`TaskResponse`, `TaskStatus`, `ErrorResponse`, `ErrorBody`, `ErrorCode`, `PaginatedList<T>`, `Pagination`).
+- [x] 2.3 Write `api/errors.md`: one section per `ErrorCode` value. Each section: when it fires, shape of `details`, suggested UI presentation. 15 codes total.
+- [x] 2.4 Write `api/README.md`: contract workflow (edit → `pnpm api:lint` → `pnpm api:types` → commit), how examples map to operations, how MSW generation works, how to add a new endpoint.
 
 ## 3. Document every existing endpoint in OpenAPI
 
-- [ ] 3.1 `GET /healthz` → operation `getHealth`. Response `{ status: "ok" }`.
-- [ ] 3.2 `GET /api/klines` → `getKlines`. Query params: `symbol` (string, required), `interval` (enum), `from` (integer, unix s), `to` (integer, unix s), `market` (enum, default `futures`), `limit` (integer, optional). Response: `array<Kline>`. Error: `INVALID_INTERVAL` / `INVALID_SYMBOL` / `INVALID_RANGE`.
-- [ ] 3.3 `GET /api/symbols` → `listSymbols`. Query: `market`, `limit`, `cursor`. Response: `{ items: Symbol[], next_cursor: string | null }` (canonical — not yet what backend emits).
-- [ ] 3.4 `GET /api/gaps` → `listGaps`. Query: `symbol`, `interval`, `status`. Response: `array<Gap>`.
-- [ ] 3.5 `POST /api/strategies` → `createStrategy`. Body `{ name, code_type, code, params_schema? }`. Response `{ id, name }`.
-- [ ] 3.6 `GET /api/strategies` → `listStrategies`. Query: `code_type`, `limit`, `cursor`. Response: `{ items: Strategy[], next_cursor }`.
-- [ ] 3.7 `GET /api/strategies/{id}` → `getStrategy`.
-- [ ] 3.8 `POST /api/backtest/start` → `startBacktest`. Body: `{ code, config, strategy_id? }`. Response: `{ task_id, status, mode, started_at }` (use `TaskResponse`).
-- [ ] 3.9 `GET /api/backtest/status/{task_id}` → `getBacktestStatus`. Response: `TaskResponse<BacktestProgress>`.
-- [ ] 3.10 `GET /api/backtest/result/{task_id}` → `getBacktestResult`. Response: `TaskResponse<BacktestResult>`. `BacktestResult` schema covers equity curve, summary metrics, trades, per-symbol breakdown.
-- [ ] 3.11 `GET /api/backtest/history` → `listBacktestHistory`. Query: `strategy_id`, `limit`, `cursor`. Response: `{ items: BacktestHistoryItem[], next_cursor }`.
-- [ ] 3.12 `POST /api/screener/start` → `startScreener`. Body: `{ code, config, strategy_id? }`. Response: `TaskResponse`.
-- [ ] 3.13 `GET /api/screener/result/{task_id}` → `getScreenerResult`. Response: `TaskResponse<ScreenerResult>`.
-- [ ] 3.14 For each operation above, write `api/examples/<operationId>.json` — one realistic payload matching the schema. Use production-looking values (real BTC price range, realistic volumes, plausible timestamps).
+- [x] 3.1 `GET /healthz` → operation `getHealth`. Response `{ status: "ok" }`.
+- [x] 3.2 `GET /api/klines` → `getKlines`. Query params: `symbol` (string, required), `interval` (enum), `from` (integer, unix s), `to` (integer, unix s), `market` (enum, default `futures`), `limit` (integer, optional). Response: `array<Kline>`. Error: `INVALID_INTERVAL` / `INVALID_SYMBOL` / `INVALID_RANGE`.
+- [x] 3.3 `GET /api/symbols` → `listSymbols`. Query: `market`, `limit`, `cursor`. Response: `{ items: Symbol[], next_cursor: string | null }` (canonical — not yet what backend emits).
+- [x] 3.4 `GET /api/gaps` → `listGaps`. Query: `symbol`, `interval`, `status`. Response: `array<Gap>`.
+- [x] 3.5 `POST /api/strategies` → `createStrategy`. Body `{ name, code_type, code, params_schema? }`. Response `{ id, name }`.
+- [x] 3.6 `GET /api/strategies` → `listStrategies`. Query: `code_type`, `limit`, `cursor`. Response: `{ items: Strategy[], next_cursor }`.
+- [x] 3.7 `GET /api/strategies/{id}` → `getStrategy`.
+- [x] 3.8 `POST /api/backtest/start` → `startBacktest`. Body: `{ code, config, strategy_id? }`. Response: `{ task_id, status, mode, started_at }` (use `TaskResponse`).
+- [x] 3.9 `GET /api/backtest/status/{task_id}` → `getBacktestStatus`. Response: `TaskResponse<BacktestProgress>`.
+- [x] 3.10 `GET /api/backtest/result/{task_id}` → `getBacktestResult`. Response: `TaskResponse<BacktestResult>`. `BacktestResult` schema covers equity curve, summary metrics, trades, per-symbol breakdown.
+- [x] 3.11 `GET /api/backtest/history` → `listBacktestHistory`. Query: `strategy_id`, `limit`, `cursor`. Response: `{ items: BacktestHistoryItem[], next_cursor }`.
+- [x] 3.12 `POST /api/screener/start` → `startScreener`. Body: `{ code, config, strategy_id? }`. Response: `TaskResponse`.
+- [x] 3.13 `GET /api/screener/result/{task_id}` → `getScreenerResult`. Response: `TaskResponse<ScreenerResult>`.
+- [x] 3.14 For each operation above, write `api/examples/<operationId>.json` — one realistic payload matching the schema. Use production-looking values (real BTC price range, realistic volumes, plausible timestamps).
 
 ## 4. Validator: `pnpm api:lint`
 
-- [ ] 4.1 Add devDep `@redocly/cli` (or equivalent openapi linter) to `desktop-client/package.json`.
-- [ ] 4.2 Write `scripts/api-lint.mjs`: loads `api/openapi.yaml`, runs Redocly lint rule set, then iterates `api/examples/*.json` and validates each against its operation's response schema (via `ajv`). Exit non-zero on any failure.
-- [ ] 4.3 Add a custom lint rule that rejects `type: string, format: date-time` on any timestamp-named field (`ts`, `*_at`, `from`, `to`, `entry_time`, `exit_time`) — enforces D6.
-- [ ] 4.4 Add script `"api:lint"` to `desktop-client/package.json` pointing at the above.
-- [ ] 4.5 Add Makefile target `api-lint` at repo root that runs `cd desktop-client && pnpm api:lint`. Include in the `test-ci` target.
+- [x] 4.1 Add devDep `@redocly/cli` (or equivalent openapi linter) to `desktop-client/package.json`.
+- [x] 4.2 Write `scripts/api-lint.mjs`: loads `api/openapi.yaml`, runs Redocly lint rule set, then iterates `api/examples/*.json` and validates each against its operation's response schema (via `ajv`). Exit non-zero on any failure.
+- [x] 4.3 Add a custom lint rule that rejects `type: string, format: date-time` on any timestamp-named field (`ts`, `*_at`, `from`, `to`, `entry_time`, `exit_time`) — enforces D6.
+- [x] 4.4 Add script `"api:lint"` to `desktop-client/package.json` pointing at the above.
+- [x] 4.5 Add Makefile target `api-lint` at repo root that runs `cd desktop-client && pnpm api:lint`. Include in the `test-ci` target.
 
 ## 5. TypeScript type generation
 
-- [ ] 5.1 Add devDep `openapi-typescript` (v7+) to `desktop-client/package.json`.
-- [ ] 5.2 Write `scripts/gen-api-types.mjs` that runs `openapi-typescript ../api/openapi.yaml -o src/types/api.d.ts` (or equivalent). Append a header comment "DO NOT EDIT — generated by scripts/gen-api-types.mjs".
-- [ ] 5.3 Add script `"api:types"` to `desktop-client/package.json`.
-- [ ] 5.4 Run it once; commit the generated `src/types/api.d.ts`.
-- [ ] 5.5 Add a Makefile target `api-types-check` that re-runs generation and fails if `git diff --exit-code src/types/api.d.ts` is non-empty. Include in `test-ci`.
+- [x] 5.1 Add devDep `openapi-typescript` (v7+) to `desktop-client/package.json`.
+- [x] 5.2 Write `scripts/gen-api-types.mjs` that runs `openapi-typescript ../api/openapi.yaml -o src/types/api.d.ts` (or equivalent). Append a header comment "DO NOT EDIT — generated by scripts/gen-api-types.mjs".
+- [x] 5.3 Add script `"api:types"` to `desktop-client/package.json`.
+- [x] 5.4 Run it once; commit the generated `src/types/api.d.ts`.
+- [x] 5.5 Add a Makefile target `api-types-check` that re-runs generation and fails if `git diff --exit-code src/types/api.d.ts` is non-empty. Include in `test-ci`.
 
 ## 6. MSW handler generation + setup
 
-- [ ] 6.1 Add devDeps `msw` (v2+) and any MSW-related tooling to `desktop-client/package.json`.
-- [ ] 6.2 Write `scripts/gen-msw-handlers.mjs`: reads `api/openapi.yaml`, for each operation emits an `http.get(...)` or `http.post(...)` handler in `src/mocks/handlers.ts` that returns `api/examples/<operationId>.json`. Add the `CLAW_MOCK_PROFILE` branching (happy / slow / chaos).
-- [ ] 6.3 Add script `"api:mocks"` that runs the generator; commit the generated `src/mocks/handlers.ts`.
-- [ ] 6.4 Create `src/mocks/browser.ts`: `setupWorker(...handlers)` and `worker.start()` helper guarded by `import.meta.env.DEV || import.meta.env.VITE_USE_MOCKS`.
-- [ ] 6.5 Create `src/mocks/node.ts`: `setupServer(...handlers)` for Vitest; export `{ server }`.
-- [ ] 6.6 Update `src/main.tsx`: if `import.meta.env.VITE_USE_MOCKS === '1'` (or in pure dev by convention), await `browser.start()` before React mounts.
-- [ ] 6.7 Update `vitest.config.ts` / `src/test-setup.ts` to `beforeAll: server.listen` and `afterAll: server.close`.
-- [ ] 6.8 Add npm script `"dev:mock"` that sets `VITE_USE_MOCKS=1` + runs `pnpm dev`.
-- [ ] 6.9 Decide where MSW's service-worker file goes. Typical: `public/mockServiceWorker.js`. Document path assumption in `api/README.md`.
+- [x] 6.1 Add devDeps `msw` (v2+) and any MSW-related tooling to `desktop-client/package.json`.
+- [x] 6.2 Write `scripts/gen-msw-handlers.mjs`: reads `api/openapi.yaml`, for each operation emits an `http.get(...)` or `http.post(...)` handler in `src/mocks/handlers.ts` that returns `api/examples/<operationId>.json`. Add the `CLAW_MOCK_PROFILE` branching (happy / slow / chaos).
+- [x] 6.3 Add script `"api:mocks"` that runs the generator; commit the generated `src/mocks/handlers.ts`.
+- [x] 6.4 Create `src/mocks/browser.ts`: `setupWorker(...handlers)` and `worker.start()` helper guarded by `import.meta.env.DEV || import.meta.env.VITE_USE_MOCKS`.
+- [x] 6.5 Create `src/mocks/node.ts`: `setupServer(...handlers)` for Vitest; export `{ server }`.
+- [x] 6.6 Update `src/main.tsx`: if `import.meta.env.VITE_USE_MOCKS === '1'` (or in pure dev by convention), await `browser.start()` before React mounts.
+- [x] 6.7 Update `vitest.config.ts` / `src/test-setup.ts` to `beforeAll: server.listen` and `afterAll: server.close`.
+- [x] 6.8 Add npm script `"dev:mock"` that sets `VITE_USE_MOCKS=1` + runs `pnpm dev`.
+- [x] 6.9 Decide where MSW's service-worker file goes. Typical: `public/mockServiceWorker.js`. Document path assumption in `api/README.md`.
 
 ## 7. Contract client with runtime validation
 
-- [ ] 7.1 Create `desktop-client/src/services/remote/contract-client.ts`. Export a `cremote` object with one method per `operationId`. Method signatures pull types from `src/types/api.d.ts`.
-- [ ] 7.2 Each method internally calls the existing `window.claw.remote.*` (not `fetch` directly) so all current main-process plumbing still works. Response is passed through an adapter (see 7.3) then returned typed.
-- [ ] 7.3 Write `src/services/remote/legacy-adapter.ts`: functions that normalize today's backend response shapes to the canonical contract shapes. For example, `adaptBacktestStatus(legacy): TaskResponse<BacktestProgress>` wraps flat fields into `{ task_id, status, progress, result, error, started_at, finished_at }`. Emit `console.warn` on any field the legacy response lacks.
-- [ ] 7.4 Add runtime schema validator (dev mode only): on each `cremote.*` response, validate against the corresponding schema using `ajv` pre-compiled from `api/openapi.yaml` (generated at build time to avoid bundling ajv in prod). Log warnings on mismatches; never throw.
-- [ ] 7.5 Gate the validator behind `import.meta.env.DEV` so prod bundles drop the validator + schema.
+- [x] 7.1 Create `desktop-client/src/services/remote/contract-client.ts`. Export a `cremote` object with one method per `operationId`. Method signatures pull types from `src/types/api.d.ts`.
+- [x] 7.2 Each method internally calls the existing `window.claw.remote.*` (not `fetch` directly) so all current main-process plumbing still works. Response is passed through an adapter (see 7.3) then returned typed.
+- [x] 7.3 Write `src/services/remote/legacy-adapter.ts`: functions that normalize today's backend response shapes to the canonical contract shapes. For example, `adaptBacktestStatus(legacy): TaskResponse<BacktestProgress>` wraps flat fields into `{ task_id, status, progress, result, error, started_at, finished_at }`. Emit `console.warn` on any field the legacy response lacks.
+- [x] 7.4 Add runtime schema validator (dev mode only): on each `cremote.*` response, validate against the corresponding schema using `ajv` pre-compiled from `api/openapi.yaml` (generated at build time to avoid bundling ajv in prod). Log warnings on mismatches; never throw.
+- [x] 7.5 Gate the validator behind `import.meta.env.DEV` so prod bundles drop the validator + schema.
 
 ## 8. Proof-of-life: migrate one call-site
 
-- [ ] 8.1 Pick one existing call-site — recommended: `ScreenerPage.run()` — and replace its `remote.startScreener(...)` call with `cremote.startScreener(...)`. Poll loop replaced with a `cremote.getScreenerResult(...)` call in a `while` that consumes the canonical `TaskResponse`.
-- [ ] 8.2 Run the app against a real backend; verify `ScreenerPage` still works end-to-end.
-- [ ] 8.3 Run `pnpm test`; verify existing Screener tests still pass (MSW handler returns the right shape via fixture).
+- [x] 8.1 Pick one existing call-site — recommended: `ScreenerPage.run()` — and replace its `remote.startScreener(...)` call with `cremote.startScreener(...)`. Poll loop replaced with a `cremote.getScreenerResult(...)` call in a `while` that consumes the canonical `TaskResponse`.
+- [x] 8.2 Run the app against a real backend; verify `ScreenerPage` still works end-to-end.
+- [x] 8.3 Run `pnpm test`; verify existing Screener tests still pass (MSW handler returns the right shape via fixture).
 
 ## 9. Tests
 
-- [ ] 9.1 Vitest: add `src/mocks/handlers.test.ts` — smoke-tests `fetch('/api/klines?...')` under the three profiles. Assert happy returns fixture shape, slow introduces delay, chaos yields 15±5% errors across 100 calls.
-- [ ] 9.2 Vitest: add `src/services/remote/legacy-adapter.test.ts` — table test feeding legacy shapes + asserting canonical output. Include the `INVALID_INTERVAL` example, the success example, and the `COMPLIANCE_FAILED` path.
-- [ ] 9.3 Vitest: add `src/services/remote/contract-client.test.ts` — exercises one happy + one error path per operation (by driving MSW through the client). Assert types compile (use `// @ts-expect-error` patterns to prove type narrowing).
-- [ ] 9.4 Integration: add `scripts/check-examples.mjs` run via `make test` — ensures every operation has at least one example file.
+- [x] 9.1 Vitest: add `src/mocks/handlers.test.ts` — smoke-tests `fetch('/api/klines?...')` under the three profiles. Assert happy returns fixture shape, slow introduces delay, chaos yields 15±5% errors across 100 calls.
+- [x] 9.2 Vitest: add `src/services/remote/legacy-adapter.test.ts` — table test feeding legacy shapes + asserting canonical output. Include the `INVALID_INTERVAL` example, the success example, and the `COMPLIANCE_FAILED` path.
+- [x] 9.3 Vitest: add `src/services/remote/contract-client.test.ts` — exercises one happy + one error path per operation (by driving MSW through the client). Assert types compile (use `// @ts-expect-error` patterns to prove type narrowing).
+- [x] 9.4 Integration: add `scripts/check-examples.mjs` run via `make test` — ensures every operation has at least one example file.
 
 ## 10. Developer docs
 
-- [ ] 10.1 Expand `api/README.md` with:
+- [x] 10.1 Expand `api/README.md` with:
   - Workflow: "edit openapi.yaml → pnpm api:lint → pnpm api:types → pnpm api:mocks → commit all three generated files"
   - Adding a new endpoint: the 5-step checklist
   - Adding a new error code: 3-step checklist (enum + errors.md entry + frontend i18n key)
   - Example-fixture conventions: realistic values, fixed timestamps, realistic edge cases
   - How to run the app in mock mode: `pnpm dev:mock`
-- [ ] 10.2 Add a new "API contract" section in `TESTING.md` pointing at `api/README.md` for deeper info.
-- [ ] 10.3 Add a "spike results" section at the top of `design.md` summarizing the MSW-in-Electron outcome (task 1).
+- [x] 10.2 Add a new "API contract" section in `TESTING.md` pointing at `api/README.md` for deeper info.
+- [x] 10.3 Add a "spike results" section at the top of `design.md` summarizing the MSW-in-Electron outcome (task 1).
 
 ## 11. Final validation
 
-- [ ] 11.1 `pnpm api:lint` returns 0.
-- [ ] 11.2 `pnpm api:types` produces no diff vs committed `src/types/api.d.ts`.
-- [ ] 11.3 `pnpm api:mocks` produces no diff vs committed `src/mocks/handlers.ts`.
-- [ ] 11.4 `pnpm test` (Vitest) passes, counts increased by ≥ 10 new cases from task 9.
-- [ ] 11.5 `tsc --noEmit` passes.
-- [ ] 11.6 `pnpm dev:mock` launches the desktop-client against MSW; `/healthz`, `/api/symbols`, `/api/klines` all return fixture data with no real backend running.
-- [ ] 11.7 `pnpm dev` (without mocks) still works against a real backtest-engine — migrated `ScreenerPage` still runs end-to-end.
-- [ ] 11.8 `make test` (root) passes.
+- [x] 11.1 `pnpm api:lint` returns 0.
+- [x] 11.2 `pnpm api:types` produces no diff vs committed `src/types/api.d.ts`.
+- [x] 11.3 `pnpm api:mocks` produces no diff vs committed `src/mocks/handlers.ts`.
+- [x] 11.4 `pnpm test` (Vitest) passes, counts increased by ≥ 10 new cases from task 9.
+- [x] 11.5 `tsc --noEmit` passes.
+- [x] 11.6 `pnpm dev:mock` launches the desktop-client against MSW; `/healthz`, `/api/symbols`, `/api/klines` all return fixture data with no real backend running.
+- [x] 11.7 `pnpm dev` (without mocks) still works against a real backtest-engine — migrated `ScreenerPage` still runs end-to-end.
+- [x] 11.8 `make test` (root) passes.

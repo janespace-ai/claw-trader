@@ -1,0 +1,23 @@
+{
+  "items": [
+    {
+      "id": "00000000-0000-0000-0000-000000000010",
+      "strategy_id": "00000000-0000-0000-0000-000000000001",
+      "status": "done",
+      "mode": "single",
+      "started_at": 1744416000,
+      "finished_at": 1744416120,
+      "summary_return": 12.5
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000011",
+      "strategy_id": "00000000-0000-0000-0000-000000000001",
+      "status": "done",
+      "mode": "single",
+      "started_at": 1744329600,
+      "finished_at": 1744329720,
+      "summary_return": -2.1
+    }
+  ],
+  "next_cursor": null
+}

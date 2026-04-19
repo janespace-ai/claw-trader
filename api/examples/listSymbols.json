@@ -1,0 +1,10 @@
+{
+  "items": [
+    { "symbol": "BTC_USDT", "market": "futures", "rank": 1, "volume_24h_quote": 5128061921, "status": "active", "updated_at": 1744416000 },
+    { "symbol": "ETH_USDT", "market": "futures", "rank": 2, "volume_24h_quote": 2940715000, "status": "active", "updated_at": 1744416000 },
+    { "symbol": "SOL_USDT", "market": "futures", "rank": 3, "volume_24h_quote": 1620550000, "status": "active", "updated_at": 1744416000 },
+    { "symbol": "DOGE_USDT", "market": "futures", "rank": 4, "volume_24h_quote": 880330000, "status": "active", "updated_at": 1744416000 },
+    { "symbol": "AVAX_USDT", "market": "futures", "rank": 5, "volume_24h_quote": 510220000, "status": "active", "updated_at": 1744416000 }
+  ],
+  "next_cursor": "eyJyYW5rIjo1LCJzeW1ib2wiOiJBVkFYX1VTRFQifQ=="
+}

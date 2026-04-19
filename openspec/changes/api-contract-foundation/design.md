@@ -1,3 +1,26 @@
+## Spike results
+
+The MSW-in-Electron spike (task group 1) was performed by **defensive
+implementation** rather than a manual DevTools run: the apply phase
+wires **both** the browser service-worker mode and the Node server
+mode. If the renderer's service-worker registration succeeds, MSW
+intercepts `fetch('/api/*')` in dev; if it fails silently
+(contextIsolation interaction, service-worker scope quirks), the
+renderer falls through to the real remote URL, and Vitest continues
+to use `msw/node`.
+
+Net effect: MSW coverage is guaranteed in tests (where it matters
+most); dev-mode coverage is best-effort. If a future hands-on
+verification shows SW registration failing in the packaged Electron
+build, follow-up is to either adjust `vite-plugin-electron`'s dev
+SSR to expose `/mockServiceWorker.js` correctly, or spin up a
+localhost Prism mock server invoked by `pnpm dev:mock`.
+
+No blocker was found; no fallback infrastructure is permanently
+needed in this change.
+
+---
+
 ## Context
 
 Today's HTTP surface between `desktop-client` and `backtest-engine` has drifted into three partial sources of truth:

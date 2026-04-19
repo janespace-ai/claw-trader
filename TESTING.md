@@ -2,6 +2,10 @@
 
 How to run tests, add new ones, and keep the infrastructure healthy.
 
+> **API contract tests / mock server:** see [api/README.md](./api/README.md).
+> `pnpm api:lint` validates the OpenAPI + examples; `pnpm dev:mock` runs the
+> desktop-client against MSW fixtures without needing a real backend.
+
 ## Prerequisites
 
 - Docker (for the Timescale container used by DB-backed tests)

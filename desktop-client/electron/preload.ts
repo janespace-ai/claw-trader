@@ -68,6 +68,13 @@ const bridge = {
   remote: {
     setBaseURL: (url: string) => invoke('remote:setBaseURL', url),
     health: () => invoke('remote:health'),
+    /** Generic passthrough: cremote (contract client) routes all its
+     *  calls through here. Legacy helpers below are kept for the
+     *  screens that still use `remote.*` directly during migration. */
+    fetch: (
+      path: string,
+      opts?: { method?: string; body?: unknown; query?: Record<string, unknown> },
+    ) => invoke('remote:request', path, opts ?? {}),
     backtest: {
       start: (payload: unknown) => invoke('remote:backtest:start', payload),
       status: (taskId: string) => invoke('remote:backtest:status', taskId),
