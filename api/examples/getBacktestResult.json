@@ -1,0 +1,46 @@
+{
+  "task_id": "00000000-0000-0000-0000-000000000010",
+  "status": "done",
+  "started_at": 1744416000,
+  "finished_at": 1744416120,
+  "result": {
+    "metrics": {
+      "total_return": 12.5,
+      "sharpe": 1.42,
+      "max_drawdown": -8.2,
+      "win_rate": 56.0,
+      "profit_factor": 1.78,
+      "avg_trade": 2.1,
+      "total_trades": 48
+    },
+    "equity_curve": [
+      { "ts": 1744329600, "value": 10000 },
+      { "ts": 1744372800, "value": 10150 },
+      { "ts": 1744416000, "value": 11250 }
+    ],
+    "trades": [
+      {
+        "id": "t-1",
+        "symbol": "BTC_USDT",
+        "side": "long",
+        "entry_ts": 1744329600,
+        "entry_price": 62100.0,
+        "exit_ts": 1744351200,
+        "exit_price": 63450.0,
+        "pnl_pct": 2.17,
+        "duration_hours": 6
+      },
+      {
+        "id": "t-2",
+        "symbol": "BTC_USDT",
+        "side": "short",
+        "entry_ts": 1744362000,
+        "entry_price": 63900.0,
+        "exit_ts": 1744372800,
+        "exit_price": 63200.0,
+        "pnl_pct": 1.10,
+        "duration_hours": 3
+      }
+    ]
+  }
+}

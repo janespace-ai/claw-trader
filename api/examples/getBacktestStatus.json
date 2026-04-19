@@ -1,0 +1,6 @@
+{
+  "task_id": "00000000-0000-0000-0000-000000000010",
+  "status": "running",
+  "progress": { "phase": "sandbox", "done": 45, "total": 100 },
+  "started_at": 1744416000
+}

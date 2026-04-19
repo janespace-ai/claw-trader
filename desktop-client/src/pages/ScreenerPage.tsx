@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCoinListStore } from '@/stores/coinListStore';
 import { useStrategyStore } from '@/stores/strategyStore';
+import { cremote, toErrorBody } from '@/services/remote/contract-client';
 import { useAutoRunStore } from '@/stores/autoRunStore';
-import { remote } from '@/services/remote/client';
 import type { ScreenerRowResult } from '@/types/domain';
 
 interface SavedList {
@@ -79,36 +79,34 @@ export function ScreenerPage() {
     setStatus('running');
     setError(null);
     try {
-      const { task_id } = await remote.startScreener({
+      // Contract-client migration: canonical `TaskResponse` via cremote.
+      const task = await cremote.startScreener({
         code: screenerStrategy.code,
         config: { market: 'futures', lookback_days: 365 },
         strategy_id: screenerStrategy.id,
       });
-      // Poll result
+      // Poll result — canonical envelope has result embedded when done.
       for (let attempts = 0; attempts < 120; attempts++) {
-        const r: any = await remote.screenerResult(task_id);
-        if (r?.status === 'done') {
-          const res = r.result ?? { results: [] };
-          setResults(res.results as ScreenerRowResult[]);
-          setSymbols(
-            (res.results as ScreenerRowResult[])
-              .filter((x) => x.passed)
-              .map((x) => x.symbol),
-          );
+        const r = await cremote.getScreenerResult({ task_id: task.task_id });
+        if (r.status === 'done') {
+          const rows = (r.result?.results ?? []) as ScreenerRowResult[];
+          setResults(rows);
+          setSymbols(rows.filter((x) => x.passed).map((x) => x.symbol));
           setStatus('done');
           return;
         }
-        if (r?.status === 'failed') {
-          setError(r.error || 'failed');
+        if (r.status === 'failed') {
+          setError(r.error?.message || r.error?.code || 'failed');
           setStatus('error');
           return;
         }
-        await new Promise((r) => setTimeout(r, 1500));
+        await new Promise((rsv) => setTimeout(rsv, 1500));
       }
       setError('timeout');
       setStatus('error');
-    } catch (err: any) {
-      setError(err?.message ?? String(err));
+    } catch (err: unknown) {
+      const body = toErrorBody(err);
+      setError(`${body.code}: ${body.message}`);
       setStatus('error');
     }
   };

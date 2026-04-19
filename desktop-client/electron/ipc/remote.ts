@@ -83,4 +83,37 @@ export function registerRemoteHandlers(ipcMain: IpcMain, initialBaseURL: string)
       body: JSON.stringify(payload),
     }),
   );
+
+  // Generic passthrough used by the contract client (`cremote`). Lets
+  // the renderer call any `/api/*` path without adding a per-endpoint
+  // IPC channel. MSW interception only happens inside the renderer, so
+  // when this channel is used the request goes to the real backend;
+  // the renderer decides whether to route through here or intercept.
+  ipcMain.handle(
+    'remote:request',
+    async (
+      _e,
+      path: string,
+      opts: { method?: string; body?: unknown; query?: Record<string, unknown> } = {},
+    ) => {
+      const method = (opts.method ?? 'GET').toUpperCase();
+      let qs = '';
+      if (opts.query) {
+        const params = new URLSearchParams();
+        for (const [k, v] of Object.entries(opts.query)) {
+          if (v === undefined || v === null) continue;
+          if (Array.isArray(v)) v.forEach((el) => params.append(k, String(el)));
+          else params.set(k, String(v));
+        }
+        const s = params.toString();
+        if (s) qs = '?' + s;
+      }
+      const init: RequestInit = { method };
+      if (opts.body !== undefined) {
+        init.headers = { 'content-type': 'application/json' };
+        init.body = JSON.stringify(opts.body);
+      }
+      return fetchJSON(`${baseURL}${path}${qs}`, init);
+    },
+  );
 }

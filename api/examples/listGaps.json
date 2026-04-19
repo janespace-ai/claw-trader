@@ -1,0 +1,26 @@
+[
+  {
+    "id": 101,
+    "symbol": "BTC_USDT",
+    "market": "futures",
+    "interval": "5m",
+    "gap_from": 1744300200,
+    "gap_to": 1744301400,
+    "missing_bars": 3,
+    "status": "detected",
+    "retry_count": 0,
+    "error": null
+  },
+  {
+    "id": 102,
+    "symbol": "XYZ_USDT",
+    "market": "futures",
+    "interval": "1h",
+    "gap_from": 1744200000,
+    "gap_to": 1744210800,
+    "missing_bars": 3,
+    "status": "unrecoverable",
+    "retry_count": 3,
+    "error": "s3 object not found"
+  }
+]

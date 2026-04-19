@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "name": "SMA Crossover v3",
+      "code_type": "strategy",
+      "code": "from claw.strategy import Strategy\n\nclass MyStrategy(Strategy):\n    def setup(self):\n        self.fast = self.indicator('SMA', period=10)\n        self.slow = self.indicator('SMA', period=30)\n    def on_bar(self, bar):\n        if self.fast.iloc[-1] > self.slow.iloc[-1]:\n            self.buy(size=1)\n        else:\n            self.sell(size=1)\n",
+      "params_schema": { "fast": { "type": "int", "default": 10 }, "slow": { "type": "int", "default": 30 } },
+      "current_version": 3,
+      "created_at": 1743768000,
+      "updated_at": 1744416000
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "name": "Bollinger Breakout",
+      "code_type": "strategy",
+      "code": "from claw.strategy import Strategy\n\nclass BB(Strategy):\n    def on_bar(self, bar):\n        pass\n",
+      "params_schema": null,
+      "current_version": 1,
+      "created_at": 1743509000,
+      "updated_at": 1744330000
+    }
+  ],
+  "next_cursor": null
+}
