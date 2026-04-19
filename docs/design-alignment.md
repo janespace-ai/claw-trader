@@ -8,10 +8,10 @@ each screen change lands.
 |---|---|---|---|---|
 | `o89E6` | `ScrRow` | TBD (Watchlist row variant) | Pending | `screener-chart-first` |
 | `IQK4J` | `StrategyCard` | TBD (`src/components/strategy/StrategyCard.tsx`) | Pending | `strategy-management-v2` |
-| `sZ3y6` | `TradeRow` | TBD (`src/components/workspace/TradesTab.tsx` row) | Pending | `workspace-preview-backtest` |
+| `sZ3y6` | `TradeRow` | `screens/workspace/TradesTab` row | Shipped | `workspace-preview-backtest` |
 | `IjMN8` | `ProviderCard` | TBD (`src/components/settings/ProviderCard.tsx`) | Pending | `settings-full-page` |
 | `Ysu4M` | `RailRow` | `Watchlist` row (`src/components/primitives/Watchlist`) | Shipped | `ui-foundation` |
-| `djIo5` | `PTradeRow` | TBD (preview-backtest trade row variant) | Pending | `workspace-preview-backtest` |
+| `djIo5` | `PTradeRow` | `screens/workspace/TradesTab` row (same impl as `sZ3y6`, variant via `selectedSymbol` prop) | Shipped | `workspace-preview-backtest` |
 | `WN8ia` | `RailRow8` | `Watchlist` row (compact variant) | Shipped | `ui-foundation` |
 | `Nn13b` | `MetTile` | `MetricsGrid` tile (`src/components/primitives/MetricsGrid`) | Shipped | `ui-foundation` |
 | `8oiDW` | `GridCell` | TBD (`src/components/workspace/CrossSymbolGrid` cell) | Pending | `multi-symbol-grid` |
@@ -26,6 +26,10 @@ each screen change lands.
 | — | Strategy draft card | `screens/workspace/StrategyDraftCard` | Shipped | `workspace-strategy-design` |
 | — | Run Preview CTA card | `screens/workspace/RunPreviewCard` | Shipped | `workspace-strategy-design` |
 | `Q6cKp` / `MZuaq` | Strategy Design screen (dark / light) | `screens/workspace/StrategyDesign` | Shipped | `workspace-strategy-design` |
+| — | Preview Backtest topbar | `screens/workspace/PreviewTopbar` | Shipped | `workspace-preview-backtest` |
+| — | Signal Review verdict list | `components/chat/VerdictList` | Shipped | `workspace-preview-backtest` |
+| — | Quick metrics tab | `screens/workspace/QuickMetricsTab` | Shipped | `workspace-preview-backtest` |
+| `3PSG8` / `PISBa` | Preview Backtest screen (dark / light) | `screens/workspace/PreviewBacktest` | Shipped | `workspace-preview-backtest` |
 
 ## Conventions
 
