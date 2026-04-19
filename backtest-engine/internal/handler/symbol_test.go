@@ -9,6 +9,12 @@ import (
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/testhttp"
 )
 
+// paginatedResponse decodes the canonical `{items, next_cursor}` wrapper.
+type paginatedResponse struct {
+	Items      []map[string]any `json:"items"`
+	NextCursor *string          `json:"next_cursor"`
+}
+
 func TestSymbolHandler_Empty(t *testing.T) {
 	st := testdb.New(t)
 	h := NewSymbolHandler(st)
@@ -16,10 +22,13 @@ func TestSymbolHandler_Empty(t *testing.T) {
 	if testhttp.Status(resp) != 200 {
 		t.Fatalf("expected 200, got %d", testhttp.Status(resp))
 	}
-	var rows []map[string]any
-	testhttp.DecodeJSON(t, resp, &rows)
-	if len(rows) != 0 {
-		t.Errorf("empty DB expected 0 rows, got %d", len(rows))
+	var body paginatedResponse
+	testhttp.DecodeJSON(t, resp, &body)
+	if len(body.Items) != 0 {
+		t.Errorf("empty DB expected 0 rows, got %d", len(body.Items))
+	}
+	if body.NextCursor != nil {
+		t.Errorf("expected nil next_cursor, got %q", *body.NextCursor)
 	}
 }
 
@@ -39,12 +48,12 @@ func TestSymbolHandler_HappyPath(t *testing.T) {
 	if testhttp.Status(resp) != 200 {
 		t.Fatalf("expected 200, got %d", testhttp.Status(resp))
 	}
-	var rows []map[string]any
-	testhttp.DecodeJSON(t, resp, &rows)
-	if len(rows) != 2 {
-		t.Fatalf("expected 2 rows, got %d", len(rows))
+	var body paginatedResponse
+	testhttp.DecodeJSON(t, resp, &body)
+	if len(body.Items) != 2 {
+		t.Fatalf("expected 2 rows, got %d", len(body.Items))
 	}
-	if rows[0]["symbol"] != "BTC_USDT" {
-		t.Errorf("expected BTC_USDT first, got %v", rows[0]["symbol"])
+	if body.Items[0]["symbol"] != "BTC_USDT" {
+		t.Errorf("expected BTC_USDT first, got %v", body.Items[0]["symbol"])
 	}
 }

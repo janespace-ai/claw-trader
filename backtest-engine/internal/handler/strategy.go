@@ -2,11 +2,11 @@ package handler
 
 import (
 	"context"
-	"net/http"
 	"strconv"
 
 	"github.com/cloudwego/hertz/pkg/app"
 
+	apierr "github.com/janespace-ai/claw-trader/backtest-engine/internal/errors"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/model"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/store"
 )
@@ -32,15 +32,15 @@ type createStrategyReq struct {
 func (h *StrategyHandler) Create(ctx context.Context, c *app.RequestContext) {
 	var req createStrategyReq
 	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		RespondError(c, apierr.Wrap(err, apierr.CodeInvalidRange, "bind request: "+err.Error()))
 		return
 	}
 	if req.Name == "" || req.Code == "" {
-		c.JSON(http.StatusBadRequest, map[string]string{"error": "name and code are required"})
+		RespondError(c, apierr.New(apierr.CodeInvalidRange, "name and code are required"))
 		return
 	}
 	if req.CodeType != model.CodeTypeStrategy && req.CodeType != model.CodeTypeScreener {
-		c.JSON(http.StatusBadRequest, map[string]string{"error": "code_type must be 'strategy' or 'screener'"})
+		RespondError(c, apierr.New(apierr.CodeInvalidRange, "code_type must be 'strategy' or 'screener'"))
 		return
 	}
 
@@ -49,15 +49,14 @@ func (h *StrategyHandler) Create(ctx context.Context, c *app.RequestContext) {
 		Code: req.Code, ParamsSchema: req.ParamsSchema,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, map[string]any{"id": id, "name": req.Name})
+	RespondOK(c, map[string]any{"id": id, "name": req.Name})
 }
 
-// List handles GET /api/strategies?code_type=&limit=.
-// `code_type` is the canonical query param (matches the JSON field on create);
-// `type` is accepted as an alias for backward compatibility.
+// List handles GET /api/strategies?code_type=&limit=&cursor=. Returns
+// a canonical Paginated<Strategy>.
 func (h *StrategyHandler) List(ctx context.Context, c *app.RequestContext) {
 	codeType := string(c.Query("code_type"))
 	if codeType == "" {
@@ -65,16 +64,28 @@ func (h *StrategyHandler) List(ctx context.Context, c *app.RequestContext) {
 	}
 	limit := 50
 	if v := string(c.Query("limit")); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 200 {
 			limit = n
 		}
 	}
-	list, err := h.store.ListStrategies(ctx, codeType, limit)
+	// Fetch one extra to detect "next page exists". `cursor` isn't
+	// decoded today — the store doesn't support it yet — but we emit
+	// a `next_cursor` when the page is full so clients can paginate
+	// once the store gains cursor support without an API break.
+	list, err := h.store.ListStrategies(ctx, codeType, limit+1)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, list)
+	var nextCursor *string
+	cut := len(list)
+	if cut > limit {
+		cut = limit
+		if ptr, cerr := model.EncodeCursor(map[string]any{"offset": limit}); cerr == nil {
+			nextCursor = ptr
+		}
+	}
+	RespondPaginated(c, list[:cut], nextCursor)
 }
 
 // Get handles GET /api/strategies/:id.
@@ -82,12 +93,13 @@ func (h *StrategyHandler) Get(ctx context.Context, c *app.RequestContext) {
 	id := c.Param("id")
 	st, ok, err := h.store.GetStrategy(ctx, id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
 		return
 	}
 	if !ok {
-		c.JSON(http.StatusNotFound, map[string]string{"error": "not_found"})
+		RespondError(c, apierr.New(apierr.CodeStrategyNotFound, "strategy not found").
+			WithDetails(map[string]any{"strategy_id": id}))
 		return
 	}
-	c.JSON(http.StatusOK, st)
+	RespondOK(c, st)
 }

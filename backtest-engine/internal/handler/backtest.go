@@ -2,12 +2,13 @@ package handler
 
 import (
 	"context"
-	"errors"
+	stderrors "errors"
 	"net/http"
 	"strconv"
 
 	"github.com/cloudwego/hertz/pkg/app"
 
+	apierr "github.com/janespace-ai/claw-trader/backtest-engine/internal/errors"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/model"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/service"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/store"
@@ -31,15 +32,16 @@ type startBacktestReq struct {
 	Mode       string               `json:"mode,omitempty"` // default 'single'
 }
 
-// Start handles POST /api/backtest/start.
+// Start handles POST /api/backtest/start. Responds with a canonical
+// `TaskResponse` envelope.
 func (h *BacktestHandler) Start(ctx context.Context, c *app.RequestContext) {
 	var req startBacktestReq
 	if err := c.BindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		RespondError(c, apierr.Wrap(err, apierr.CodeInvalidRange, "bind request: "+err.Error()))
 		return
 	}
 	if req.Code == "" {
-		c.JSON(http.StatusBadRequest, map[string]string{"error": "code is required"})
+		RespondError(c, apierr.New(apierr.CodeInvalidRange, "code is required"))
 		return
 	}
 	if req.Mode == "" {
@@ -52,21 +54,21 @@ func (h *BacktestHandler) Start(ctx context.Context, c *app.RequestContext) {
 	})
 	if err != nil {
 		var compErr *service.ComplianceError
-		if errors.As(err, &compErr) {
-			c.JSON(http.StatusBadRequest, map[string]any{
-				"error":   "compliance_failed",
-				"details": compErr.Violations,
-			})
+		if stderrors.As(err, &compErr) {
+			RespondError(c, apierr.New(apierr.CodeComplianceFailed, "compliance failed").
+				WithDetails(map[string]any{"violations": compErr.Violations}))
 			return
 		}
-		// Single-in-flight conflict
-		c.JSON(http.StatusConflict, map[string]string{"error": err.Error()})
+		// Single-in-flight conflict or other service error.
+		he := apierr.Wrap(err, apierr.CodeInternalError, err.Error())
+		he.Status = http.StatusConflict
+		RespondError(c, he)
 		return
 	}
-	c.JSON(http.StatusOK, map[string]any{
-		"task_id": runID,
-		"status":  model.StatusPending,
-		"mode":    req.Mode,
+	RespondTask(c, model.TaskResponse{
+		TaskID:    runID,
+		Status:    model.TaskStatusPending,
+		StartedAt: unixNow(),
 	})
 }
 
@@ -75,51 +77,84 @@ func (h *BacktestHandler) Status(ctx context.Context, c *app.RequestContext) {
 	taskID := c.Param("task_id")
 	run, ok, err := h.store.GetBacktestRun(ctx, taskID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
 		return
 	}
 	if !ok {
-		c.JSON(http.StatusNotFound, map[string]string{"error": "task_not_found"})
+		RespondError(c, apierr.New(apierr.CodeBacktestNotFound, "backtest not found").
+			WithDetails(map[string]any{"task_id": taskID}))
 		return
 	}
-	c.JSON(http.StatusOK, run)
+	RespondTask(c, toTaskResponse(run))
 }
 
-// Result handles GET /api/backtest/result/:task_id.
+// Result handles GET /api/backtest/result/:task_id. Unlike the old
+// implementation this returns 200 even for in-progress tasks — the
+// canonical TaskResponse envelope carries that information via
+// `status` and never uses 202.
 func (h *BacktestHandler) Result(ctx context.Context, c *app.RequestContext) {
 	taskID := c.Param("task_id")
 	run, ok, err := h.store.GetBacktestRun(ctx, taskID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
 		return
 	}
 	if !ok {
-		c.JSON(http.StatusNotFound, map[string]string{"error": "task_not_found"})
+		RespondError(c, apierr.New(apierr.CodeBacktestNotFound, "backtest not found").
+			WithDetails(map[string]any{"task_id": taskID}))
 		return
 	}
-	if run.Status == model.StatusRunning || run.Status == model.StatusPending {
-		c.JSON(http.StatusAccepted, map[string]any{
-			"task_id": run.ID, "status": run.Status,
-			"message": "task still in progress",
-		})
-		return
-	}
-	c.JSON(http.StatusOK, run)
+	RespondTask(c, toTaskResponse(run))
 }
 
-// History handles GET /api/backtest/history?strategy_id=&limit=.
+// historyCursor is the opaque resume-point structure for paginated
+// history listing. base64(json(historyCursor)).
+type historyCursor struct {
+	CreatedAtUnix int64 `json:"c"`
+}
+
+// History handles GET /api/backtest/history?strategy_id=&limit=&cursor=.
+// Returns a canonical Paginated<BacktestHistoryItem>.
 func (h *BacktestHandler) History(ctx context.Context, c *app.RequestContext) {
 	strategyID := string(c.Query("strategy_id"))
 	limit := 20
 	if v := string(c.Query("limit")); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 100 {
 			limit = n
 		}
 	}
-	runs, err := h.store.ListBacktestRuns(ctx, strategyID, limit)
+	// Fetch one extra to determine if there's a next page.
+	runs, err := h.store.ListBacktestRuns(ctx, strategyID, limit+1)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
 		return
 	}
-	c.JSON(http.StatusOK, runs)
+
+	items := make([]map[string]any, 0, limit)
+	var nextCursor *string
+	cut := len(runs)
+	if cut > limit {
+		cut = limit
+		cur := historyCursor{CreatedAtUnix: runs[limit-1].CreatedAt.Unix()}
+		if ptr, cerr := model.EncodeCursor(cur); cerr == nil {
+			nextCursor = ptr
+		}
+	}
+	for i := 0; i < cut; i++ {
+		r := runs[i]
+		entry := map[string]any{
+			"id":         r.ID,
+			"status":     string(mapStatus(r.Status)),
+			"mode":       r.Mode,
+			"created_at": r.CreatedAt.Unix(),
+		}
+		if r.StrategyID != nil {
+			entry["strategy_id"] = *r.StrategyID
+		}
+		if r.FinishedAt != nil {
+			entry["finished_at"] = r.FinishedAt.Unix()
+		}
+		items = append(items, entry)
+	}
+	RespondPaginated(c, items, nextCursor)
 }

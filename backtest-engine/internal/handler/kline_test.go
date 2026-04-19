@@ -28,10 +28,18 @@ func TestKlineHandler_BadInterval(t *testing.T) {
 	if testhttp.Status(resp) != 400 {
 		t.Fatalf("expected 400, got %d", testhttp.Status(resp))
 	}
-	var body map[string]any
+	var body struct {
+		Error struct {
+			Code    string         `json:"code"`
+			Details map[string]any `json:"details"`
+		} `json:"error"`
+	}
 	testhttp.DecodeJSON(t, resp, &body)
-	if _, ok := body["allowed_intervals"]; !ok {
-		t.Errorf("expected allowed_intervals in error body; got %v", body)
+	if body.Error.Code != "INVALID_INTERVAL" {
+		t.Errorf("expected code INVALID_INTERVAL, got %q", body.Error.Code)
+	}
+	if _, ok := body.Error.Details["allowed_intervals"]; !ok {
+		t.Errorf("expected allowed_intervals in error details; got %v", body.Error.Details)
 	}
 }
 
