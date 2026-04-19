@@ -6,7 +6,7 @@ each screen change lands.
 
 | Pencil ID | Pencil name | Code component | Status | Change |
 |---|---|---|---|---|
-| `o89E6` | `ScrRow` | TBD (Watchlist row variant) | Pending | `screener-chart-first` |
+| `o89E6` | `ScrRow` | `Watchlist` row (`screens/ScreenerScreen` passed/failed split) | Shipped | `screener-chart-first` |
 | `IQK4J` | `StrategyCard` | TBD (`src/components/strategy/StrategyCard.tsx`) | Pending | `strategy-management-v2` |
 | `sZ3y6` | `TradeRow` | `screens/workspace/TradesTab` row | Shipped | `workspace-preview-backtest` |
 | `IjMN8` | `ProviderCard` | TBD (`src/components/settings/ProviderCard.tsx`) | Pending | `settings-full-page` |
@@ -36,6 +36,9 @@ each screen change lands.
 | — | OptimLens improvement list | `screens/workspace/ImprovementList` | Shipped | `workspace-deep-backtest` |
 | — | Optimize param-grid modal | `screens/workspace/OptimizeModal` | Shipped | `workspace-deep-backtest` |
 | `QdrlI` / `TR0Ib` | Deep Backtest screen (dark / light) | `screens/workspace/DeepBacktest` | Shipped | `workspace-deep-backtest` |
+| — | Screener topbar | `screens/screener/ScreenerTopbar` | Shipped | `screener-chart-first` |
+| — | Saved lists overlay | `screens/screener/SavedListsOverlay` | Shipped | `screener-chart-first` |
+| `bnwnL` / `iFmHp` | Screener (chart-first) screen (dark / light) | `screens/ScreenerScreen` | Shipped | `screener-chart-first` |
 
 ## Conventions
 
