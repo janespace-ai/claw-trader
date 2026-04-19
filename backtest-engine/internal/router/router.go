@@ -13,11 +13,12 @@ import (
 )
 
 // Register wires routes onto the given Hertz server.
-func Register(h *server.Hertz, st *store.Store, bs *service.BacktestService, ss *service.ScreenerService) {
+func Register(h *server.Hertz, st *store.Store, bs *service.BacktestService, ss *service.ScreenerService, as *service.AnalysisService) {
 	bh := handler.NewBacktestHandler(bs, st)
 	sh := handler.NewScreenerHandler(ss, st)
 	th := handler.NewStrategyHandler(st)
 	svh := handler.NewStrategyVersionsHandler(st)
+	ah := handler.NewAnalysisHandler(as)
 	ch := handler.NewCallbackHandler(bs, ss)
 
 	// Market-data gateway: these replace the data-aggregator endpoints of
@@ -58,6 +59,13 @@ func Register(h *server.Hertz, st *store.Store, bs *service.BacktestService, ss 
 		api.GET("/gaps", gapH.List)
 
 		api.GET("/engine/status", engH.Get)
+
+		// Analysis: OptimLens / Signal Review / Trade Explain.
+		api.POST("/analysis/optimlens", ah.StartOptimLens)
+		api.GET("/analysis/optimlens/:task_id", ah.GetOptimLens)
+		api.POST("/analysis/signals", ah.StartSignalReview)
+		api.GET("/analysis/signals/:task_id", ah.GetSignalReview)
+		api.POST("/analysis/trade", ah.ExplainTrade)
 	}
 
 	internal := h.Group("/internal")
