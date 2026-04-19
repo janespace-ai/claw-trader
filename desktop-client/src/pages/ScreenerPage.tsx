@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useCoinListStore } from '@/stores/coinListStore';
 import { useStrategyStore } from '@/stores/strategyStore';
 import { cremote, toErrorBody } from '@/services/remote/contract-client';
+import { useAutoRunStore } from '@/stores/autoRunStore';
 import type { ScreenerRowResult } from '@/types/domain';
 
 interface SavedList {
@@ -28,6 +29,25 @@ export function ScreenerPage() {
   const [results, setResults] = useState<ScreenerRowResult[]>([]);
   const [status, setStatus] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
+
+  // When the chat auto-runs a screener, mirror its results into our
+  // local table so the left panel looks the same whether the user
+  // clicked "Run screener" or just talked to the AI.
+  const autoRunStatus = useAutoRunStore((s) => s.status);
+  useEffect(() => {
+    if (!autoRunStatus) return;
+    if (autoRunStatus.phase === 'running') {
+      setStatus('running');
+      setError(null);
+    } else if (autoRunStatus.phase === 'done') {
+      setResults(autoRunStatus.results);
+      setStatus('done');
+      setError(null);
+    } else if (autoRunStatus.phase === 'failed') {
+      setStatus('error');
+      setError(autoRunStatus.error);
+    }
+  }, [autoRunStatus]);
 
   const [showSaved, setShowSaved] = useState(false);
   const [savedLists, setSavedLists] = useState<SavedList[]>([]);
