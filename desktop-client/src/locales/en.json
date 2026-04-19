@@ -143,6 +143,8 @@
   "chart.symbol_equity": "Symbol equity",
   "chart.trade_click_hint": "click a row to jump to that point on the chart",
   "chart.no_monthly_data": "No monthly returns data yet.",
+  "chart.no_data_for_interval": "No candle data available for this interval. Try a longer timeframe (1h / 4h / 1d).",
+  "chart.indicators": "Indicators",
   "chart.loss": "Loss",
   "chart.gain": "Gain",
   "trade.count": "{{count}} trades",
