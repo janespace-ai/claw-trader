@@ -75,6 +75,7 @@ func main() {
 	// Services.
 	bs := service.NewBacktestService(*cfg, st, cc, sm)
 	ss := service.NewScreenerService(*cfg, st, cc, sm)
+	as := service.NewAnalysisService(st)
 
 	// Hertz server.
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Address, cfg.Server.Port)
@@ -83,7 +84,7 @@ func main() {
 		server.WithReadTimeout(30*time.Second),
 		server.WithWriteTimeout(30*time.Second),
 	)
-	router.Register(h, st, bs, ss)
+	router.Register(h, st, bs, ss, as)
 
 	go func() {
 		log.Printf("HTTP server listening on %s", addr)
