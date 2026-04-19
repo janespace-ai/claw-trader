@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { IChartApi, Time } from 'lightweight-charts';
 import {
   AIPersonaShell,
   ClawChart,
   WorkspaceShell,
   type CandlePoint,
   type OverlayLine,
-  type VisibleTimeRange,
-  type PlotLayout,
 } from '@/components/primitives';
 import { cremote, toErrorBody } from '@/services/remote/contract-client';
 import { useAppStore } from '@/stores/appStore';
@@ -34,7 +33,7 @@ import {
   type OverlayIndicatorId,
   type PaneIndicatorId,
 } from './ChartIndicatorBar';
-import { IndicatorPane } from './IndicatorPane';
+import { IndicatorChartPane } from './IndicatorChartPane';
 import { AIPanel } from '@/components/chat/AIPanel';
 
 type Interval = '5m' | '15m' | '30m' | '1h' | '4h' | '1d';
@@ -48,6 +47,13 @@ const OVERLAY_SET: ReadonlySet<string> = new Set<OverlayIndicatorId>([
 function isPane(id: IndicatorId): id is PaneIndicatorId {
   return !OVERLAY_SET.has(id);
 }
+
+/** Forced common width for every chart's right price scale. Accommodates
+ *  both 6-digit dollar prices ("75,380.4") and shorter indicator labels
+ *  ("60.00"). Using the same value across the main chart and every pane
+ *  means their plot areas line up horizontally regardless of which
+ *  labels happen to be in view. */
+const SHARED_PRICE_SCALE_WIDTH = 68;
 
 /**
  * Workspace — Strategy Design screen.
@@ -69,14 +75,6 @@ export function StrategyDesign() {
   const [fetchState, setFetchState] = useState<FetchState>('loading');
   const [isRunning, setIsRunning] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
-  /** Time window the user is zoomed into on the main chart. Emitted
-   *  from `ClawChart.Candles` and fed into each `IndicatorPane` so the
-   *  panes stay in sync with the price chart on zoom/pan. */
-  const [visibleRange, setVisibleRange] = useState<VisibleTimeRange | null>(null);
-  /** Horizontal plot measurements of the main chart; panes reserve the
-   *  same right-gutter so their SVG plot area lines up pixel-accurately
-   *  with the candle chart above. */
-  const [plotLayout, setPlotLayout] = useState<PlotLayout | null>(null);
 
   // --- Chart data ----------------------------------------------------------
   useEffect(() => {
@@ -180,6 +178,68 @@ export function StrategyDesign() {
     [klines, indicators],
   );
 
+  // --- Time-scale sync across main chart + all indicator panes ------------
+  // Every chart we mount registers itself here; a single shared handler
+  // on each chart mirrors the user's zoom / pan to every other chart.
+  // `syncingRef` breaks the feedback loop that would otherwise fire
+  // when `setVisibleRange` triggers the target chart's own subscribers.
+  const chartsRef = useRef<Map<string, IChartApi>>(new Map());
+  const syncingRef = useRef(false);
+
+  const registerChart = useCallback((id: string, chart: IChartApi) => {
+    chartsRef.current.set(id, chart);
+    const handler = (range: { from: Time; to: Time } | null) => {
+      if (!range || syncingRef.current) return;
+      syncingRef.current = true;
+      try {
+        for (const [otherId, otherChart] of chartsRef.current.entries()) {
+          if (otherId === id) continue;
+          otherChart.timeScale().setVisibleRange(range);
+        }
+      } finally {
+        // Release after the cascading setVisibleRange calls have
+        // had their subscribers execute. Deferring to rAF (rather
+        // than clearing synchronously) prevents the flag from
+        // resetting before lightweight-charts finishes propagating.
+        requestAnimationFrame(() => {
+          syncingRef.current = false;
+        });
+      }
+    };
+    chart.timeScale().subscribeVisibleTimeRangeChange(handler);
+
+    // If the user has already zoomed the main chart, a just-toggled-on
+    // pane needs to inherit that range immediately rather than
+    // fit-to-content'ing its own data. Copy the current main-chart
+    // range onto the new chart once its data is likely present.
+    if (id !== 'main') {
+      const main = chartsRef.current.get('main');
+      if (main) {
+        requestAnimationFrame(() => {
+          const currentRange = main.timeScale().getVisibleRange();
+          if (currentRange) {
+            syncingRef.current = true;
+            chart.timeScale().setVisibleRange(currentRange);
+            requestAnimationFrame(() => {
+              syncingRef.current = false;
+            });
+          }
+        });
+      }
+    }
+  }, []);
+
+  // Prune chart registry entries whose panes are no longer active so
+  // removed panes don't receive stale sync events. The pane itself
+  // handles `chart.remove()` via its unmount cleanup.
+  useEffect(() => {
+    const registry = chartsRef.current;
+    const activeIds = new Set<string>(['main', ...activePanes.map((p) => `pane:${p}`)]);
+    for (const id of Array.from(registry.keys())) {
+      if (!activeIds.has(id)) registry.delete(id);
+    }
+  }, [activePanes]);
+
   // --- Run Preview ---------------------------------------------------------
   const draftCode = useWorkspaceDraftStore((s) => s.code);
   const draftStrategyId = useWorkspaceDraftStore((s) => s.strategyId);
@@ -229,6 +289,12 @@ export function StrategyDesign() {
 
   void navigate;
 
+  // The bottom-most active pane is the only one that shows its time
+  // axis — Gate / TradingView-style where stacked panes share a single
+  // axis at the foot of the group rather than repeating it on every
+  // strip.
+  const lastPane = activePanes.at(-1);
+
   return (
     <WorkspaceShell
       topbar={
@@ -243,7 +309,7 @@ export function StrategyDesign() {
         />
       }
       main={
-        <div className="flex flex-col gap-3 p-4">
+        <div className="flex flex-col gap-2 p-4">
           {fetchState === 'empty' ? (
             <div
               className="flex flex-col items-center justify-center gap-2 border border-dashed border-border-subtle rounded-md text-fg-muted text-xs"
@@ -264,72 +330,75 @@ export function StrategyDesign() {
                 overlays={overlayLines}
                 height={360}
                 showVolume
-                onVisibleTimeRangeChange={setVisibleRange}
-                onPlotLayoutChange={setPlotLayout}
+                onChartReady={(c) => registerChart('main', c)}
+                priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
               />
 
               {activePanes.includes('RSI') && (
-                <IndicatorPane
+                <IndicatorChartPane
                   title="RSI (14)"
                   latestLabel={rsiData.at(-1)?.value.toFixed(1) ?? '—'}
                   lines={[{ data: rsiData, color: 'var(--accent-primary)' }]}
-                  domain={{ min: 0, max: 100 }}
                   guides={[
                     { value: 70, color: 'var(--accent-red)' },
                     { value: 30, color: 'var(--accent-green)' },
                     { value: 50, color: 'var(--border-subtle)', dashed: false },
                   ]}
-                  visibleRange={visibleRange}
-                  rightInsetPx={plotLayout?.rightGutterPx ?? 0}
+                  showTimeAxis={lastPane === 'RSI'}
+                  priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  onChartReady={(c) => registerChart('pane:RSI', c)}
                 />
               )}
               {activePanes.includes('MACD') && macdData && (
-                <IndicatorPane
+                <IndicatorChartPane
                   title="MACD (12, 26, 9)"
                   latestLabel={macdData.macd.at(-1)?.value.toFixed(2) ?? '—'}
                   lines={[
                     { data: macdData.macd, color: 'var(--accent-primary)' },
                     { data: macdData.signal, color: 'var(--accent-yellow)' },
                   ]}
-                  guides={[{ value: 0, color: 'var(--border-subtle)', dashed: false }]}
                   histogram={macdData.histogram}
-                  visibleRange={visibleRange}
-                  rightInsetPx={plotLayout?.rightGutterPx ?? 0}
+                  guides={[{ value: 0, color: 'var(--border-subtle)', dashed: false }]}
+                  showTimeAxis={lastPane === 'MACD'}
+                  priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  onChartReady={(c) => registerChart('pane:MACD', c)}
                 />
               )}
               {activePanes.includes('STOCH') && stochData && (
-                <IndicatorPane
+                <IndicatorChartPane
                   title="Stochastic (14, 3)"
                   latestLabel={stochData.k.at(-1)?.value.toFixed(1) ?? '—'}
                   lines={[
                     { data: stochData.k, color: 'var(--accent-primary)' },
                     { data: stochData.d, color: 'var(--accent-yellow)' },
                   ]}
-                  domain={{ min: 0, max: 100 }}
                   guides={[
                     { value: 80, color: 'var(--accent-red)' },
                     { value: 20, color: 'var(--accent-green)' },
                   ]}
-                  visibleRange={visibleRange}
-                  rightInsetPx={plotLayout?.rightGutterPx ?? 0}
+                  showTimeAxis={lastPane === 'STOCH'}
+                  priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  onChartReady={(c) => registerChart('pane:STOCH', c)}
                 />
               )}
               {activePanes.includes('ATR') && atrData.length > 0 && (
-                <IndicatorPane
+                <IndicatorChartPane
                   title="ATR (14)"
                   latestLabel={atrData.at(-1)?.value.toFixed(2) ?? '—'}
                   lines={[{ data: atrData, color: 'var(--accent-yellow)' }]}
-                  visibleRange={visibleRange}
-                  rightInsetPx={plotLayout?.rightGutterPx ?? 0}
+                  showTimeAxis={lastPane === 'ATR'}
+                  priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  onChartReady={(c) => registerChart('pane:ATR', c)}
                 />
               )}
               {activePanes.includes('OBV') && obvData.length > 0 && (
-                <IndicatorPane
+                <IndicatorChartPane
                   title="OBV"
                   latestLabel={obvData.at(-1)?.value.toFixed(0) ?? '—'}
                   lines={[{ data: obvData, color: 'var(--accent-primary)' }]}
-                  visibleRange={visibleRange}
-                  rightInsetPx={plotLayout?.rightGutterPx ?? 0}
+                  showTimeAxis={lastPane === 'OBV'}
+                  priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  onChartReady={(c) => registerChart('pane:OBV', c)}
                 />
               )}
             </>
