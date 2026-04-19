@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
 
 /**
@@ -6,12 +7,13 @@ import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
  * conditions / interval / leverage are read-only (derived from summary).
  */
 export function StrategyDraftCard() {
+  const { t } = useTranslation();
   const draft = useWorkspaceDraftStore();
 
   if (!draft.summary || !draft.code) {
     return (
       <div className="rounded-lg bg-surface-secondary border border-border-subtle p-4 text-fg-muted text-sm">
-        No strategy draft yet. Chat with the AI Strategist to start.
+        {t('workspace.design.no_draft')}
       </div>
     );
   }
@@ -22,7 +24,7 @@ export function StrategyDraftCard() {
     <div className="rounded-lg bg-surface-secondary border border-border-subtle p-4 space-y-3">
       <div className="flex items-center justify-between">
         <div className="font-heading font-semibold text-sm">
-          {s.name || 'Unnamed strategy'}
+          {s.name || t('workspace.draft.unnamed')}
         </div>
         {draft.version && (
           <span className="text-[10px] font-mono text-fg-muted px-2 py-0.5 rounded-full bg-surface-tertiary">
@@ -33,26 +35,26 @@ export function StrategyDraftCard() {
 
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
         {s.interval && (
-          <Row label="Interval" value={s.interval} />
+          <Row label={t('workspace.draft.interval')} value={s.interval} />
         )}
         {s.symbols && s.symbols.length > 0 && (
-          <Row label="Symbols" value={s.symbols.join(', ')} />
+          <Row label={t('workspace.draft.symbols')} value={s.symbols.join(', ')} />
         )}
         {s.leverage !== undefined && s.leverage !== null && (
-          <Row label="Leverage" value={String(s.leverage)} />
+          <Row label={t('workspace.draft.leverage')} value={String(s.leverage)} />
         )}
         {s.longCondition && (
-          <Row label="Long when" value={s.longCondition} mono wide />
+          <Row label={t('workspace.draft.long_when')} value={s.longCondition} mono wide />
         )}
         {s.shortCondition && (
-          <Row label="Short when" value={s.shortCondition} mono wide />
+          <Row label={t('workspace.draft.short_when')} value={s.shortCondition} mono wide />
         )}
       </div>
 
       {Object.keys(draft.params).length > 0 && (
         <div className="pt-2 border-t border-border-subtle">
           <div className="text-[10px] uppercase tracking-wider text-fg-muted mb-2">
-            Params
+            {t('workspace.draft.params')}
           </div>
           <div className="grid grid-cols-2 gap-2">
             {Object.entries(draft.params).map(([k, v]) => (

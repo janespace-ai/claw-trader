@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ViewModeSwitcher } from '@/components/workspace/ViewModeSwitcher';
 import type { ViewMode } from '@/stores/workspaceStore';
 
@@ -20,6 +21,7 @@ export function DeepTopbar({
   viewMode,
   onViewModeChange,
 }: Props) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between h-14 px-5 bg-surface-secondary border-b border-border-subtle">
       <div className="flex items-baseline gap-3">
@@ -32,9 +34,9 @@ export function DeepTopbar({
           onClick={onOptimize}
           disabled={isOptimizing || !canOptimize}
           className="px-3 py-1.5 rounded-md bg-accent-primary text-fg-inverse text-xs font-semibold disabled:opacity-50"
-          title={canOptimize ? undefined : 'Strategy needs tunable params to optimize'}
+          title={canOptimize ? undefined : t('workspace.deep.need_params')}
         >
-          {isOptimizing ? 'Optimizing…' : 'Optimize'}
+          {isOptimizing ? t('action.optimizing') : t('action.optimize')}
         </button>
       </div>
     </div>

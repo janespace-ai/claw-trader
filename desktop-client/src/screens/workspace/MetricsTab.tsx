@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { MetricsGrid, type Metric } from '@/components/primitives';
 import type { components } from '@/types/api';
 
@@ -13,27 +14,28 @@ function pct(v: number | null | undefined): number | null {
 }
 
 export function MetricsTab({ metrics }: Props) {
+  const { t } = useTranslation();
   if (!metrics) {
     return (
       <div className="p-6 text-center text-fg-muted text-sm">
-        Metrics pending.
+        {t('metric.pending')}.
       </div>
     );
   }
   const headline: Metric[] = [
-    { label: 'Total Return', value: pct(metrics.total_return), unit: '%', emphasis: 'large' },
-    { label: 'Sharpe', value: metrics.sharpe ?? null, emphasis: 'large' },
-    { label: 'Max DD', value: pct(metrics.max_drawdown), unit: '%', emphasis: 'large' },
+    { label: t('metric.total_return'), value: pct(metrics.total_return), unit: '%', emphasis: 'large' },
+    { label: t('metric.sharpe_ratio'), value: metrics.sharpe ?? null, emphasis: 'large' },
+    { label: t('metric.max_drawdown'), value: pct(metrics.max_drawdown), unit: '%', emphasis: 'large' },
   ];
   const secondary: Metric[] = [
-    { label: 'Sortino', value: metrics.sortino ?? null },
-    { label: 'Calmar', value: metrics.calmar ?? null },
-    { label: 'Profit Factor', value: metrics.profit_factor ?? null },
-    { label: 'Win Rate', value: pct(metrics.win_rate), unit: '%' },
-    { label: 'Avg Trade', value: pct(metrics.avg_trade), unit: '%' },
-    { label: 'Avg Hours', value: metrics.avg_hours_in_trade ?? null },
-    { label: 'Positive Days', value: pct(metrics.positive_days_ratio), unit: '%' },
-    { label: 'Total Trades', value: metrics.total_trades ?? null },
+    { label: t('metric.sortino_ratio'), value: metrics.sortino ?? null },
+    { label: t('metric.calmar_ratio'), value: metrics.calmar ?? null },
+    { label: t('metric.profit_factor'), value: metrics.profit_factor ?? null },
+    { label: t('metric.win_rate'), value: pct(metrics.win_rate), unit: '%' },
+    { label: t('metric.avg_trade'), value: pct(metrics.avg_trade), unit: '%' },
+    { label: t('metric.avg_hours'), value: metrics.avg_hours_in_trade ?? null },
+    { label: t('metric.positive_days'), value: pct(metrics.positive_days_ratio), unit: '%' },
+    { label: t('metric.total_trades'), value: metrics.total_trades ?? null },
   ];
   return (
     <div className="space-y-4">

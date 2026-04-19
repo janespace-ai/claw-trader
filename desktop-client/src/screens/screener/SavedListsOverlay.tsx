@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useScreenerRunStore } from '@/stores/screenerRunStore';
 
 interface SavedList {
@@ -20,6 +21,7 @@ interface Props {
  * actual screener run.
  */
 export function SavedListsOverlay({ onClose }: Props) {
+  const { t } = useTranslation();
   const [lists, setLists] = useState<SavedList[]>([]);
   const [saveName, setSaveName] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -43,7 +45,7 @@ export function SavedListsOverlay({ onClose }: Props) {
 
   const handleSave = async () => {
     if (passedSymbols.length === 0) {
-      setErr('No passed symbols to save — run the screener first.');
+      setErr(t('screener.save_empty_error'));
       return;
     }
     try {
@@ -77,8 +79,12 @@ export function SavedListsOverlay({ onClose }: Props) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <div className="font-heading font-semibold text-sm">Saved lists</div>
-          <button onClick={onClose} className="text-fg-muted hover:text-fg-primary">
+          <div className="font-heading font-semibold text-sm">{t('screener.saved_lists')}</div>
+          <button
+            onClick={onClose}
+            className="text-fg-muted hover:text-fg-primary"
+            aria-label={t('action.close')}
+          >
             ✕
           </button>
         </div>
@@ -86,7 +92,7 @@ export function SavedListsOverlay({ onClose }: Props) {
         <div className="flex items-center gap-2">
           <input
             type="text"
-            placeholder="Name this list…"
+            placeholder={t('screener.name_list')}
             value={saveName}
             onChange={(e) => setSaveName(e.target.value)}
             className="flex-1 px-2 py-1.5 rounded-md bg-surface-secondary text-xs"
@@ -96,7 +102,7 @@ export function SavedListsOverlay({ onClose }: Props) {
             disabled={passedSymbols.length === 0}
             className="px-2 py-1.5 rounded-md bg-accent-primary text-fg-inverse text-xs font-semibold disabled:opacity-50"
           >
-            Save
+            {t('action.save')}
           </button>
         </div>
 
@@ -104,7 +110,7 @@ export function SavedListsOverlay({ onClose }: Props) {
 
         <div className="space-y-1">
           {lists.length === 0 ? (
-            <div className="text-xs text-fg-muted italic">No saved lists yet.</div>
+            <div className="text-xs text-fg-muted italic">{t('screener.no_saved_lists')}</div>
           ) : (
             lists.map((l) => (
               <div
@@ -112,16 +118,17 @@ export function SavedListsOverlay({ onClose }: Props) {
                 className="flex items-center justify-between text-xs px-2 py-2 rounded hover:bg-surface-secondary"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium truncate">{l.name || 'Untitled'}</div>
+                  <div className="font-medium truncate">{l.name || t('strategy.untitled', { defaultValue: 'Untitled' })}</div>
                   <div className="text-fg-muted text-[10px]">
-                    {l.symbols.length} symbols · {new Date(l.updated_at).toLocaleDateString()}
+                    {t('screener.symbols_count', { n: l.symbols.length })} ·{' '}
+                    {new Date(l.updated_at).toLocaleDateString()}
                   </div>
                 </div>
                 <button
                   onClick={() => handleLoad(l)}
                   className="text-accent-primary hover:underline"
                 >
-                  Load
+                  {t('action.load')}
                 </button>
               </div>
             ))

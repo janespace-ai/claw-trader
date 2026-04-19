@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { components } from '@/types/api';
 
 type OptimLensImprovement = components['schemas']['OptimLensImprovement'];
@@ -47,6 +48,7 @@ export function ImprovementCard({
   onDismiss,
   onUndismiss,
 }: Props) {
+  const { t } = useTranslation();
   const im = improvement;
   const delta = im.expected_delta ?? {};
   const key = im.title || `im-${index}`;
@@ -72,9 +74,9 @@ export function ImprovementCard({
       <p className="text-xs text-fg-secondary leading-snug">{im.rationale}</p>
       {(delta.sharpe != null || delta.max_drawdown != null || delta.win_rate != null) && (
         <div className="flex flex-wrap gap-3">
-          {formatDelta('ΔSharpe', delta.sharpe)}
-          {formatDelta('ΔMaxDD', delta.max_drawdown, '%')}
-          {formatDelta('ΔWin', delta.win_rate, '%')}
+          {formatDelta(t('workspace.improvement.delta_sharpe'), delta.sharpe)}
+          {formatDelta(t('workspace.improvement.delta_maxdd'), delta.max_drawdown, '%')}
+          {formatDelta(t('workspace.improvement.delta_win'), delta.win_rate, '%')}
         </div>
       )}
       {im.suggested_change?.kind === 'param_update' && im.suggested_change.payload && (
@@ -91,9 +93,9 @@ export function ImprovementCard({
       )}
       {im.suggested_change?.kind === 'code_edit' && (
         <details className="text-[11px] font-mono text-fg-secondary bg-surface-tertiary rounded-md px-2 py-1">
-          <summary className="cursor-pointer text-fg-primary">Code diff</summary>
+          <summary className="cursor-pointer text-fg-primary">{t('workspace.improvement.code_diff')}</summary>
           <pre className="whitespace-pre-wrap text-[10px] mt-1">
-            {String((im.suggested_change.payload as { diff?: string }).diff ?? '(no diff provided)')}
+            {String((im.suggested_change.payload as { diff?: string }).diff ?? t('workspace.improvement.no_diff'))}
           </pre>
         </details>
       )}
@@ -103,7 +105,7 @@ export function ImprovementCard({
             onClick={() => onUndismiss?.(key)}
             className="text-xs text-fg-secondary hover:text-fg-primary"
           >
-            Undismiss
+            {t('action.undismiss')}
           </button>
         ) : (
           <>
@@ -112,13 +114,13 @@ export function ImprovementCard({
               disabled={isApplying}
               className="px-3 py-1 rounded-md bg-accent-primary text-fg-inverse text-xs font-semibold disabled:opacity-50"
             >
-              {isApplying ? 'Applying…' : 'Apply'}
+              {isApplying ? t('action.applying') : t('action.apply')}
             </button>
             <button
               onClick={() => onDismiss(key)}
               className="px-2 py-1 rounded-md text-xs text-fg-secondary hover:text-fg-primary"
             >
-              Dismiss
+              {t('action.dismiss')}
             </button>
           </>
         )}

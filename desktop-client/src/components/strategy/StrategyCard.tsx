@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ClawChart } from '@/components/primitives';
 import { cremote } from '@/services/remote/contract-client';
 import type { Strategy } from '@/types/domain';
@@ -32,6 +33,7 @@ export function StrategyCard({
   onToggleFavorite,
   onArchive,
 }: Props) {
+  const { t } = useTranslation();
   const [series, setSeries] = useState<MiniSeries[] | null>(null);
   const [lastReturn, setLastReturn] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -89,7 +91,7 @@ export function StrategyCard({
                 onToggleFavorite();
               }}
               className={s.is_favorite ? 'text-accent-yellow' : 'text-fg-muted hover:text-accent-yellow'}
-              aria-label={s.is_favorite ? 'Unfavorite' : 'Favorite'}
+              aria-label={s.is_favorite ? t('strategy.unfavorite') : t('strategy.favorite')}
             >
               ★
             </button>
@@ -106,7 +108,7 @@ export function StrategyCard({
               setMenuOpen((v) => !v);
             }}
             className="text-fg-muted hover:text-fg-primary text-sm px-1"
-            aria-label="More actions"
+            aria-label={t('strategy.more_actions')}
           >
             ⋯
           </button>
@@ -122,7 +124,7 @@ export function StrategyCard({
                 }}
                 className="w-full text-left px-3 py-1.5 hover:bg-surface-secondary"
               >
-                Duplicate
+                {t('action.duplicate')}
               </button>
               <button
                 onClick={() => {
@@ -131,7 +133,7 @@ export function StrategyCard({
                 }}
                 className="w-full text-left px-3 py-1.5 hover:bg-surface-secondary"
               >
-                {s.status === 'active' ? 'Archive' : 'Reactivate'}
+                {s.status === 'active' ? t('action.archive') : t('action.reactivate')}
               </button>
             </div>
           )}
@@ -143,7 +145,7 @@ export function StrategyCard({
           <ClawChart.Mini data={series} height={56} />
         ) : (
           <div className="h-full grid place-items-center text-[10px] text-fg-muted border border-dashed border-border-subtle rounded">
-            No backtests yet
+            {t('strategy.no_backtests')}
           </div>
         )}
       </div>
@@ -159,7 +161,7 @@ export function StrategyCard({
           }}
           className="text-xs text-accent-primary hover:underline"
         >
-          Open
+          {t('action.open')}
         </button>
       </div>
 

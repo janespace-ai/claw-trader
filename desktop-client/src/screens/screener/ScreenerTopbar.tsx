@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next';
+
 interface Props {
   strategyName: string | null;
   status: 'idle' | 'pending' | 'running' | 'complete' | 'failed';
@@ -17,13 +19,16 @@ export function ScreenerTopbar({
   onRun,
   onOpenSaved,
 }: Props) {
+  const { t } = useTranslation();
   const running = status === 'pending' || status === 'running';
   return (
     <div className="flex items-center justify-between h-14 px-5 bg-surface-secondary border-b border-border-subtle">
       <div className="flex items-baseline gap-3">
-        <span className="font-heading font-semibold text-sm">Screener</span>
+        <span className="font-heading font-semibold text-sm">{t('screener.title')}</span>
         <span className="text-xs text-fg-secondary">
-          {strategyName ? `Using ${strategyName}` : 'No screener strategy selected'}
+          {strategyName
+            ? t('screener.using_strategy', { name: strategyName })
+            : t('screener.no_strategy')}
         </span>
       </div>
       <div className="flex items-center gap-2">
@@ -45,15 +50,15 @@ export function ScreenerTopbar({
           onClick={onOpenSaved}
           className="px-3 py-1.5 text-xs rounded-md bg-surface-tertiary hover:bg-surface-primary"
         >
-          Saved lists
+          {t('screener.saved_lists')}
         </button>
         <button
           onClick={onRun}
           disabled={running || !strategyName}
           className="px-3 py-1.5 rounded-md bg-accent-primary text-fg-inverse text-xs font-semibold disabled:opacity-50"
-          title={strategyName ? undefined : 'Pick a screener strategy first'}
+          title={strategyName ? undefined : t('screener.pick_strategy_hint')}
         >
-          {running ? 'Running…' : 'Run screener'}
+          {running ? t('action.running') : t('action.run_screener')}
         </button>
       </div>
     </div>

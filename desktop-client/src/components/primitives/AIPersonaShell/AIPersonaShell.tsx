@@ -1,4 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 import { getPersona, type PersonaId, type PersonaConfig } from './personas';
 
 interface PersonaContextValue {
@@ -44,15 +45,18 @@ export function AIPersonaShell({ persona, context = {}, children }: ShellProps) 
 
 function Header() {
   const { persona } = usePersonaContext();
+  const { t } = useTranslation();
   return (
     <div className="flex-shrink-0 flex items-center gap-2 px-4 py-3 border-b border-border-subtle">
       <span className="w-7 h-7 rounded-full bg-accent-primary-dim grid place-items-center">
         <span className="text-accent-primary text-xs">✦</span>
       </span>
       <div className="leading-tight">
-        <div className="font-heading font-semibold text-sm text-fg-primary">{persona.title}</div>
+        <div className="font-heading font-semibold text-sm text-fg-primary">
+          {t(persona.title)}
+        </div>
         {persona.subtitle && (
-          <div className="text-[10px] text-fg-muted">{persona.subtitle}</div>
+          <div className="text-[10px] text-fg-muted">{t(persona.subtitle)}</div>
         )}
       </div>
     </div>

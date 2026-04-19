@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { components } from '@/types/api';
 
 type Trade = components['schemas']['Trade'];
@@ -22,67 +23,68 @@ function pnlClass(pct: number | null | undefined): string {
 
 /** Non-virtualized trades table; capped at `cap` rows. */
 export function TradesTab({ trades, cap = 200, selectedSymbol, onRowClick }: Props) {
+  const { t } = useTranslation();
   const rows = trades.slice(0, cap);
   return (
     <div className="bg-surface-secondary rounded-lg overflow-hidden">
       <table className="w-full text-xs">
         <thead className="text-fg-muted text-[10px] uppercase bg-surface-tertiary">
           <tr>
-            <th className="text-left py-2 px-3 font-medium">Symbol</th>
-            <th className="text-left py-2 px-3 font-medium">Side</th>
-            <th className="text-left py-2 px-3 font-medium">Entry</th>
-            <th className="text-right py-2 px-3 font-medium">Entry px</th>
-            <th className="text-left py-2 px-3 font-medium">Exit</th>
-            <th className="text-right py-2 px-3 font-medium">Exit px</th>
-            <th className="text-right py-2 px-3 font-medium">PnL %</th>
-            <th className="text-right py-2 px-3 font-medium">Dur (h)</th>
+            <th className="text-left py-2 px-3 font-medium">{t('trades.col.symbol')}</th>
+            <th className="text-left py-2 px-3 font-medium">{t('trades.col.side')}</th>
+            <th className="text-left py-2 px-3 font-medium">{t('trades.col.entry')}</th>
+            <th className="text-right py-2 px-3 font-medium">{t('trades.col.entry_px')}</th>
+            <th className="text-left py-2 px-3 font-medium">{t('trades.col.exit')}</th>
+            <th className="text-right py-2 px-3 font-medium">{t('trades.col.exit_px')}</th>
+            <th className="text-right py-2 px-3 font-medium">{t('trades.col.pnl_pct')}</th>
+            <th className="text-right py-2 px-3 font-medium">{t('trades.col.duration_h')}</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((t) => (
+          {rows.map((tr) => (
             <tr
-              key={t.id}
-              onClick={() => onRowClick?.(t)}
+              key={tr.id}
+              onClick={() => onRowClick?.(tr)}
               className={
                 'border-t border-border-subtle cursor-pointer ' +
-                (selectedSymbol === t.symbol
+                (selectedSymbol === tr.symbol
                   ? 'bg-surface-tertiary'
                   : 'hover:bg-surface-tertiary')
               }
             >
-              <td className="py-2 px-3 font-medium">{t.symbol}</td>
+              <td className="py-2 px-3 font-medium">{tr.symbol}</td>
               <td className="py-2 px-3">
                 <span
                   className={
                     'px-1.5 py-0.5 rounded text-[10px] font-semibold ' +
-                    (t.side === 'long'
+                    (tr.side === 'long'
                       ? 'bg-[color:var(--accent-green-dim)] text-accent-green'
                       : 'bg-[color:var(--accent-red-dim)] text-accent-red')
                   }
                 >
-                  {t.side}
+                  {tr.side}
                 </span>
               </td>
-              <td className="py-2 px-3 text-fg-secondary">{formatTs(t.entry_ts)}</td>
-              <td className="py-2 px-3 text-right font-mono">{t.entry_price.toFixed(4)}</td>
+              <td className="py-2 px-3 text-fg-secondary">{formatTs(tr.entry_ts)}</td>
+              <td className="py-2 px-3 text-right font-mono">{tr.entry_price.toFixed(4)}</td>
               <td className="py-2 px-3 text-fg-secondary">
-                {t.exit_ts != null ? formatTs(t.exit_ts) : '—'}
+                {tr.exit_ts != null ? formatTs(tr.exit_ts) : '—'}
               </td>
               <td className="py-2 px-3 text-right font-mono">
-                {t.exit_price != null ? t.exit_price.toFixed(4) : '—'}
+                {tr.exit_price != null ? tr.exit_price.toFixed(4) : '—'}
               </td>
-              <td className={'py-2 px-3 text-right font-mono ' + pnlClass(t.pnl_pct)}>
-                {t.pnl_pct != null ? (t.pnl_pct * 100).toFixed(2) + '%' : '—'}
+              <td className={'py-2 px-3 text-right font-mono ' + pnlClass(tr.pnl_pct)}>
+                {tr.pnl_pct != null ? (tr.pnl_pct * 100).toFixed(2) + '%' : '—'}
               </td>
               <td className="py-2 px-3 text-right text-fg-secondary">
-                {t.duration_hours != null ? t.duration_hours.toFixed(1) : '—'}
+                {tr.duration_hours != null ? tr.duration_hours.toFixed(1) : '—'}
               </td>
             </tr>
           ))}
           {trades.length === 0 && (
             <tr>
               <td colSpan={8} className="py-6 text-center text-fg-muted">
-                No trades in this preview.
+                {t('trades.empty')}
               </td>
             </tr>
           )}
@@ -90,7 +92,7 @@ export function TradesTab({ trades, cap = 200, selectedSymbol, onRowClick }: Pro
       </table>
       {trades.length > cap && (
         <div className="text-[10px] text-fg-muted px-3 py-2 border-t border-border-subtle">
-          Showing {cap} of {trades.length}. Upgrade to virtualized view to see the rest.
+          {t('trades.truncated', { cap, total: trades.length })}
         </div>
       )}
     </div>

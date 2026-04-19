@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AIPersonaShell,
   ClawChart,
@@ -30,6 +31,7 @@ interface Props {
  * Pencil frame `s9ooT` (dark) / `Aib9J` (light).
  */
 export function SymbolDetailScreen({ symbol, returnTo, backtestTaskId }: Props) {
+  const { t } = useTranslation();
   const navigate = useAppStore((s) => s.navigate);
   const focusedTradeId = useWorkspaceStore((s) => s.focusedTradeId);
   const focusTrade = useWorkspaceStore((s) => s.focusTrade);
@@ -139,7 +141,7 @@ export function SymbolDetailScreen({ symbol, returnTo, backtestTaskId }: Props) 
               onClick={() => navigate(returnTo)}
               className="text-xs text-accent-primary hover:underline"
             >
-              ← Back
+              {t('symbol.back')}
             </button>
             <span className="font-heading font-semibold text-sm">{symbol}</span>
             {metadata?.name && (
@@ -176,22 +178,22 @@ export function SymbolDetailScreen({ symbol, returnTo, backtestTaskId }: Props) 
       main={
         <div className="flex flex-col gap-4 p-4">
           <div>
-            <div className="text-[10px] uppercase text-fg-muted mb-1">Price & Signals</div>
+            <div className="text-[10px] uppercase text-fg-muted mb-1">{t('symbol.price_signals')}</div>
             <ClawChart.Candles data={klines} markers={markers} height={320} showVolume />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-4">
             <div>
-              <div className="text-[10px] uppercase text-fg-muted mb-1">Trade journal</div>
+              <div className="text-[10px] uppercase text-fg-muted mb-1">{t('symbol.trade_journal')}</div>
               <TradesTab
                 trades={tradesForSymbol}
                 selectedSymbol={symbol}
-                onRowClick={(t) => focusTrade(t.id)}
+                onRowClick={(tr) => focusTrade(tr.id)}
               />
             </div>
             <div className="space-y-3">
               <div className="bg-surface-secondary rounded-lg p-3">
-                <div className="text-[10px] uppercase text-fg-muted">Symbol equity</div>
+                <div className="text-[10px] uppercase text-fg-muted">{t('symbol.equity')}</div>
                 <div className="text-sm font-mono">
                   {equityCurve.length === 0 ? '—' : (totalReturn >= 0 ? '+' : '') + (totalReturn * 100).toFixed(2) + '%'}
                 </div>
@@ -203,10 +205,12 @@ export function SymbolDetailScreen({ symbol, returnTo, backtestTaskId }: Props) 
                 )}
               </div>
               <div className="bg-surface-secondary rounded-lg p-3">
-                <div className="text-[10px] uppercase text-fg-muted">Trades</div>
+                <div className="text-[10px] uppercase text-fg-muted">{t('symbol.trades')}</div>
                 <div className="text-sm font-mono">{tradesForSymbol.length}</div>
                 <div className="text-[11px] text-fg-muted">
-                  {tradesForSymbol.filter((t) => (t.pnl_pct ?? 0) > 0).length} winners
+                  {t('symbol.winners', {
+                    n: tradesForSymbol.filter((tr) => (tr.pnl_pct ?? 0) > 0).length,
+                  })}
                 </div>
               </div>
             </div>

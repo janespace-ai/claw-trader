@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   AIPersonaShell,
   ClawChart,
@@ -20,6 +21,7 @@ import { SavedListsOverlay } from './screener/SavedListsOverlay';
  * Pencil frame `bnwnL` (dark) / `iFmHp` (light).
  */
 export function ScreenerScreen() {
+  const { t } = useTranslation();
   const results = useScreenerRunStore((s) => s.results);
   const focusedSymbol = useScreenerRunStore((s) => s.focusedSymbol);
   const status = useScreenerRunStore((s) => s.status);
@@ -128,7 +130,7 @@ export function ScreenerScreen() {
           <div className="p-3 space-y-4">
             <div>
               <div className="text-[10px] uppercase text-fg-muted mb-2 px-2">
-                Passed ({passed.length})
+                {t('screener.section.passed')} ({passed.length})
               </div>
               <Watchlist
                 items={passed}
@@ -139,7 +141,7 @@ export function ScreenerScreen() {
             {failed.length > 0 && (
               <details>
                 <summary className="text-[10px] uppercase text-fg-muted cursor-pointer px-2">
-                  Failed ({failed.length})
+                  {t('screener.section.failed')} ({failed.length})
                 </summary>
                 <div className="mt-1">
                   <Watchlist items={failed} focused={focusedSymbol} onFocus={focus} />
@@ -156,8 +158,8 @@ export function ScreenerScreen() {
             ) : (
               <div className="flex-1 grid place-items-center text-fg-muted text-sm border border-border-subtle rounded-lg p-10">
                 {status === 'complete'
-                  ? 'Pick a symbol from the left rail.'
-                  : 'Run the screener to populate the list.'}
+                  ? t('screener.pick_symbol')
+                  : t('screener.run_empty')}
               </div>
             )}
           </div>

@@ -61,7 +61,9 @@ describe('UI primitives — smoke renders', () => {
         <AIPersonaShell.Composer />
       </AIPersonaShell>,
     );
-    expect(getByText('Trade Analysis')).toBeTruthy();
+    // Persona title is now an i18n key. react-i18next isn't initialized
+    // in the vitest env so `t(key)` returns the raw key.
+    expect(getByText('persona.trade_analysis.title')).toBeTruthy();
     expect(getByText('Intro text')).toBeTruthy();
     // Composer is hidden when persona.composer === false
     expect(container.textContent).not.toContain('Composer not yet');

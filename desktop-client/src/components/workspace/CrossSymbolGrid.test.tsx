@@ -25,7 +25,9 @@ describe('CrossSymbolGrid', () => {
 
   it('shows empty state when no cells', () => {
     render(<CrossSymbolGrid cells={[]} />);
-    expect(screen.getByText(/No per-symbol/i)).toBeDefined();
+    // Post i18n: empty-state goes through t('grid.empty'). The vitest
+    // env doesn't init react-i18next so t() returns the raw key.
+    expect(screen.getByText('grid.empty')).toBeDefined();
   });
 
   it('single-click triggers onSingleClick', () => {

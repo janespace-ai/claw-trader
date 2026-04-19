@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ClawChart } from '@/components/primitives';
 
 export interface SymbolCell {
@@ -39,6 +40,7 @@ export function CrossSymbolGrid({
   onSingleClick,
   onDoubleClick,
 }: Props) {
+  const { t } = useTranslation();
   const [sort, setSort] = useState<Sort>('return-desc');
 
   const sorted = useMemo(() => {
@@ -65,7 +67,7 @@ export function CrossSymbolGrid({
   if (sorted.length === 0) {
     return (
       <div className="p-8 text-center text-fg-muted text-sm border border-dashed border-border-subtle rounded-lg">
-        No per-symbol results to display. Run a multi-symbol backtest first.
+        {t('grid.empty')}
       </div>
     );
   }
@@ -74,18 +76,18 @@ export function CrossSymbolGrid({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="text-[10px] uppercase text-fg-muted">
-          {sorted.length} symbol{sorted.length === 1 ? '' : 's'}
+          {t('grid.symbols_count', { n: sorted.length })}
         </div>
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as Sort)}
           className="bg-surface-tertiary text-xs px-2 py-1 rounded-md"
-          aria-label="Sort cells"
+          aria-label={t('grid.sort_aria')}
         >
-          <option value="return-desc">Return ↓</option>
-          <option value="return-asc">Return ↑</option>
-          <option value="symbol">Symbol A–Z</option>
-          <option value="trades-desc">Trades ↓</option>
+          <option value="return-desc">{t('grid.sort.return_desc')}</option>
+          <option value="return-asc">{t('grid.sort.return_asc')}</option>
+          <option value="symbol">{t('grid.sort.symbol')}</option>
+          <option value="trades-desc">{t('grid.sort.trades_desc')}</option>
         </select>
       </div>
       <div
@@ -124,13 +126,13 @@ export function CrossSymbolGrid({
                   <ClawChart.Mini data={c.equity} height={64} />
                 ) : (
                   <div className="h-full grid place-items-center text-[10px] text-fg-muted border border-dashed border-border-subtle rounded">
-                    No equity data
+                    {t('grid.cell.no_equity')}
                   </div>
                 )}
               </div>
               {c.trades != null && (
                 <div className="text-[10px] text-fg-muted mt-1">
-                  {c.trades} trade{c.trades === 1 ? '' : 's'}
+                  {t('grid.cell.trades', { n: c.trades })}
                 </div>
               )}
             </div>
