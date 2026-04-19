@@ -31,6 +31,10 @@ interface Props {
    *  pane stays in sync with the main chart's zoom/pan. `null` / omitted
    *  means "show every point". */
   visibleRange?: VisibleTimeRange | null;
+  /** Right-side CSS padding applied to the pane so the SVG plot area
+   *  exactly matches the main chart's plot area (the chart has a
+   *  right-axis gutter the pane has to reserve to stay aligned). */
+  rightInsetPx?: number;
   height?: number;
 }
 
@@ -68,6 +72,7 @@ export function IndicatorPane({
   guides = [],
   histogram,
   visibleRange,
+  rightInsetPx = 0,
   height = 84,
 }: Props) {
   const view = useMemo(() => {
@@ -165,11 +170,20 @@ export function IndicatorPane({
 
   return (
     <div
-      className="relative bg-surface-secondary rounded-md px-2 py-1"
-      style={{ height: height + 18 }}
+      className="relative bg-surface-secondary rounded-md py-1"
+      style={{
+        // The main chart's canvas spans its container edge-to-edge with
+        // a right-axis gutter baked in. To line up exactly, the pane's
+        // SVG plot area mirrors that layout: the container reserves
+        // `rightInsetPx` on the right, and the SVG then covers the full
+        // remaining width. The title row gets its own inner padding so
+        // label text still has breathing room on the left.
+        height: height + 18,
+        paddingRight: rightInsetPx,
+      }}
       aria-label={title}
     >
-      <div className="flex items-center justify-between text-[10px] text-fg-muted">
+      <div className="flex items-center justify-between text-[10px] text-fg-muted px-2">
         <span>{title}</span>
         {latestLabel != null && <span className="font-mono">{latestLabel}</span>}
       </div>
