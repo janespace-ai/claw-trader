@@ -15,3 +15,6 @@ export type { Metric } from './MetricsGrid/MetricsGrid';
 export { AIPersonaShell, usePersonaContext } from './AIPersonaShell/AIPersonaShell';
 export { PERSONAS, getPersona } from './AIPersonaShell/personas';
 export type { PersonaId, PersonaConfig } from './AIPersonaShell/personas';
+
+export { MonthlyHeatmap } from './MonthlyHeatmap/MonthlyHeatmap';
+export type { MonthlyReturn } from './MonthlyHeatmap/MonthlyHeatmap';

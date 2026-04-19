@@ -7,6 +7,7 @@ import { BacktestPage } from '@/pages/BacktestPage';
 import { SettingsModal } from '@/pages/SettingsPage';
 import { StrategyDesign } from '@/screens/workspace/StrategyDesign';
 import { PreviewBacktest } from '@/screens/workspace/PreviewBacktest';
+import { DeepBacktest } from '@/screens/workspace/DeepBacktest';
 import { useAppStore } from '@/stores/appStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useStrategyStore } from '@/stores/strategyStore';
@@ -54,15 +55,7 @@ export default function App() {
           {route.kind === 'strategies' && <StrategiesPage />}
           {route.kind === 'workspace' && workspaceMode === 'design' && <StrategyDesign />}
           {route.kind === 'workspace' && workspaceMode === 'preview' && <PreviewBacktest />}
-          {route.kind === 'workspace' && workspaceMode === 'deep' && (
-            <div className="p-6 text-fg-muted">
-              Running deep backtest — full screen coming in{' '}
-              <code className="text-fg-primary">workspace-deep-backtest</code>.
-              <div className="mt-2 text-xs">
-                Legacy view (transitional): <BacktestPage />
-              </div>
-            </div>
-          )}
+          {route.kind === 'workspace' && workspaceMode === 'deep' && <DeepBacktest />}
           {route.kind === 'symbol-detail' && (
             <div className="p-6 text-fg-muted">
               Symbol detail for {route.symbol} — coming in the{' '}

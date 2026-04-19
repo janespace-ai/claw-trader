@@ -15,7 +15,7 @@ import { useSignalReviewStore } from '@/stores/signalReviewStore';
 import { useAutoSignalReview } from '@/stores/useAutoSignalReview';
 import { VerdictList } from '@/components/chat/VerdictList';
 import { PreviewTopbar } from './PreviewTopbar';
-import { TradesTab } from './TradesTab';
+import { TradesTab } from '@/components/workspace/TradesTab';
 import { QuickMetricsTab } from './QuickMetricsTab';
 import type { components } from '@/types/api';
 
