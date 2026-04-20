@@ -309,5 +309,7 @@
   "timeframe.label": "Timeframe",
   "timeframe.indicators": "Indicators",
   "timeframe.screenshot": "Screenshot",
-  "timeframe.settings": "Chart settings"
+  "timeframe.settings": "Chart settings",
+  "chart.resize_main": "Resize chart",
+  "chart.resize_pane": "Resize {{name}} pane"
 }

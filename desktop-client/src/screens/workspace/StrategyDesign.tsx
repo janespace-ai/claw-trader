@@ -31,12 +31,12 @@ import {
   mfi,
   roc,
 } from '@/services/indicators';
-import { StrategyTopbar } from './StrategyTopbar';
 import { StrategyDraftCard } from './StrategyDraftCard';
 import { RunPreviewCard } from './RunPreviewCard';
 import { MarketStrip, computeRollingStats } from '@/components/workspace/MarketStrip';
 import { SymbolList } from '@/components/workspace/SymbolList';
 import { TimeframeBar } from '@/components/workspace/TimeframeBar';
+import { ResizeHandle } from '@/components/workspace/ResizeHandle';
 import type { components } from '@/types/api';
 import {
   ChartIndicatorBar,
@@ -125,6 +125,31 @@ export function StrategyDesign() {
   const [isRunning, setIsRunning] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<components['schemas']['SymbolMetadata'] | null>(null);
+
+  // --- Resizable pane heights --------------------------------------------
+  // The main chart and each active indicator pane own their own height
+  // state so the user can drag the thin bar between them to grow/shrink
+  // either side. Heights are clamped in `resizeMain` / `resizePane` so
+  // a runaway drag can't collapse a chart to zero or push it past a
+  // reasonable viewport size.
+  const MIN_CHART_HEIGHT = 120;
+  const MAX_CHART_HEIGHT = 900;
+  const MIN_PANE_HEIGHT = 60;
+  const MAX_PANE_HEIGHT = 400;
+  const [mainHeight, setMainHeight] = useState<number>(360);
+  const [paneHeights, setPaneHeights] = useState<Record<string, number>>({});
+  const clamp = (v: number, lo: number, hi: number) =>
+    v < lo ? lo : v > hi ? hi : v;
+  const resizeMain = (dy: number) => {
+    setMainHeight((h) => clamp(h + dy, MIN_CHART_HEIGHT, MAX_CHART_HEIGHT));
+  };
+  const resizePane = (id: string, dy: number) => {
+    setPaneHeights((prev) => {
+      const cur = prev[id] ?? 100;
+      return { ...prev, [id]: clamp(cur + dy, MIN_PANE_HEIGHT, MAX_PANE_HEIGHT) };
+    });
+  };
+  const paneHeight = (id: string) => paneHeights[id] ?? 100;
 
   // --- Symbol metadata (drives the market-info strip) ---------------------
   useEffect(() => {
@@ -539,15 +564,28 @@ export function StrategyDesign() {
     });
   }, []);
 
+  // Primary CTA that now lives inside the AI persona header instead of
+  // in a dedicated workspace topbar. Keeps the chart area maximally
+  // tall (no empty 52px row above it) while still giving the Run
+  // Preview button a prominent, always-visible home.
+  const runPreviewButton = (
+    <button
+      type="button"
+      onClick={handleRunPreview}
+      disabled={!canRunPreview || isRunning}
+      className={[
+        'px-3 py-1.5 rounded-md text-xs font-semibold transition-colors',
+        canRunPreview && !isRunning
+          ? 'bg-accent-primary text-fg-inverse hover:opacity-90'
+          : 'bg-surface-tertiary text-fg-muted cursor-not-allowed',
+      ].join(' ')}
+    >
+      {isRunning ? '…' : '✦ ' + t('workspace.design.run_preview')}
+    </button>
+  );
+
   return (
     <WorkspaceShell
-      topbar={
-        <StrategyTopbar
-          onRunPreview={handleRunPreview}
-          canRunPreview={canRunPreview}
-          isRunning={isRunning}
-        />
-      }
       leftRail={
         <SymbolList
           focusedSymbol={focusedSymbol}
@@ -595,10 +633,14 @@ export function StrategyDesign() {
               <ClawChart.Candles
                 data={klines}
                 overlays={overlayLines}
-                height={360}
+                height={mainHeight}
                 showVolume
                 onChartReady={(c) => registerChart('main', c)}
                 priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+              />
+              <ResizeHandle
+                onResize={resizeMain}
+                ariaLabel={t('chart.resize_main', { defaultValue: 'Resize chart' })}
               />
 
               {activePanes.includes('RSI') && (
@@ -619,7 +661,14 @@ export function StrategyDesign() {
                   ]}
                   showTimeAxis={lastPane === 'RSI'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  height={paneHeight('RSI')}
                   onChartReady={(c) => registerChart('pane:RSI', c)}
+                />
+              )}
+              {activePanes.includes('RSI') && (
+                <ResizeHandle
+                  onResize={(dy) => resizePane('RSI', dy)}
+                  ariaLabel={t('chart.resize_pane', { defaultValue: 'Resize RSI pane', name: 'RSI' })}
                 />
               )}
               {activePanes.includes('MACD') && macdData && (
@@ -651,7 +700,14 @@ export function StrategyDesign() {
                   guides={[{ value: 0, color: 'var(--border-subtle)', dashed: false }]}
                   showTimeAxis={lastPane === 'MACD'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  height={paneHeight('MACD')}
                   onChartReady={(c) => registerChart('pane:MACD', c)}
+                />
+              )}
+              {activePanes.includes('MACD') && (
+                <ResizeHandle
+                  onResize={(dy) => resizePane('MACD', dy)}
+                  ariaLabel={t('chart.resize_pane', { defaultValue: 'Resize MACD pane', name: 'MACD' })}
                 />
               )}
               {activePanes.includes('STOCH') && stochData && (
@@ -678,7 +734,14 @@ export function StrategyDesign() {
                   ]}
                   showTimeAxis={lastPane === 'STOCH'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  height={paneHeight('STOCH')}
                   onChartReady={(c) => registerChart('pane:STOCH', c)}
+                />
+              )}
+              {activePanes.includes('STOCH') && (
+                <ResizeHandle
+                  onResize={(dy) => resizePane('STOCH', dy)}
+                  ariaLabel={t('chart.resize_pane', { defaultValue: 'Resize STOCH pane', name: 'STOCH' })}
                 />
               )}
               {activePanes.includes('ATR') && atrData.length > 0 && (
@@ -694,7 +757,14 @@ export function StrategyDesign() {
                   lines={[{ data: atrData, color: 'var(--accent-yellow)' }]}
                   showTimeAxis={lastPane === 'ATR'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  height={paneHeight('ATR')}
                   onChartReady={(c) => registerChart('pane:ATR', c)}
+                />
+              )}
+              {activePanes.includes('ATR') && (
+                <ResizeHandle
+                  onResize={(dy) => resizePane('ATR', dy)}
+                  ariaLabel={t('chart.resize_pane', { defaultValue: 'Resize ATR pane', name: 'ATR' })}
                 />
               )}
               {activePanes.includes('OBV') && obvData.length > 0 && (
@@ -709,7 +779,14 @@ export function StrategyDesign() {
                   lines={[{ data: obvData, color: 'var(--accent-primary)' }]}
                   showTimeAxis={lastPane === 'OBV'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  height={paneHeight('OBV')}
                   onChartReady={(c) => registerChart('pane:OBV', c)}
+                />
+              )}
+              {activePanes.includes('OBV') && (
+                <ResizeHandle
+                  onResize={(dy) => resizePane('OBV', dy)}
+                  ariaLabel={t('chart.resize_pane', { defaultValue: 'Resize OBV pane', name: 'OBV' })}
                 />
               )}
               {activePanes.includes('KDJ') && kdjData && (
@@ -732,7 +809,14 @@ export function StrategyDesign() {
                   ]}
                   showTimeAxis={lastPane === 'KDJ'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  height={paneHeight('KDJ')}
                   onChartReady={(c) => registerChart('pane:KDJ', c)}
+                />
+              )}
+              {activePanes.includes('KDJ') && (
+                <ResizeHandle
+                  onResize={(dy) => resizePane('KDJ', dy)}
+                  ariaLabel={t('chart.resize_pane', { defaultValue: 'Resize KDJ pane', name: 'KDJ' })}
                 />
               )}
               {activePanes.includes('CCI') && cciData.length > 0 && (
@@ -750,7 +834,14 @@ export function StrategyDesign() {
                   ]}
                   showTimeAxis={lastPane === 'CCI'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  height={paneHeight('CCI')}
                   onChartReady={(c) => registerChart('pane:CCI', c)}
+                />
+              )}
+              {activePanes.includes('CCI') && (
+                <ResizeHandle
+                  onResize={(dy) => resizePane('CCI', dy)}
+                  ariaLabel={t('chart.resize_pane', { defaultValue: 'Resize CCI pane', name: 'CCI' })}
                 />
               )}
               {activePanes.includes('WR') && wrData.length > 0 && (
@@ -767,7 +858,14 @@ export function StrategyDesign() {
                   ]}
                   showTimeAxis={lastPane === 'WR'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  height={paneHeight('WR')}
                   onChartReady={(c) => registerChart('pane:WR', c)}
+                />
+              )}
+              {activePanes.includes('WR') && (
+                <ResizeHandle
+                  onResize={(dy) => resizePane('WR', dy)}
+                  ariaLabel={t('chart.resize_pane', { defaultValue: 'Resize WR pane', name: 'WR' })}
                 />
               )}
               {activePanes.includes('MFI') && mfiData.length > 0 && (
@@ -784,7 +882,14 @@ export function StrategyDesign() {
                   ]}
                   showTimeAxis={lastPane === 'MFI'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  height={paneHeight('MFI')}
                   onChartReady={(c) => registerChart('pane:MFI', c)}
+                />
+              )}
+              {activePanes.includes('MFI') && (
+                <ResizeHandle
+                  onResize={(dy) => resizePane('MFI', dy)}
+                  ariaLabel={t('chart.resize_pane', { defaultValue: 'Resize MFI pane', name: 'MFI' })}
                 />
               )}
               {activePanes.includes('ROC') && rocData.length > 0 && (
@@ -798,7 +903,14 @@ export function StrategyDesign() {
                   guides={[{ value: 0, color: 'var(--border-subtle)', dashed: false }]}
                   showTimeAxis={lastPane === 'ROC'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  height={paneHeight('ROC')}
                   onChartReady={(c) => registerChart('pane:ROC', c)}
+                />
+              )}
+              {activePanes.includes('ROC') && (
+                <ResizeHandle
+                  onResize={(dy) => resizePane('ROC', dy)}
+                  ariaLabel={t('chart.resize_pane', { defaultValue: 'Resize ROC pane', name: 'ROC' })}
                 />
               )}
             </>
@@ -826,6 +938,7 @@ export function StrategyDesign() {
         <AIPersonaShell
           persona="strategist"
           context={{ focusedSymbol, interval, indicators }}
+          headerAction={runPreviewButton}
         >
           <div className="flex-1 overflow-hidden">
             <AIPanel />
