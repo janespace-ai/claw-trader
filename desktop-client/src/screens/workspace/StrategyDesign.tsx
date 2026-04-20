@@ -336,8 +336,14 @@ export function StrategyDesign() {
 
               {activePanes.includes('RSI') && (
                 <IndicatorChartPane
-                  title="RSI (14)"
-                  latestLabel={rsiData.at(-1)?.value.toFixed(1) ?? '—'}
+                  title="RSI"
+                  params="(14)"
+                  values={[
+                    {
+                      text: rsiData.at(-1)?.value.toFixed(2) ?? '—',
+                      color: 'var(--accent-primary)',
+                    },
+                  ]}
                   lines={[{ data: rsiData, color: 'var(--accent-primary)' }]}
                   guides={[
                     { value: 70, color: 'var(--accent-red)' },
@@ -351,8 +357,25 @@ export function StrategyDesign() {
               )}
               {activePanes.includes('MACD') && macdData && (
                 <IndicatorChartPane
-                  title="MACD (12, 26, 9)"
-                  latestLabel={macdData.macd.at(-1)?.value.toFixed(2) ?? '—'}
+                  title="MACD"
+                  params="(12, 26, 9)"
+                  values={[
+                    {
+                      text: macdData.macd.at(-1)?.value.toFixed(2) ?? '—',
+                      color: 'var(--accent-primary)',
+                    },
+                    {
+                      text: macdData.signal.at(-1)?.value.toFixed(2) ?? '—',
+                      color: 'var(--accent-yellow)',
+                    },
+                    {
+                      text: macdData.histogram.at(-1)?.value.toFixed(2) ?? '—',
+                      color:
+                        (macdData.histogram.at(-1)?.value ?? 0) >= 0
+                          ? 'var(--accent-green)'
+                          : 'var(--accent-red)',
+                    },
+                  ]}
                   lines={[
                     { data: macdData.macd, color: 'var(--accent-primary)' },
                     { data: macdData.signal, color: 'var(--accent-yellow)' },
@@ -366,8 +389,18 @@ export function StrategyDesign() {
               )}
               {activePanes.includes('STOCH') && stochData && (
                 <IndicatorChartPane
-                  title="Stochastic (14, 3)"
-                  latestLabel={stochData.k.at(-1)?.value.toFixed(1) ?? '—'}
+                  title="Stochastic"
+                  params="(14, 3)"
+                  values={[
+                    {
+                      text: 'K ' + (stochData.k.at(-1)?.value.toFixed(1) ?? '—'),
+                      color: 'var(--accent-primary)',
+                    },
+                    {
+                      text: 'D ' + (stochData.d.at(-1)?.value.toFixed(1) ?? '—'),
+                      color: 'var(--accent-yellow)',
+                    },
+                  ]}
                   lines={[
                     { data: stochData.k, color: 'var(--accent-primary)' },
                     { data: stochData.d, color: 'var(--accent-yellow)' },
@@ -383,8 +416,14 @@ export function StrategyDesign() {
               )}
               {activePanes.includes('ATR') && atrData.length > 0 && (
                 <IndicatorChartPane
-                  title="ATR (14)"
-                  latestLabel={atrData.at(-1)?.value.toFixed(2) ?? '—'}
+                  title="ATR"
+                  params="(14)"
+                  values={[
+                    {
+                      text: atrData.at(-1)?.value.toFixed(2) ?? '—',
+                      color: 'var(--accent-yellow)',
+                    },
+                  ]}
                   lines={[{ data: atrData, color: 'var(--accent-yellow)' }]}
                   showTimeAxis={lastPane === 'ATR'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
@@ -394,7 +433,12 @@ export function StrategyDesign() {
               {activePanes.includes('OBV') && obvData.length > 0 && (
                 <IndicatorChartPane
                   title="OBV"
-                  latestLabel={obvData.at(-1)?.value.toFixed(0) ?? '—'}
+                  values={[
+                    {
+                      text: obvData.at(-1)?.value.toFixed(0) ?? '—',
+                      color: 'var(--accent-primary)',
+                    },
+                  ]}
                   lines={[{ data: obvData, color: 'var(--accent-primary)' }]}
                   showTimeAxis={lastPane === 'OBV'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
