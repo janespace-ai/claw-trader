@@ -32,23 +32,29 @@ export function TopBar({ onOpenSettings }: Props) {
 
   return (
     <div className="flex items-center justify-between h-14 px-5 bg-surface-secondary border-b border-border-subtle">
+      {/* Brand — Pencil TopBar `tbL`. Logo mark bumped from 28→32px and
+          the wordmark from 14→16px so the app title is legible at the
+          same glance as the right-hand status pill. */}
       <div className="flex items-center gap-3">
-        <div className="w-7 h-7 rounded-md bg-accent-primary text-fg-inverse font-bold grid place-items-center">
+        <div className="w-8 h-8 rounded-md bg-accent-primary text-fg-inverse font-bold grid place-items-center text-lg font-heading">
           C
         </div>
-        <span className="font-heading font-semibold text-sm">{t('app.title')}</span>
+        <span className="font-heading font-semibold text-base">{t('app.title')}</span>
       </div>
 
-      <div className="flex items-center gap-1">
+      {/* Tabs — Pencil TopBar `tbC`. Larger text (14px vs 12px) + more
+          generous padding (10×18 vs 8×16) makes each tab a proper tap
+          target and matches the redesigned Pencil `nFWSA`. */}
+      <div className="flex items-center gap-1.5">
         {tabs.map((x) => (
           <button
             key={x.key}
             onClick={() => handleTabClick(x.key)}
             className={
-              'px-4 py-2 rounded-md text-xs font-medium transition-colors ' +
+              'px-4 py-2.5 rounded-md text-sm font-medium transition-colors ' +
               (tab === x.key
-                ? 'bg-accent-primary-dim text-accent-primary'
-                : 'text-fg-secondary hover:text-fg-primary')
+                ? 'bg-accent-primary-dim text-accent-primary font-semibold'
+                : 'text-fg-secondary hover:text-fg-primary hover:bg-surface-tertiary')
             }
           >
             {t(x.labelKey)}
@@ -56,10 +62,13 @@ export function TopBar({ onOpenSettings }: Props) {
         ))}
       </div>
 
+      {/* Right-side — Pencil TopBar `tbR`. Status pill text 11→13px and
+          the settings button gets a proper 36×36 tap box with a 20px
+          glyph instead of a bare text-sm character. */}
       <div className="flex items-center gap-3">
         <div
           className={
-            'flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-medium ' +
+            'flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[13px] font-medium ' +
             (remoteConnected
               ? 'bg-[color:var(--accent-green-dim)] text-accent-green'
               : 'bg-[color:var(--accent-red-dim)] text-accent-red')
@@ -67,7 +76,7 @@ export function TopBar({ onOpenSettings }: Props) {
         >
           <span
             className={
-              'w-1.5 h-1.5 rounded-full ' +
+              'w-2 h-2 rounded-full ' +
               (remoteConnected ? 'bg-accent-green' : 'bg-accent-red')
             }
           />
@@ -75,7 +84,7 @@ export function TopBar({ onOpenSettings }: Props) {
         </div>
         <button
           onClick={onOpenSettings}
-          className="text-fg-secondary hover:text-fg-primary text-sm px-2"
+          className="w-9 h-9 rounded-md grid place-items-center text-fg-secondary hover:text-fg-primary hover:bg-surface-tertiary text-lg transition-colors"
           aria-label={t('nav.settings')}
         >
           ⚙
