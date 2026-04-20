@@ -2,16 +2,25 @@
  *  price chart) and "pane" (its own strip below) is still meaningful
  *  to the screen that renders them, but the chip bar itself puts them
  *  all in a single row à la Gate — less visual noise, more space. */
-export type OverlayIndicatorId = 'SMA20' | 'SMA50' | 'SMA200' | 'EMA12' | 'EMA26' | 'BB' | 'VWAP' | 'DONCHIAN';
-export type PaneIndicatorId = 'RSI' | 'MACD' | 'STOCH' | 'ATR' | 'OBV';
+export type OverlayIndicatorId =
+  | 'SMA20' | 'SMA50' | 'SMA200'
+  | 'EMA12' | 'EMA26'
+  | 'BB' | 'VWAP' | 'DONCHIAN' | 'SAR';
+export type PaneIndicatorId =
+  | 'RSI' | 'MACD' | 'STOCH' | 'ATR' | 'OBV'
+  | 'KDJ' | 'CCI' | 'WR' | 'MFI' | 'ROC';
 export type IndicatorId = OverlayIndicatorId | PaneIndicatorId;
 
-/** Display order: overlays first (by complexity), then panes. Chosen
- *  to roughly match Gate's bar order so users coming from there find
- *  the layout familiar. */
+/** Display order: overlays first, then panes. Chosen to roughly match
+ *  Gate's bar order so users coming from there find the layout
+ *  familiar. */
 const ALL_INDICATORS: IndicatorId[] = [
-  'SMA20', 'SMA50', 'SMA200', 'EMA12', 'EMA26', 'BB', 'VWAP', 'DONCHIAN',
-  'RSI', 'MACD', 'STOCH', 'ATR', 'OBV',
+  'SMA20', 'SMA50', 'SMA200',
+  'EMA12', 'EMA26',
+  'BB', 'VWAP', 'DONCHIAN', 'SAR',
+  'RSI', 'MACD', 'KDJ', 'STOCH',
+  'CCI', 'WR', 'MFI', 'ROC',
+  'ATR', 'OBV',
 ];
 
 interface Props {

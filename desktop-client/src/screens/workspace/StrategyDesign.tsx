@@ -24,11 +24,18 @@ import {
   obv,
   vwap,
   donchian,
+  kdj,
+  sar,
+  cci,
+  williamsR,
+  mfi,
+  roc,
 } from '@/services/indicators';
 import { StrategyTopbar } from './StrategyTopbar';
 import { StrategyDraftCard } from './StrategyDraftCard';
 import { RunPreviewCard } from './RunPreviewCard';
-import { MarketStrip } from '@/components/workspace/MarketStrip';
+import { MarketStrip, computeRollingStats } from '@/components/workspace/MarketStrip';
+import { SymbolList } from '@/components/workspace/SymbolList';
 import type { components } from '@/types/api';
 import {
   ChartIndicatorBar,
@@ -44,7 +51,7 @@ type Interval = '5m' | '15m' | '30m' | '1h' | '4h' | '1d';
 type FetchState = 'loading' | 'empty' | 'ready';
 
 const OVERLAY_SET: ReadonlySet<string> = new Set<OverlayIndicatorId>([
-  'SMA20', 'SMA50', 'SMA200', 'EMA12', 'EMA26', 'BB', 'VWAP', 'DONCHIAN',
+  'SMA20', 'SMA50', 'SMA200', 'EMA12', 'EMA26', 'BB', 'VWAP', 'DONCHIAN', 'SAR',
 ]);
 
 function isPane(id: IndicatorId): id is PaneIndicatorId {
@@ -314,6 +321,17 @@ export function StrategyDesign() {
         { id: 'dc-lower', data: d.lower, color: 'var(--accent-primary)', lineWidth: 1 },
       );
     }
+    if (indicators.includes('SAR')) {
+      // SAR renders as a thin dotted line; lightweight-charts doesn't
+      // do point scatter natively, so we use a 1-wide line series
+      // which visually reads as dots tracking above/below price.
+      out.push({
+        id: 'sar',
+        data: sar(klines, 0.02, 0.2),
+        color: 'var(--accent-yellow)',
+        lineWidth: 1,
+      });
+    }
     return out;
   }, [klines, indicators]);
 
@@ -351,6 +369,31 @@ export function StrategyDesign() {
   );
   const obvData = useMemo(
     () => (indicators.includes('OBV') && klines.length ? alignToCandles(obv(klines), klines) : []),
+    [klines, indicators],
+  );
+  const kdjData = useMemo(() => {
+    if (!indicators.includes('KDJ') || klines.length === 0) return null;
+    const raw = kdj(klines, 9, 3);
+    return {
+      k: alignToCandles(raw.k, klines),
+      d: alignToCandles(raw.d, klines),
+      j: alignToCandles(raw.j, klines),
+    };
+  }, [klines, indicators]);
+  const cciData = useMemo(
+    () => (indicators.includes('CCI') && klines.length ? alignToCandles(cci(klines, 20), klines) : []),
+    [klines, indicators],
+  );
+  const wrData = useMemo(
+    () => (indicators.includes('WR') && klines.length ? alignToCandles(williamsR(klines, 14), klines) : []),
+    [klines, indicators],
+  );
+  const mfiData = useMemo(
+    () => (indicators.includes('MFI') && klines.length ? alignToCandles(mfi(klines, 14), klines) : []),
+    [klines, indicators],
+  );
+  const rocData = useMemo(
+    () => (indicators.includes('ROC') && klines.length ? alignToCandles(roc(klines, 12), klines) : []),
     [klines, indicators],
   );
 
@@ -497,12 +540,23 @@ export function StrategyDesign() {
           isRunning={isRunning}
         />
       }
+      leftRail={
+        <SymbolList
+          focusedSymbol={focusedSymbol}
+          onSelect={handleSymbolChange}
+        />
+      }
       main={
         <div className="flex flex-col">
           {/* Gate-style market info strip: price, 24h change, high/low,
               volume, max leverage, funding rate. Spans edge-to-edge
               above the padded chart area. */}
-          <MarketStrip metadata={metadata} symbol={focusedSymbol} />
+          <MarketStrip
+            metadata={metadata}
+            symbol={focusedSymbol}
+            rollingStats={computeRollingStats(klines)}
+            baseCurrency={focusedSymbol.split('_')[0] ?? 'base'}
+          />
         <div className="flex flex-col gap-2 p-4">
           {fetchState === 'empty' ? (
             <div
@@ -637,6 +691,95 @@ export function StrategyDesign() {
                   showTimeAxis={lastPane === 'OBV'}
                   priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
                   onChartReady={(c) => registerChart('pane:OBV', c)}
+                />
+              )}
+              {activePanes.includes('KDJ') && kdjData && (
+                <IndicatorChartPane
+                  title="KDJ"
+                  params="(9, 3)"
+                  values={[
+                    { text: 'K ' + fmt(latestValue(kdjData.k), 1), color: 'var(--accent-primary)' },
+                    { text: 'D ' + fmt(latestValue(kdjData.d), 1), color: 'var(--accent-yellow)' },
+                    { text: 'J ' + fmt(latestValue(kdjData.j), 1), color: 'var(--accent-green)' },
+                  ]}
+                  lines={[
+                    { data: kdjData.k, color: 'var(--accent-primary)' },
+                    { data: kdjData.d, color: 'var(--accent-yellow)' },
+                    { data: kdjData.j, color: 'var(--accent-green)' },
+                  ]}
+                  guides={[
+                    { value: 80, color: 'var(--accent-red)' },
+                    { value: 20, color: 'var(--accent-green)' },
+                  ]}
+                  showTimeAxis={lastPane === 'KDJ'}
+                  priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  onChartReady={(c) => registerChart('pane:KDJ', c)}
+                />
+              )}
+              {activePanes.includes('CCI') && cciData.length > 0 && (
+                <IndicatorChartPane
+                  title="CCI"
+                  params="(20)"
+                  values={[
+                    { text: fmt(latestValue(cciData), 1), color: 'var(--accent-primary)' },
+                  ]}
+                  lines={[{ data: cciData, color: 'var(--accent-primary)' }]}
+                  guides={[
+                    { value: 100, color: 'var(--accent-red)' },
+                    { value: -100, color: 'var(--accent-green)' },
+                    { value: 0, color: 'var(--border-subtle)', dashed: false },
+                  ]}
+                  showTimeAxis={lastPane === 'CCI'}
+                  priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  onChartReady={(c) => registerChart('pane:CCI', c)}
+                />
+              )}
+              {activePanes.includes('WR') && wrData.length > 0 && (
+                <IndicatorChartPane
+                  title="W%R"
+                  params="(14)"
+                  values={[
+                    { text: fmt(latestValue(wrData), 1), color: 'var(--accent-primary)' },
+                  ]}
+                  lines={[{ data: wrData, color: 'var(--accent-primary)' }]}
+                  guides={[
+                    { value: -20, color: 'var(--accent-red)' },
+                    { value: -80, color: 'var(--accent-green)' },
+                  ]}
+                  showTimeAxis={lastPane === 'WR'}
+                  priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  onChartReady={(c) => registerChart('pane:WR', c)}
+                />
+              )}
+              {activePanes.includes('MFI') && mfiData.length > 0 && (
+                <IndicatorChartPane
+                  title="MFI"
+                  params="(14)"
+                  values={[
+                    { text: fmt(latestValue(mfiData), 1), color: 'var(--accent-primary)' },
+                  ]}
+                  lines={[{ data: mfiData, color: 'var(--accent-primary)' }]}
+                  guides={[
+                    { value: 80, color: 'var(--accent-red)' },
+                    { value: 20, color: 'var(--accent-green)' },
+                  ]}
+                  showTimeAxis={lastPane === 'MFI'}
+                  priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  onChartReady={(c) => registerChart('pane:MFI', c)}
+                />
+              )}
+              {activePanes.includes('ROC') && rocData.length > 0 && (
+                <IndicatorChartPane
+                  title="ROC"
+                  params="(12)"
+                  values={[
+                    { text: fmt(latestValue(rocData), 2), color: 'var(--accent-yellow)' },
+                  ]}
+                  lines={[{ data: rocData, color: 'var(--accent-yellow)' }]}
+                  guides={[{ value: 0, color: 'var(--border-subtle)', dashed: false }]}
+                  showTimeAxis={lastPane === 'ROC'}
+                  priceScaleMinWidth={SHARED_PRICE_SCALE_WIDTH}
+                  onChartReady={(c) => registerChart('pane:ROC', c)}
                 />
               )}
             </>

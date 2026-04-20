@@ -2,12 +2,57 @@ import { useTranslation } from 'react-i18next';
 import type { components } from '@/types/api';
 
 type SymbolMetadata = components['schemas']['SymbolMetadata'];
+type Kline = { ts: number; o: number; h: number; l: number; c: number; v?: number };
+
+export interface RollingWindowStats {
+  high: number | null;
+  low: number | null;
+  /** Base-currency volume (sum of kline.v over the window). */
+  volumeBase: number | null;
+}
+
+/**
+ * Derive 24-hour high / low / base-volume from a rolling window of
+ * klines. The backend's `SymbolMetadata` exposes `volume_24h_quote`
+ * but not the other three, so the frontend computes them from the
+ * candles that are already on hand — no extra API calls.
+ *
+ * The window is defined as "all candles whose ts is within the last
+ * 24 hours"; if the loaded data doesn't cover a full day, we use
+ * whatever we have (values are still correct for the loaded range).
+ */
+export function computeRollingStats(klines: Kline[]): RollingWindowStats {
+  if (klines.length === 0) {
+    return { high: null, low: null, volumeBase: null };
+  }
+  const lastTs = klines[klines.length - 1].ts;
+  const cutoff = lastTs - 24 * 3600;
+  let high = -Infinity;
+  let low = Infinity;
+  let volumeBase = 0;
+  for (let i = klines.length - 1; i >= 0; i--) {
+    const k = klines[i];
+    if (k.ts < cutoff) break;
+    if (k.h > high) high = k.h;
+    if (k.l < low) low = k.l;
+    if (k.v != null) volumeBase += k.v;
+  }
+  return {
+    high: Number.isFinite(high) ? high : null,
+    low: Number.isFinite(low) ? low : null,
+    volumeBase: volumeBase > 0 ? volumeBase : null,
+  };
+}
 
 interface Props {
   /** Full symbol metadata from `cremote.getSymbolMetadata`. */
   metadata: SymbolMetadata | null;
   /** Fallback ticker when metadata hasn't loaded yet. */
   symbol: string;
+  /** Derived 24h stats computed from klines by the parent screen. */
+  rollingStats?: RollingWindowStats;
+  /** Base currency ticker shown in the volume label (e.g. "BTC"). */
+  baseCurrency?: string;
 }
 
 /**
@@ -21,12 +66,15 @@ interface Props {
  * as "—" so the layout stays consistent; they light up once the
  * backend contract grows to include them.
  */
-export function MarketStrip({ metadata, symbol }: Props) {
+export function MarketStrip({ metadata, symbol, rollingStats, baseCurrency }: Props) {
   const { t } = useTranslation();
   const ticker = metadata?.symbol ?? symbol;
   const displayName = metadata?.name;
   const price = metadata?.last_price;
   const changePct = metadata?.change_24h_pct;
+  const high24h = rollingStats?.high ?? null;
+  const low24h = rollingStats?.low ?? null;
+  const volumeBase = rollingStats?.volumeBase ?? null;
 
   // Color the price + change based on sign — positive green, negative
   // red, unknown muted.
@@ -40,15 +88,15 @@ export function MarketStrip({ metadata, symbol }: Props) {
   const stats: Array<{ label: string; value: string; valueClass?: string }> = [
     {
       label: t('market.high_24h'),
-      value: '—', // not yet in contract
+      value: high24h != null ? fmtPrice(high24h) : '—',
     },
     {
       label: t('market.low_24h'),
-      value: '—',
+      value: low24h != null ? fmtPrice(low24h) : '—',
     },
     {
-      label: t('market.volume_24h', { unit: 'BTC' }),
-      value: '—',
+      label: t('market.volume_24h', { unit: baseCurrency ?? 'base' }),
+      value: volumeBase != null ? fmtCompact(volumeBase) : '—',
     },
     {
       label: t('market.volume_24h_quote'),
