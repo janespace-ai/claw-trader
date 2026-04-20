@@ -115,10 +115,21 @@ export function StrategyDesign() {
   const [isRunning, setIsRunning] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
 
+  // How many bars of lookback to pre-fetch on mount / symbol change.
+  // 30 days × 24h = 720 bars on 1h interval; scales proportionally for
+  // other intervals.
+  const INITIAL_WINDOW_SEC = 30 * 24 * 3600;
+  // How many additional days to fetch each time the user drags past
+  // the earliest loaded bar.
+  const LAZY_WINDOW_SEC = 30 * 24 * 3600;
+  // When the visible logical range's `from` drops below this many bars
+  // from the left edge of the dataset, kick off another lazy load.
+  const LAZY_TRIGGER_BARS = 30;
+
   // --- Chart data ----------------------------------------------------------
   useEffect(() => {
     const to = Math.floor(Date.now() / 1000);
-    const from = to - 30 * 24 * 3600;
+    const from = to - INITIAL_WINDOW_SEC;
     let cancelled = false;
     setFetchState('loading');
     cremote
@@ -151,6 +162,100 @@ export function StrategyDesign() {
       cancelled = true;
     };
   }, [focusedSymbol, interval]);
+
+  // --- Lazy-load older klines ---------------------------------------------
+  // When the user drags the chart to reveal earlier history and gets
+  // within `LAZY_TRIGGER_BARS` of the leftmost bar, we fetch another
+  // `LAZY_WINDOW_SEC` of historical candles and prepend them to
+  // `klines`. A ref-based guard keeps multiple near-simultaneous range
+  // events from firing concurrent fetches; an `exhausted` flag stops
+  // us from infinite-looping when the backend runs out of history.
+  const loadingOlderRef = useRef(false);
+  const exhaustedRef = useRef(false);
+  const klinesRef = useRef<CandlePoint[]>([]);
+  klinesRef.current = klines;
+  const symbolIntervalRef = useRef({ symbol: focusedSymbol, interval });
+  symbolIntervalRef.current = { symbol: focusedSymbol, interval };
+
+  // Reset lazy-load state whenever the user switches symbol or interval.
+  useEffect(() => {
+    loadingOlderRef.current = false;
+    exhaustedRef.current = false;
+  }, [focusedSymbol, interval]);
+
+  const loadOlderKlines = useCallback(async () => {
+    if (loadingOlderRef.current || exhaustedRef.current) return;
+    const existing = klinesRef.current;
+    if (existing.length === 0) return;
+
+    loadingOlderRef.current = true;
+    try {
+      const { symbol, interval: iv } = symbolIntervalRef.current;
+      const oldestTs = existing[0].ts;
+      const to = oldestTs - 1;
+      const from = to - LAZY_WINDOW_SEC;
+      const older = await cremote.getKlines({
+        symbol,
+        interval: iv,
+        from,
+        to,
+        market: 'futures',
+      });
+      // Defensive dedupe in case backend returned the boundary candle.
+      const firstExistingTs = existing[0].ts;
+      const prepend = older
+        .filter((k) => k.ts < firstExistingTs)
+        .map((k) => ({
+          ts: k.ts,
+          o: k.o,
+          h: k.h,
+          l: k.l,
+          c: k.c,
+          v: k.v,
+        }));
+
+      if (prepend.length === 0) {
+        // Backend has no more data at this depth — stop asking.
+        exhaustedRef.current = true;
+        return;
+      }
+
+      // Capture the user's current logical window BEFORE the React
+      // state update triggers `setData` on the main chart; we'll shift
+      // it right by the number of prepended bars so the view stays
+      // pinned to the same moment in time (logical indices shift by
+      // exactly `prepend.length`).
+      const mainChart = chartsRef.current.get('main');
+      const savedRange = mainChart?.timeScale().getVisibleLogicalRange();
+
+      setKlines((prev) => [...prepend, ...prev]);
+
+      if (mainChart && savedRange) {
+        // After React commits and all the charts have re-run their
+        // data effects, restore the shifted range. Wrapping with
+        // `syncingRef` suppresses the cascade that would otherwise
+        // fire from the main chart's own range-change subscriber.
+        requestAnimationFrame(() => {
+          syncingRef.current = true;
+          const shift = prepend.length;
+          const nextRange = {
+            from: savedRange.from + shift,
+            to: savedRange.to + shift,
+          };
+          for (const [, c] of chartsRef.current.entries()) {
+            c.timeScale().setVisibleLogicalRange(nextRange);
+          }
+          requestAnimationFrame(() => {
+            syncingRef.current = false;
+          });
+        });
+      }
+    } catch {
+      // Swallow network errors; the user can retry by dragging again.
+    } finally {
+      loadingOlderRef.current = false;
+    }
+  }, []);
 
   // --- Indicator overlays --------------------------------------------------
   const overlayLines: OverlayLine[] = useMemo(() => {
@@ -262,6 +367,13 @@ export function StrategyDesign() {
         requestAnimationFrame(() => {
           syncingRef.current = false;
         });
+      }
+
+      // Lazy-load older history — only the main chart triggers this;
+      // pane charts derive their data from `klines` via indicators, so
+      // they'd just react to the parent state update.
+      if (id === 'main' && range.from < LAZY_TRIGGER_BARS) {
+        void loadOlderKlines();
       }
     };
     chart.timeScale().subscribeVisibleLogicalRangeChange(handler);

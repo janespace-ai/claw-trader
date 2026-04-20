@@ -1,28 +1,17 @@
-import { useTranslation } from 'react-i18next';
-
-/** Indicator identifiers. Split into two groups so the bar can render
- *  overlays on one row and pane-indicators on the next. */
+/** Indicator identifiers. The split between "overlay" (drawn on the
+ *  price chart) and "pane" (its own strip below) is still meaningful
+ *  to the screen that renders them, but the chip bar itself puts them
+ *  all in a single row à la Gate — less visual noise, more space. */
 export type OverlayIndicatorId = 'SMA20' | 'SMA50' | 'SMA200' | 'EMA12' | 'EMA26' | 'BB' | 'VWAP' | 'DONCHIAN';
 export type PaneIndicatorId = 'RSI' | 'MACD' | 'STOCH' | 'ATR' | 'OBV';
 export type IndicatorId = OverlayIndicatorId | PaneIndicatorId;
 
-export const OVERLAY_INDICATORS: OverlayIndicatorId[] = [
-  'SMA20',
-  'SMA50',
-  'SMA200',
-  'EMA12',
-  'EMA26',
-  'BB',
-  'VWAP',
-  'DONCHIAN',
-];
-
-export const PANE_INDICATORS: PaneIndicatorId[] = [
-  'RSI',
-  'MACD',
-  'STOCH',
-  'ATR',
-  'OBV',
+/** Display order: overlays first (by complexity), then panes. Chosen
+ *  to roughly match Gate's bar order so users coming from there find
+ *  the layout familiar. */
+const ALL_INDICATORS: IndicatorId[] = [
+  'SMA20', 'SMA50', 'SMA200', 'EMA12', 'EMA26', 'BB', 'VWAP', 'DONCHIAN',
+  'RSI', 'MACD', 'STOCH', 'ATR', 'OBV',
 ];
 
 interface Props {
@@ -31,46 +20,33 @@ interface Props {
 }
 
 /**
- * Row of indicator-toggle chips rendered **below** the Candles chart
- * (per Pencil layout — the top bar only holds symbol + timeframe).
- * Grouped into two rows: "Overlays" (drawn on the price chart) and
- * "Panes" (rendered as separate strips beneath the price chart).
+ * Single-row indicator-toggle bar rendered **below** the Candles chart,
+ * mirroring Gate's compact chip strip (no categorical labels, no row
+ * grouping). Overflows wrap onto additional lines only when the
+ * window is too narrow to fit all chips in one row.
  */
 export function ChartIndicatorBar({ selected, onToggle }: Props) {
-  const { t } = useTranslation();
-  const renderChip = (id: IndicatorId) => {
-    const on = selected.includes(id);
-    return (
-      <button
-        key={id}
-        type="button"
-        onClick={() => onToggle(id)}
-        className={[
-          'px-2 py-1 rounded font-mono text-[11px] transition-colors',
-          on
-            ? 'bg-accent-primary-dim text-accent-primary'
-            : 'text-fg-muted hover:text-fg-primary hover:bg-surface-tertiary',
-        ].join(' ')}
-        aria-pressed={on}
-      >
-        {id}
-      </button>
-    );
-  };
   return (
-    <div className="space-y-1 text-[11px] px-1">
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-fg-muted uppercase w-20">
-          {t('chart.indicators_overlay', { defaultValue: 'Overlay' })}
-        </span>
-        {OVERLAY_INDICATORS.map(renderChip)}
-      </div>
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-fg-muted uppercase w-20">
-          {t('chart.indicators_pane', { defaultValue: 'Pane' })}
-        </span>
-        {PANE_INDICATORS.map(renderChip)}
-      </div>
+    <div className="flex items-center gap-2 flex-wrap text-[11px] px-1">
+      {ALL_INDICATORS.map((id) => {
+        const on = selected.includes(id);
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onToggle(id)}
+            className={[
+              'px-2 py-1 rounded font-mono text-[11px] transition-colors',
+              on
+                ? 'bg-accent-primary-dim text-accent-primary'
+                : 'text-fg-muted hover:text-fg-primary hover:bg-surface-tertiary',
+            ].join(' ')}
+            aria-pressed={on}
+          >
+            {id}
+          </button>
+        );
+      })}
     </div>
   );
 }
