@@ -101,6 +101,11 @@ export function Candles({
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
   const overlaySeriesRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map());
+  /** Imperative hook exposed by the mount effect so downstream data /
+   *  overlay / marker effects can request a layout re-measure on the
+   *  next animation frame (lightweight-charts updates its price-axis
+   *  width asynchronously after `setData`). */
+  const emitLayoutSoonRef = useRef<() => void>(() => {});
 
   // -- Create on mount --------------------------------------------------------
   useEffect(() => {
@@ -148,14 +153,39 @@ export function Candles({
     const emitLayout = () => {
       if (!chartRef.current || !containerRef.current) return;
       const totalWidthPx = containerRef.current.clientWidth;
-      const plotWidthPx = chartRef.current.timeScale().width();
-      const rightGutterPx = Math.max(0, totalWidthPx - plotWidthPx);
+      // Prefer the price scale's own width() over
+      // `total − timeScale().width()` because the latter under-reports
+      // before `setData` has populated the scale with labels — we'd
+      // emit a near-zero gutter, panes would render too wide, then
+      // never re-measure. `priceScale('right').width()` tracks label
+      // width dynamically via lightweight-charts' internal layout.
+      let rightGutterPx = 0;
+      try {
+        rightGutterPx = chartRef.current.priceScale('right').width();
+      } catch {
+        const plotW = chartRef.current.timeScale().width();
+        rightGutterPx = Math.max(0, totalWidthPx - plotW);
+      }
+      const plotWidthPx = Math.max(0, totalWidthPx - rightGutterPx);
       const next = { totalWidthPx, plotWidthPx, rightGutterPx };
       const json = `${next.totalWidthPx}|${next.plotWidthPx}`;
       if (json === lastLayoutJson) return;
       lastLayoutJson = json;
       onLayoutRef.current?.(next);
     };
+    // Some measurements only stabilise after one paint (e.g. the
+    // right-axis gutter depends on label widths which depend on the
+    // last `setData`). `emitLayoutSoon` schedules the measure via rAF
+    // so it runs after the browser has laid out the new frame.
+    let rafId = 0;
+    const emitLayoutSoon = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = 0;
+        emitLayout();
+      });
+    };
+    emitLayoutSoonRef.current = emitLayoutSoon;
     // Resize observer — also re-measures plot layout whenever the
     // container changes size.
     const ro = new ResizeObserver((entries) => {
@@ -187,7 +217,7 @@ export function Candles({
     chart.timeScale().subscribeVisibleTimeRangeChange(rangeHandler);
 
     // Initial layout emit (next microtask so the chart has laid out).
-    const initialLayoutT = setTimeout(emitLayout, 0);
+    const initialLayoutT = setTimeout(emitLayoutSoon, 0);
 
     // Theme redraw
     const stopTheme = observeThemeChanges(() => {
@@ -205,6 +235,8 @@ export function Candles({
 
     return () => {
       clearTimeout(initialLayoutT);
+      if (rafId) cancelAnimationFrame(rafId);
+      emitLayoutSoonRef.current = () => {};
       ro.disconnect();
       chart.timeScale().unsubscribeVisibleTimeRangeChange(rangeHandler);
       stopTheme();
@@ -244,6 +276,10 @@ export function Candles({
         })),
       );
     }
+    // New data → new price labels → potentially different right-axis
+    // gutter width. Schedule a re-measure for the next animation frame
+    // so panes re-align.
+    emitLayoutSoonRef.current();
   }, [data]);
 
   // -- Overlay lines ----------------------------------------------------------
@@ -286,6 +322,10 @@ export function Candles({
         })),
       );
     }
+    // Overlays can pull the visible y-range into larger-number territory
+    // (e.g. BB upper bands in a price peak), widening the right-axis
+    // gutter; re-measure after paint.
+    emitLayoutSoonRef.current();
   }, [overlays]);
 
   // -- Markers ----------------------------------------------------------------
