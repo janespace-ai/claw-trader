@@ -28,6 +28,8 @@ import {
 import { StrategyTopbar } from './StrategyTopbar';
 import { StrategyDraftCard } from './StrategyDraftCard';
 import { RunPreviewCard } from './RunPreviewCard';
+import { MarketStrip } from '@/components/workspace/MarketStrip';
+import type { components } from '@/types/api';
 import {
   ChartIndicatorBar,
   type IndicatorId,
@@ -114,6 +116,23 @@ export function StrategyDesign() {
   const [fetchState, setFetchState] = useState<FetchState>('loading');
   const [isRunning, setIsRunning] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
+  const [metadata, setMetadata] = useState<components['schemas']['SymbolMetadata'] | null>(null);
+
+  // --- Symbol metadata (drives the market-info strip) ---------------------
+  useEffect(() => {
+    let cancelled = false;
+    cremote
+      .getSymbolMetadata({ symbol: focusedSymbol })
+      .then((m) => {
+        if (!cancelled) setMetadata(m);
+      })
+      .catch(() => {
+        if (!cancelled) setMetadata(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [focusedSymbol]);
 
   // How many bars of lookback to pre-fetch on mount / symbol change.
   // 30 days × 24h = 720 bars on 1h interval; scales proportionally for
@@ -479,6 +498,11 @@ export function StrategyDesign() {
         />
       }
       main={
+        <div className="flex flex-col">
+          {/* Gate-style market info strip: price, 24h change, high/low,
+              volume, max leverage, funding rate. Spans edge-to-edge
+              above the padded chart area. */}
+          <MarketStrip metadata={metadata} symbol={focusedSymbol} />
         <div className="flex flex-col gap-2 p-4">
           {fetchState === 'empty' ? (
             <div
@@ -631,6 +655,7 @@ export function StrategyDesign() {
               lastError={lastError}
             />
           </div>
+        </div>
         </div>
       }
       rightRail={
