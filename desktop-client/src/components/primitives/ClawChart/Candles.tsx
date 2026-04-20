@@ -72,6 +72,13 @@ interface Props {
    *  price-axis gutter changes (e.g. when a wider number moves into
    *  view). Panes use this to match horizontal alignment. */
   onPlotLayoutChange?: (layout: PlotLayout) => void;
+  /** Fired once after the chart is created. Parents register the
+   *  instance for bidirectional time-scale sync with sibling panes. */
+  onChartReady?: (chart: IChartApi) => void;
+  /** When set, forces the right price scale to this minimum pixel
+   *  width. The main chart and all panes use the same value so their
+   *  right gutters (and therefore plot areas) line up. */
+  priceScaleMinWidth?: number;
 }
 
 /**
@@ -89,6 +96,8 @@ export function Candles({
   convention = 'green-up',
   onVisibleTimeRangeChange,
   onPlotLayoutChange,
+  onChartReady,
+  priceScaleMinWidth,
 }: Props) {
   // Latest callbacks in refs so the subscribe effect below doesn't
   // have to re-subscribe every time the parent rebinds them.
@@ -96,6 +105,8 @@ export function Candles({
   onVisibleRef.current = onVisibleTimeRangeChange;
   const onLayoutRef = useRef(onPlotLayoutChange);
   onLayoutRef.current = onPlotLayoutChange;
+  const onReadyRef = useRef(onChartReady);
+  onReadyRef.current = onChartReady;
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
@@ -120,6 +131,7 @@ export function Candles({
       { ...chartOptionsFromTheme(containerRef.current.clientWidth, height), autoSize: true },
     );
     chartRef.current = chart;
+    onReadyRef.current?.(chart);
 
     const t = readThemeVars();
     const up = convention === 'green-up' ? t.accentGreen : t.accentRed;
@@ -342,6 +354,18 @@ export function Candles({
     }));
     series.setMarkers(mapped);
   }, [markers]);
+
+  // -- Right price-scale minimum width --------------------------------------
+  // Forcing a common minimum on the main chart AND all indicator panes
+  // means every chart's right gutter is the same width, so their plot
+  // areas line up even when label lengths differ (e.g. RSI 0-100 vs
+  // MACD ±200 vs price 75,000s).
+  useEffect(() => {
+    if (!chartRef.current || priceScaleMinWidth == null) return;
+    chartRef.current.priceScale('right').applyOptions({
+      minimumWidth: priceScaleMinWidth,
+    });
+  }, [priceScaleMinWidth]);
 
   return (
     <div
