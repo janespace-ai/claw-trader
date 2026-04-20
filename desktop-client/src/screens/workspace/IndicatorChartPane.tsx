@@ -25,9 +25,26 @@ export interface GuideSpec {
   dashed?: boolean;
 }
 
+/** One inline value badge rendered in the pane header. When multiple
+ *  lines are plotted (e.g. MACD has macd + signal + histogram), each
+ *  value is shown in its corresponding line color so the user can
+ *  read them at a glance — matching Gate's "RSI 14 43.12" /
+ *  "MACD 12 26 close 9 EMA EMA -3.7 -68.8 -65.2" headers. */
+export interface HeaderValue {
+  text: string;
+  color?: string;
+}
+
 interface Props {
   title: string;
+  /** Parameter string shown after the title (e.g. "(14)", "(12, 26, 9)"). */
+  params?: string;
+  /** @deprecated — use `values` instead. Kept for backward-compat. */
   latestLabel?: string;
+  /** Per-line latest values, rendered after `title (params)` in the
+   *  pane header row. Colors match the corresponding chart line so
+   *  users can visually associate each number with its series. */
+  values?: HeaderValue[];
   lines: LineSpec[];
   histogram?: IndicatorPoint[];
   guides?: GuideSpec[];
@@ -58,7 +75,9 @@ interface Props {
  */
 export function IndicatorChartPane({
   title,
+  params,
   latestLabel,
+  values,
   lines,
   histogram,
   guides = [],
@@ -231,9 +250,25 @@ export function IndicatorChartPane({
 
   return (
     <div className="bg-surface-secondary rounded-md pt-1" aria-label={title}>
-      <div className="flex items-center justify-between text-[10px] text-fg-muted px-2 pb-1">
-        <span>{title}</span>
-        {latestLabel != null && <span className="font-mono">{latestLabel}</span>}
+      <div className="flex items-center gap-2 text-[10px] px-2 pb-1 whitespace-nowrap overflow-hidden">
+        <span className="font-semibold text-fg-primary">{title}</span>
+        {params && <span className="text-fg-muted">{params}</span>}
+        {/* Gate-style inline value badges, each colored to match its
+            chart line. Falls back to the deprecated single-string
+            `latestLabel` prop when `values` isn't supplied. */}
+        {values && values.length > 0 ? (
+          values.map((v, i) => (
+            <span
+              key={i}
+              className="font-mono"
+              style={v.color ? { color: resolveCssColor(v.color) ?? undefined } : undefined}
+            >
+              {v.text}
+            </span>
+          ))
+        ) : latestLabel != null ? (
+          <span className="font-mono text-fg-muted ml-auto">{latestLabel}</span>
+        ) : null}
       </div>
       <div ref={containerRef} style={{ width: '100%', height }} />
     </div>
