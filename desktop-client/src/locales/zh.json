@@ -157,6 +157,7 @@
   "symbol_picker.placeholder": "搜索币种…",
   "symbol_picker.no_results": "没有匹配的币种。",
   "symbol_picker.loading": "加载中…",
+  "symbol_list.header": "币种",
   "chart.loss": "亏损",
   "chart.gain": "盈利",
   "trade.count": "{{count}} 笔交易",

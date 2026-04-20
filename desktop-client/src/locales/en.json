@@ -157,6 +157,7 @@
   "symbol_picker.placeholder": "Search symbols…",
   "symbol_picker.no_results": "No symbols match.",
   "symbol_picker.loading": "Loading…",
+  "symbol_list.header": "Symbols",
   "chart.loss": "Loss",
   "chart.gain": "Gain",
   "trade.count": "{{count}} trades",
