@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { IChartApi, Time } from 'lightweight-charts';
+import type { IChartApi, LogicalRange } from 'lightweight-charts';
+import type { IndicatorPoint, IndicatorSeriesPoint } from '@/services/indicators';
 import {
   AIPersonaShell,
   ClawChart,
@@ -54,6 +55,44 @@ function isPane(id: IndicatorId): id is PaneIndicatorId {
  *  means their plot areas line up horizontally regardless of which
  *  labels happen to be in view. */
 const SHARED_PRICE_SCALE_WIDTH = 68;
+
+/**
+ * Align a sparse indicator series (which only emits values for bars
+ * after the warmup period) to the full candle-time grid, filling the
+ * warmup bars with `value: null` so the chart receives whitespace
+ * points instead of skipping those logical indices.
+ *
+ * This is what keeps cross-chart logical-range sync in register even
+ * when the user pans past the last bar — every chart has the same
+ * number of points, so logical index N refers to the same moment on
+ * candles, RSI, MACD, etc.
+ */
+function alignToCandles(
+  sparse: IndicatorPoint[],
+  candles: CandlePoint[],
+): IndicatorSeriesPoint[] {
+  if (candles.length === 0) return [];
+  const byTs = new Map<number, number>();
+  for (const p of sparse) byTs.set(p.ts, p.value);
+  return candles.map((c) => ({
+    ts: c.ts,
+    value: byTs.has(c.ts) ? byTs.get(c.ts)! : null,
+  }));
+}
+
+/** Read the latest numeric value in a padded series — skips any
+ *  trailing whitespace (unlikely since indicators stabilise by the
+ *  last bar, but safe against edge cases). */
+function latestValue(series: IndicatorSeriesPoint[]): number | null {
+  for (let i = series.length - 1; i >= 0; i--) {
+    if (series[i].value != null) return series[i].value;
+  }
+  return null;
+}
+
+function fmt(v: number | null, digits = 2): string {
+  return v == null ? '—' : v.toFixed(digits);
+}
 
 /**
  * Workspace — Strategy Design screen.
@@ -157,24 +196,37 @@ export function StrategyDesign() {
   // --- Separate panes (RSI / MACD / STOCH / ATR / OBV) --------------------
   const activePanes = indicators.filter(isPane);
 
+  // Each memo computes the raw (sparse) series, then pads it to the
+  // full candle grid via `alignToCandles` so downstream logical-range
+  // sync stays consistent — logical index N refers to the same moment
+  // on every chart. Warmup bars become whitespace points in the pane.
   const rsiData = useMemo(
-    () => (indicators.includes('RSI') && klines.length ? rsi(klines, 14) : []),
+    () => (indicators.includes('RSI') && klines.length ? alignToCandles(rsi(klines, 14), klines) : []),
     [klines, indicators],
   );
-  const macdData = useMemo(
-    () => (indicators.includes('MACD') && klines.length ? macd(klines, 12, 26, 9) : null),
-    [klines, indicators],
-  );
-  const stochData = useMemo(
-    () => (indicators.includes('STOCH') && klines.length ? stochastic(klines, 14, 3) : null),
-    [klines, indicators],
-  );
+  const macdData = useMemo(() => {
+    if (!indicators.includes('MACD') || klines.length === 0) return null;
+    const raw = macd(klines, 12, 26, 9);
+    return {
+      macd: alignToCandles(raw.macd, klines),
+      signal: alignToCandles(raw.signal, klines),
+      histogram: alignToCandles(raw.histogram, klines),
+    };
+  }, [klines, indicators]);
+  const stochData = useMemo(() => {
+    if (!indicators.includes('STOCH') || klines.length === 0) return null;
+    const raw = stochastic(klines, 14, 3);
+    return {
+      k: alignToCandles(raw.k, klines),
+      d: alignToCandles(raw.d, klines),
+    };
+  }, [klines, indicators]);
   const atrData = useMemo(
-    () => (indicators.includes('ATR') && klines.length ? atr(klines, 14) : []),
+    () => (indicators.includes('ATR') && klines.length ? alignToCandles(atr(klines, 14), klines) : []),
     [klines, indicators],
   );
   const obvData = useMemo(
-    () => (indicators.includes('OBV') && klines.length ? obv(klines) : []),
+    () => (indicators.includes('OBV') && klines.length ? alignToCandles(obv(klines), klines) : []),
     [klines, indicators],
   );
 
@@ -188,38 +240,44 @@ export function StrategyDesign() {
 
   const registerChart = useCallback((id: string, chart: IChartApi) => {
     chartsRef.current.set(id, chart);
-    const handler = (range: { from: Time; to: Time } | null) => {
+    // Logical-range sync (not time-range) so panning past the last
+    // bar still keeps every pane in lockstep. Every chart is padded
+    // to the same logical length via `alignToCandles`, so logical
+    // index N refers to the same moment everywhere — `setVisibleLogicalRange`
+    // won't be silently clamped to a chart's own data end the way
+    // `setVisibleRange` was.
+    const handler = (range: LogicalRange | null) => {
       if (!range || syncingRef.current) return;
       syncingRef.current = true;
       try {
         for (const [otherId, otherChart] of chartsRef.current.entries()) {
           if (otherId === id) continue;
-          otherChart.timeScale().setVisibleRange(range);
+          otherChart.timeScale().setVisibleLogicalRange(range);
         }
       } finally {
-        // Release after the cascading setVisibleRange calls have
-        // had their subscribers execute. Deferring to rAF (rather
-        // than clearing synchronously) prevents the flag from
-        // resetting before lightweight-charts finishes propagating.
+        // Release after the cascading calls have had their
+        // subscribers execute. Deferring to rAF rather than clearing
+        // synchronously prevents the flag from resetting before
+        // lightweight-charts finishes propagating the change.
         requestAnimationFrame(() => {
           syncingRef.current = false;
         });
       }
     };
-    chart.timeScale().subscribeVisibleTimeRangeChange(handler);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
 
     // If the user has already zoomed the main chart, a just-toggled-on
     // pane needs to inherit that range immediately rather than
     // fit-to-content'ing its own data. Copy the current main-chart
-    // range onto the new chart once its data is likely present.
+    // logical range onto the new chart once its data is likely present.
     if (id !== 'main') {
       const main = chartsRef.current.get('main');
       if (main) {
         requestAnimationFrame(() => {
-          const currentRange = main.timeScale().getVisibleRange();
+          const currentRange = main.timeScale().getVisibleLogicalRange();
           if (currentRange) {
             syncingRef.current = true;
-            chart.timeScale().setVisibleRange(currentRange);
+            chart.timeScale().setVisibleLogicalRange(currentRange);
             requestAnimationFrame(() => {
               syncingRef.current = false;
             });
@@ -340,7 +398,7 @@ export function StrategyDesign() {
                   params="(14)"
                   values={[
                     {
-                      text: rsiData.at(-1)?.value.toFixed(2) ?? '—',
+                      text: fmt(latestValue(rsiData)),
                       color: 'var(--accent-primary)',
                     },
                   ]}
@@ -361,17 +419,17 @@ export function StrategyDesign() {
                   params="(12, 26, 9)"
                   values={[
                     {
-                      text: macdData.macd.at(-1)?.value.toFixed(2) ?? '—',
+                      text: fmt(latestValue(macdData.macd)),
                       color: 'var(--accent-primary)',
                     },
                     {
-                      text: macdData.signal.at(-1)?.value.toFixed(2) ?? '—',
+                      text: fmt(latestValue(macdData.signal)),
                       color: 'var(--accent-yellow)',
                     },
                     {
-                      text: macdData.histogram.at(-1)?.value.toFixed(2) ?? '—',
+                      text: fmt(latestValue(macdData.histogram)),
                       color:
-                        (macdData.histogram.at(-1)?.value ?? 0) >= 0
+                        (latestValue(macdData.histogram) ?? 0) >= 0
                           ? 'var(--accent-green)'
                           : 'var(--accent-red)',
                     },
@@ -393,11 +451,11 @@ export function StrategyDesign() {
                   params="(14, 3)"
                   values={[
                     {
-                      text: 'K ' + (stochData.k.at(-1)?.value.toFixed(1) ?? '—'),
+                      text: 'K ' + fmt(latestValue(stochData.k), 1),
                       color: 'var(--accent-primary)',
                     },
                     {
-                      text: 'D ' + (stochData.d.at(-1)?.value.toFixed(1) ?? '—'),
+                      text: 'D ' + fmt(latestValue(stochData.d), 1),
                       color: 'var(--accent-yellow)',
                     },
                   ]}
@@ -420,7 +478,7 @@ export function StrategyDesign() {
                   params="(14)"
                   values={[
                     {
-                      text: atrData.at(-1)?.value.toFixed(2) ?? '—',
+                      text: fmt(latestValue(atrData)),
                       color: 'var(--accent-yellow)',
                     },
                   ]}
@@ -435,7 +493,7 @@ export function StrategyDesign() {
                   title="OBV"
                   values={[
                     {
-                      text: obvData.at(-1)?.value.toFixed(0) ?? '—',
+                      text: fmt(latestValue(obvData), 0),
                       color: 'var(--accent-primary)',
                     },
                   ]}

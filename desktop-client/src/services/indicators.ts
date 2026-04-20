@@ -24,9 +24,22 @@ export interface CandleLike {
   v?: number;
 }
 
+/** Dense indicator output: every point has a real numeric value.
+ *  Indicator math (`sma`, `ema`, `rsi`, …) only emits the bars where
+ *  the indicator has stabilised, so warmup bars are dropped entirely. */
 export interface IndicatorPoint {
   ts: number;
   value: number;
+}
+
+/** Gap-tolerant indicator series: `value === null` marks a whitespace
+ *  (warmup) bar that still occupies a logical index on the chart but
+ *  has no visible value. Produced by `alignToCandles` when an
+ *  indicator is padded to a parent candles grid so cross-chart
+ *  logical-range sync stays in register. */
+export interface IndicatorSeriesPoint {
+  ts: number;
+  value: number | null;
 }
 
 // ---- SMA -------------------------------------------------------------------
