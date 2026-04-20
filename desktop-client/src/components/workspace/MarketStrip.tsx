@@ -1,5 +1,7 @@
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { components } from '@/types/api';
+import { SymbolPicker } from './SymbolPicker';
 
 type SymbolMetadata = components['schemas']['SymbolMetadata'];
 type Kline = { ts: number; o: number; h: number; l: number; c: number; v?: number };
@@ -49,6 +51,12 @@ interface Props {
   metadata: SymbolMetadata | null;
   /** Fallback ticker when metadata hasn't loaded yet. */
   symbol: string;
+  /** Called when the user picks a new symbol from the dropdown. */
+  onSymbolChange?: (symbol: string) => void;
+  /** Whether the symbol is in the favourites set (drives the star). */
+  isFavorite?: boolean;
+  /** Called when the user toggles the favourite star. */
+  onToggleFavorite?: () => void;
   /** Derived 24h stats computed from klines by the parent screen. */
   rollingStats?: RollingWindowStats;
   /** Base currency ticker shown in the volume label (e.g. "BTC"). */
@@ -66,8 +74,19 @@ interface Props {
  * as "—" so the layout stays consistent; they light up once the
  * backend contract grows to include them.
  */
-export function MarketStrip({ metadata, symbol, rollingStats, baseCurrency }: Props) {
+export function MarketStrip({
+  metadata,
+  symbol,
+  onSymbolChange,
+  isFavorite,
+  onToggleFavorite,
+  rollingStats,
+  baseCurrency,
+}: Props) {
   const { t } = useTranslation();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const tickerBtnRef = useRef<HTMLButtonElement | null>(null);
+  const [pickerAnchor, setPickerAnchor] = useState<{ top: number; left: number } | null>(null);
   const ticker = metadata?.symbol ?? symbol;
   const displayName = metadata?.name;
   const price = metadata?.last_price;
@@ -126,13 +145,68 @@ export function MarketStrip({ metadata, symbol, rollingStats, baseCurrency }: Pr
       className="flex items-center gap-5 h-[60px] px-4 bg-surface-primary border-b border-border-subtle overflow-x-auto"
       aria-label={t('market.strip_label', { symbol: ticker })}
     >
-      {/* Symbol block */}
+      {/* Favourite star — matches Pencil MktStrip `UEHjX`. Rendered as
+          a button so keyboard users can toggle with Enter/Space. The
+          glyph flips ☆ → ★ and colors up in accent-yellow when set. */}
+      <button
+        type="button"
+        onClick={onToggleFavorite}
+        aria-pressed={!!isFavorite}
+        aria-label={
+          isFavorite
+            ? t('market.unfavorite', { defaultValue: 'Remove from favorites' })
+            : t('market.favorite', { defaultValue: 'Add to favorites' })
+        }
+        className={[
+          'shrink-0 text-[15px] leading-none transition-colors',
+          isFavorite
+            ? 'text-accent-yellow'
+            : 'text-fg-muted hover:text-fg-primary',
+        ].join(' ')}
+      >
+        {isFavorite ? '★' : '☆'}
+      </button>
+
+      {/* Symbol block — ticker becomes a dropdown trigger (Pencil
+          MktStrip ticker column `cY9KB` + chevron `RbOua`). */}
       <div className="flex flex-col gap-0.5 shrink-0">
-        <span className="font-mono text-[15px] font-bold text-fg-primary">
-          {formatTicker(ticker)}
-        </span>
+        <button
+          ref={tickerBtnRef}
+          type="button"
+          onClick={() => {
+            const r = tickerBtnRef.current?.getBoundingClientRect();
+            if (r) setPickerAnchor({ top: r.bottom + 4, left: r.left });
+            setPickerOpen((v) => !v);
+          }}
+          disabled={!onSymbolChange}
+          className={[
+            'flex items-center gap-1 font-mono text-[15px] font-bold text-fg-primary',
+            onSymbolChange ? 'hover:text-accent-primary' : 'cursor-default',
+          ].join(' ')}
+          aria-haspopup="listbox"
+          aria-expanded={pickerOpen}
+        >
+          <span>{formatTicker(ticker)}</span>
+          {onSymbolChange && (
+            <span className="text-[10px] text-fg-muted" aria-hidden>
+              ▾
+            </span>
+          )}
+        </button>
         <span className="text-[10px] text-fg-muted">{displayName ?? ticker}</span>
       </div>
+
+      {pickerOpen && onSymbolChange && (
+        <SymbolPicker
+          current={ticker}
+          anchor={pickerAnchor ?? undefined}
+          onPick={(s) => {
+            onSymbolChange(s);
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
+      )}
 
       <div className="w-px h-7 bg-border-subtle" />
 

@@ -303,5 +303,11 @@
   "settings.default_model": "Default model",
   "settings.status": "Status",
   "error.api_key_invalid": "API key is invalid",
-  "error.generic": "Something went wrong"
+  "error.generic": "Something went wrong",
+  "market.favorite": "Add to favorites",
+  "market.unfavorite": "Remove from favorites",
+  "timeframe.label": "Timeframe",
+  "timeframe.indicators": "Indicators",
+  "timeframe.screenshot": "Screenshot",
+  "timeframe.settings": "Chart settings"
 }

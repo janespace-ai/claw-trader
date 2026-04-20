@@ -36,6 +36,7 @@ import { StrategyDraftCard } from './StrategyDraftCard';
 import { RunPreviewCard } from './RunPreviewCard';
 import { MarketStrip, computeRollingStats } from '@/components/workspace/MarketStrip';
 import { SymbolList } from '@/components/workspace/SymbolList';
+import { TimeframeBar } from '@/components/workspace/TimeframeBar';
 import type { components } from '@/types/api';
 import {
   ChartIndicatorBar,
@@ -527,14 +528,21 @@ export function StrategyDesign() {
   // strip.
   const lastPane = activePanes.at(-1);
 
+  // "Indicators" button on the timeframe bar scrolls the indicator
+  // picker (which renders beneath the chart) into view, giving the
+  // bar a functional handle without duplicating the picker UI.
+  const indicatorBarRef = useRef<HTMLDivElement | null>(null);
+  const handleOpenIndicators = useCallback(() => {
+    indicatorBarRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+    });
+  }, []);
+
   return (
     <WorkspaceShell
       topbar={
         <StrategyTopbar
-          symbol={focusedSymbol}
-          onSymbolChange={handleSymbolChange}
-          interval={interval}
-          onIntervalChange={setInterval}
           onRunPreview={handleRunPreview}
           canRunPreview={canRunPreview}
           isRunning={isRunning}
@@ -548,14 +556,25 @@ export function StrategyDesign() {
       }
       main={
         <div className="flex flex-col">
-          {/* Gate-style market info strip: price, 24h change, high/low,
-              volume, max leverage, funding rate. Spans edge-to-edge
-              above the padded chart area. */}
+          {/* Gate-style market info strip: favourite star, ticker
+              dropdown, price, 24h change, high/low, volume, max
+              leverage, funding rate. Spans edge-to-edge above the
+              chart area; matches Pencil `MktStrip` (1wUsP). */}
           <MarketStrip
             metadata={metadata}
             symbol={focusedSymbol}
+            onSymbolChange={handleSymbolChange}
             rollingStats={computeRollingStats(klines)}
             baseCurrency={focusedSymbol.split('_')[0] ?? 'base'}
+          />
+          {/* Dedicated timeframe + chart-controls row — Pencil `TfBar`
+              (LXpUp). Sits between the market strip and the chart so
+              users can switch intervals without hunting in the topbar. */}
+          <TimeframeBar
+            interval={interval}
+            onIntervalChange={setInterval}
+            indicatorsActive={indicators.length > 0}
+            onOpenIndicators={handleOpenIndicators}
           />
         <div className="flex flex-col gap-2 p-4">
           {fetchState === 'empty' ? (
@@ -785,10 +804,12 @@ export function StrategyDesign() {
             </>
           )}
 
-          <ChartIndicatorBar
-            selected={indicators}
-            onToggle={handleToggleIndicator}
-          />
+          <div ref={indicatorBarRef}>
+            <ChartIndicatorBar
+              selected={indicators}
+              onToggle={handleToggleIndicator}
+            />
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <StrategyDraftCard />
