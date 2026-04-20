@@ -19,6 +19,11 @@ interface ShellProps {
   persona: PersonaId;
   /** Persona-specific payload (e.g. { backtestTaskId } for signal-review). */
   context?: Record<string, unknown>;
+  /** Optional action rendered on the right side of the persona header.
+   *  Used e.g. by the Strategy Design screen to surface the primary
+   *  "Run Preview" CTA alongside the AI strategist title, keeping the
+   *  workspace topbar free for screen-level navigation only. */
+  headerAction?: ReactNode;
   children: ReactNode;
 }
 
@@ -31,19 +36,19 @@ interface ShellProps {
  * The shell renders a stock header + Intro/Transcript/Composer slots
  * (if the caller omits any, we render defaults).
  */
-export function AIPersonaShell({ persona, context = {}, children }: ShellProps) {
+export function AIPersonaShell({ persona, context = {}, headerAction, children }: ShellProps) {
   const cfg = getPersona(persona);
   return (
     <Ctx.Provider value={{ persona: cfg, context }}>
       <div className="flex flex-col h-full bg-surface-secondary">
-        <Header />
+        <Header action={headerAction} />
         <div className="flex-1 overflow-hidden flex flex-col">{children}</div>
       </div>
     </Ctx.Provider>
   );
 }
 
-function Header() {
+function Header({ action }: { action?: ReactNode }) {
   const { persona } = usePersonaContext();
   const { t } = useTranslation();
   return (
@@ -59,6 +64,7 @@ function Header() {
           <div className="text-[10px] text-fg-muted">{t(persona.subtitle)}</div>
         )}
       </div>
+      {action && <div className="ml-auto flex items-center">{action}</div>}
     </div>
   );
 }

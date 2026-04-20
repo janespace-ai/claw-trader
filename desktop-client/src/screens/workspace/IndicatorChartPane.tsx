@@ -11,10 +11,15 @@ import {
   observeThemeChanges,
   resolveCssColor,
 } from '@/components/primitives/ClawChart/theme';
-import type { IndicatorPoint } from '@/services/indicators';
+import type { IndicatorPoint, IndicatorSeriesPoint } from '@/services/indicators';
 
 export interface LineSpec {
-  data: IndicatorPoint[];
+  /** Accepts either a dense `IndicatorPoint[]` (from raw math) or a
+   *  `IndicatorSeriesPoint[]` padded to the parent candles grid with
+   *  `value: null` at warmup bars. The pane emits whitespace points
+   *  for null values so logical indices stay aligned with sibling
+   *  charts. */
+  data: IndicatorPoint[] | IndicatorSeriesPoint[];
   color: string;
   lineWidth?: 1 | 2 | 3 | 4;
 }
@@ -46,7 +51,7 @@ interface Props {
    *  users can visually associate each number with its series. */
   values?: HeaderValue[];
   lines: LineSpec[];
-  histogram?: IndicatorPoint[];
+  histogram?: IndicatorPoint[] | IndicatorSeriesPoint[];
   guides?: GuideSpec[];
   height?: number;
   /** Only the bottom-most active pane should show the time axis. */
@@ -176,13 +181,22 @@ export function IndicatorChartPane({
       const s = existing.pop();
       if (s) chart.removeSeries(s);
     }
-    // Update each series' data + color.
+    // Update each series' data + color. Null / non-finite values are
+    // emitted as lightweight-charts whitespace points (`{ time }` only)
+    // so every series keeps a logical index for every candle timestamp,
+    // even for warmup bars before the indicator stabilises. That
+    // alignment is what lets the cross-chart logical-range sync stay
+    // in register when the user pans past the last bar.
     lines.forEach((spec, i) => {
       const s = existing[i];
       const color = resolveCssColor(spec.color) ?? '#888';
       s.applyOptions({ color, lineWidth: spec.lineWidth ?? 2 });
       s.setData(
-        spec.data.map((p) => ({ time: p.ts as UTCTimestamp, value: p.value })),
+        spec.data.map((p) =>
+          p.value == null || !Number.isFinite(p.value)
+            ? { time: p.ts as UTCTimestamp }
+            : { time: p.ts as UTCTimestamp, value: p.value },
+        ),
       );
     });
   }, [lines]);
@@ -208,11 +222,15 @@ export function IndicatorChartPane({
       });
     }
     histogramSeriesRef.current.setData(
-      histogram.map((p) => ({
-        time: p.ts as Time,
-        value: p.value,
-        color: (p.value >= 0 ? green : red) + '80',
-      })),
+      histogram.map((p) =>
+        p.value == null || !Number.isFinite(p.value)
+          ? { time: p.ts as Time }
+          : {
+              time: p.ts as Time,
+              value: p.value,
+              color: (p.value >= 0 ? green : red) + '80',
+            },
+      ),
     );
   }, [histogram]);
 

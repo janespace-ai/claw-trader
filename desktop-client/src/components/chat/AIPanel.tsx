@@ -263,23 +263,25 @@ export function AIPanel() {
           already renders the persona title + model subtitle at the top
           of the right rail. Instead of duplicating that chrome, this
           panel only surfaces its conversation actions (history + new)
-          as a compact top-right button bar. */}
-      <div className="flex items-center justify-end gap-2 px-4 py-2 border-b border-border-subtle">
+          as a compact top-right button bar. Matches Pencil `AIHeader`
+          (Hbhty) right-side controls — 36×36 tap boxes with 18px icons
+          rather than the previous bare text-sm glyphs. */}
+      <div className="flex items-center justify-end gap-1.5 px-3 py-2 border-b border-border-subtle">
         <button
           onClick={() => setHistoryOpen((v) => !v)}
-          className="text-fg-secondary hover:text-fg-primary text-sm"
-          aria-label="history"
-          title="History"
+          className="w-9 h-9 rounded-md bg-surface-tertiary text-fg-secondary hover:text-fg-primary grid place-items-center text-lg transition-colors"
+          aria-label={t('action.history', { defaultValue: 'History' })}
+          title={t('action.history', { defaultValue: 'History' })}
         >
-          ⟲
+          <span aria-hidden>⟲</span>
         </button>
         <button
           onClick={newConversation}
-          className="text-fg-secondary hover:text-fg-primary text-sm"
-          aria-label="new"
-          title="New conversation"
+          className="w-9 h-9 rounded-md bg-surface-tertiary text-fg-secondary hover:text-fg-primary grid place-items-center text-xl leading-none transition-colors"
+          aria-label={t('action.new_conversation')}
+          title={t('action.new_conversation')}
         >
-          +
+          <span aria-hidden>+</span>
         </button>
       </div>
 

@@ -10,6 +10,12 @@ import {
   obv,
   vwap,
   donchian,
+  kdj,
+  sar,
+  cci,
+  williamsR,
+  mfi,
+  roc,
   type CandleLike,
 } from './indicators';
 
@@ -195,5 +201,104 @@ describe('donchian', () => {
     expect(result.upper[0].value).toBe(7);
     expect(result.lower[0].value).toBe(0);
     expect(result.middle[0].value).toBe(3.5);
+  });
+});
+
+describe('kdj', () => {
+  it('returns three aligned lines', () => {
+    const bars = Array.from({ length: 20 }, (_, i) => ({
+      o: 100, h: 105, l: 95, c: 100 + (i % 5), v: 0,
+    }));
+    const result = kdj(mkOHLCV(bars), 9, 3);
+    expect(result.k.length).toBe(result.d.length);
+    expect(result.k.length).toBe(result.j.length);
+    // K/D should stay in the 0-100 band for normal-range data.
+    for (const p of result.k) expect(p.value).toBeGreaterThanOrEqual(0);
+    for (const p of result.d) expect(p.value).toBeLessThanOrEqual(100);
+  });
+
+  it('J = 3K − 2D', () => {
+    const bars = Array.from({ length: 15 }, (_, i) => ({
+      o: 100 + i, h: 102 + i, l: 98 + i, c: 101 + i, v: 0,
+    }));
+    const { k, d, j } = kdj(mkOHLCV(bars), 9);
+    const last = k.length - 1;
+    expect(j[last].value).toBeCloseTo(3 * k[last].value - 2 * d[last].value, 5);
+  });
+});
+
+describe('sar', () => {
+  it('emits one dot per bar after the first', () => {
+    const bars = Array.from({ length: 20 }, (_, i) => ({
+      o: 100 + i, h: 101 + i, l: 99 + i, c: 100 + i, v: 0,
+    }));
+    const result = sar(mkOHLCV(bars));
+    expect(result.length).toBe(bars.length - 1);
+  });
+
+  it('stays below price in a steady uptrend', () => {
+    const bars = Array.from({ length: 20 }, (_, i) => ({
+      o: 100 + i, h: 101 + i, l: 99 + i, c: 100 + i, v: 0,
+    }));
+    const result = sar(mkOHLCV(bars));
+    // After a few bars the SAR has caught up; check the tail.
+    const tail = result.slice(5);
+    for (let i = 0; i < tail.length; i++) {
+      expect(tail[i].value).toBeLessThanOrEqual(bars[i + 6].h);
+    }
+  });
+});
+
+describe('cci', () => {
+  it('returns 0 when typical equals the running mean', () => {
+    const bars = Array.from({ length: 25 }, () => ({
+      o: 100, h: 100, l: 100, c: 100, v: 0,
+    }));
+    const result = cci(mkOHLCV(bars), 20);
+    for (const p of result) expect(p.value).toBe(0);
+  });
+});
+
+describe('williamsR', () => {
+  it('is -100 at the rolling low', () => {
+    const bars = Array.from({ length: 20 }, (_, i) => ({
+      o: 100, h: 102, l: 98, c: i === 19 ? 98 : 100, v: 0,
+    }));
+    const result = williamsR(mkOHLCV(bars), 14);
+    expect(result.at(-1)!.value).toBe(-100);
+  });
+
+  it('is 0 at the rolling high', () => {
+    const bars = Array.from({ length: 20 }, (_, i) => ({
+      o: 100, h: 102, l: 98, c: i === 19 ? 102 : 100, v: 0,
+    }));
+    const result = williamsR(mkOHLCV(bars), 14);
+    expect(result.at(-1)!.value).toBe(0);
+  });
+});
+
+describe('mfi', () => {
+  it('returns values in 0-100 range', () => {
+    const bars = Array.from({ length: 25 }, (_, i) => ({
+      o: 100, h: 102, l: 98, c: 100 + (i % 3), v: 1000,
+    }));
+    const result = mfi(mkOHLCV(bars), 14);
+    for (const p of result) {
+      expect(p.value).toBeGreaterThanOrEqual(0);
+      expect(p.value).toBeLessThanOrEqual(100);
+    }
+  });
+});
+
+describe('roc', () => {
+  it('computes percent change over N bars', () => {
+    // Price goes 100 → 110 over 10 bars → ROC ≈ +10%
+    const bars: { o: number; h: number; l: number; c: number; v: number }[] = [];
+    for (let i = 0; i <= 10; i++) {
+      const c = 100 + i;
+      bars.push({ o: c, h: c, l: c, c, v: 0 });
+    }
+    const result = roc(mkOHLCV(bars), 10);
+    expect(result[0].value).toBeCloseTo(10, 5);
   });
 });

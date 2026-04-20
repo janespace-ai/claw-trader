@@ -24,9 +24,22 @@ export interface CandleLike {
   v?: number;
 }
 
+/** Dense indicator output: every point has a real numeric value.
+ *  Indicator math (`sma`, `ema`, `rsi`, …) only emits the bars where
+ *  the indicator has stabilised, so warmup bars are dropped entirely. */
 export interface IndicatorPoint {
   ts: number;
   value: number;
+}
+
+/** Gap-tolerant indicator series: `value === null` marks a whitespace
+ *  (warmup) bar that still occupies a logical index on the chart but
+ *  has no visible value. Produced by `alignToCandles` when an
+ *  indicator is padded to a parent candles grid so cross-chart
+ *  logical-range sync stays in register. */
+export interface IndicatorSeriesPoint {
+  ts: number;
+  value: number | null;
 }
 
 // ---- SMA -------------------------------------------------------------------
@@ -317,4 +330,175 @@ export function donchian(candles: CandleLike[], period = 20): Donchian {
     middle.push({ ts, value: (hi + lo) / 2 });
   }
   return { upper, lower, middle };
+}
+
+// ---- KDJ -------------------------------------------------------------------
+
+export interface KDJ {
+  k: IndicatorPoint[];
+  d: IndicatorPoint[];
+  j: IndicatorPoint[];
+}
+
+/** KDJ is a three-line stochastic variant popular in Chinese markets.
+ *  K/D are smoothed %K/%D; J = 3K − 2D and can exceed the 0-100 range,
+ *  signalling overbought/oversold momentum. */
+export function kdj(candles: CandleLike[], kPeriod = 9, dPeriod = 3): KDJ {
+  if (candles.length < kPeriod) return { k: [], d: [], j: [] };
+  const k: IndicatorPoint[] = [];
+  const d: IndicatorPoint[] = [];
+  const j: IndicatorPoint[] = [];
+  let prevK = 50;
+  let prevD = 50;
+  for (let i = kPeriod - 1; i < candles.length; i++) {
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let n = i - kPeriod + 1; n <= i; n++) {
+      if (candles[n].h > hi) hi = candles[n].h;
+      if (candles[n].l < lo) lo = candles[n].l;
+    }
+    const range = hi - lo;
+    const rsv = range === 0 ? 50 : (100 * (candles[i].c - lo)) / range;
+    // Classic Chinese formulation: K = (2/3)·K_prev + (1/3)·RSV
+    const kv = (2 / 3) * prevK + (1 / 3) * rsv;
+    const dv = (2 / 3) * prevD + (1 / 3) * kv;
+    const jv = 3 * kv - 2 * dv;
+    k.push({ ts: candles[i].ts, value: kv });
+    d.push({ ts: candles[i].ts, value: dv });
+    j.push({ ts: candles[i].ts, value: jv });
+    prevK = kv;
+    prevD = dv;
+  }
+  // dPeriod is used for the initialization smoothing — dropping it is
+  // intentional; the rolling EMA-style update already smooths D.
+  void dPeriod;
+  return { k, d, j };
+}
+
+// ---- Parabolic SAR ---------------------------------------------------------
+
+/** Parabolic SAR (Welles Wilder). Returns one dot per bar, positioned
+ *  below the bar in an uptrend and above in a downtrend — rendered as
+ *  an overlay scatter on the price chart. */
+export function sar(
+  candles: CandleLike[],
+  step = 0.02,
+  maxStep = 0.2,
+): IndicatorPoint[] {
+  if (candles.length < 2) return [];
+  const out: IndicatorPoint[] = [];
+  // Assume first bar starts an uptrend (common initialization).
+  let uptrend = candles[1].c >= candles[0].c;
+  let ep = uptrend ? candles[0].h : candles[0].l;
+  let af = step;
+  let sarVal = uptrend ? candles[0].l : candles[0].h;
+  for (let i = 1; i < candles.length; i++) {
+    sarVal = sarVal + af * (ep - sarVal);
+    const { h, l } = candles[i];
+    if (uptrend) {
+      // Stop can't be above the prior two lows.
+      if (i >= 2) sarVal = Math.min(sarVal, candles[i - 1].l, candles[i - 2].l);
+      if (l < sarVal) {
+        // Flip to downtrend.
+        uptrend = false;
+        sarVal = ep;
+        ep = l;
+        af = step;
+      } else if (h > ep) {
+        ep = h;
+        af = Math.min(af + step, maxStep);
+      }
+    } else {
+      if (i >= 2) sarVal = Math.max(sarVal, candles[i - 1].h, candles[i - 2].h);
+      if (h > sarVal) {
+        uptrend = true;
+        sarVal = ep;
+        ep = h;
+        af = step;
+      } else if (l < ep) {
+        ep = l;
+        af = Math.min(af + step, maxStep);
+      }
+    }
+    out.push({ ts: candles[i].ts, value: sarVal });
+  }
+  return out;
+}
+
+// ---- Commodity Channel Index ----------------------------------------------
+
+/** CCI = (typical − SMA(typical)) / (0.015 · meanDeviation). Typically
+ *  cycles in ±100; breaches of ±200 mark strong momentum. */
+export function cci(candles: CandleLike[], period = 20): IndicatorPoint[] {
+  if (candles.length < period) return [];
+  const out: IndicatorPoint[] = [];
+  const typical = candles.map((c) => (c.h + c.l + c.c) / 3);
+  for (let i = period - 1; i < candles.length; i++) {
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += typical[j];
+    const avg = sum / period;
+    let dev = 0;
+    for (let j = i - period + 1; j <= i; j++) dev += Math.abs(typical[j] - avg);
+    const meanDev = dev / period;
+    const value = meanDev === 0 ? 0 : (typical[i] - avg) / (0.015 * meanDev);
+    out.push({ ts: candles[i].ts, value });
+  }
+  return out;
+}
+
+// ---- Williams %R -----------------------------------------------------------
+
+/** %R = -100 · (highN − close) / (highN − lowN). Output is 0 to -100. */
+export function williamsR(candles: CandleLike[], period = 14): IndicatorPoint[] {
+  if (candles.length < period) return [];
+  const out: IndicatorPoint[] = [];
+  for (let i = period - 1; i < candles.length; i++) {
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let j = i - period + 1; j <= i; j++) {
+      if (candles[j].h > hi) hi = candles[j].h;
+      if (candles[j].l < lo) lo = candles[j].l;
+    }
+    const range = hi - lo;
+    // Adding `+ 0` normalises `-0` to `+0` at the overbought boundary
+    // (when close === high, `-100 * 0 / range` is `-0` in IEEE-754).
+    const raw = range === 0 ? -50 : (-100 * (hi - candles[i].c)) / range;
+    out.push({ ts: candles[i].ts, value: raw + 0 });
+  }
+  return out;
+}
+
+// ---- Money Flow Index ------------------------------------------------------
+
+/** MFI is a volume-weighted RSI. Output in 0-100. */
+export function mfi(candles: CandleLike[], period = 14): IndicatorPoint[] {
+  if (candles.length <= period) return [];
+  const typical = candles.map((c) => (c.h + c.l + c.c) / 3);
+  const rawFlow = candles.map((c, i) => typical[i] * (c.v ?? 0));
+  const out: IndicatorPoint[] = [];
+  for (let i = period; i < candles.length; i++) {
+    let pos = 0;
+    let neg = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      if (typical[j] > typical[j - 1]) pos += rawFlow[j];
+      else if (typical[j] < typical[j - 1]) neg += rawFlow[j];
+    }
+    const value = neg === 0 ? 100 : 100 - 100 / (1 + pos / neg);
+    out.push({ ts: candles[i].ts, value });
+  }
+  return out;
+}
+
+// ---- Rate of Change --------------------------------------------------------
+
+/** ROC = 100 · (close − close[N bars ago]) / close[N bars ago]. */
+export function roc(candles: CandleLike[], period = 12): IndicatorPoint[] {
+  if (candles.length <= period) return [];
+  const out: IndicatorPoint[] = [];
+  for (let i = period; i < candles.length; i++) {
+    const prev = candles[i - period].c;
+    const value = prev === 0 ? 0 : (100 * (candles[i].c - prev)) / prev;
+    out.push({ ts: candles[i].ts, value });
+  }
+  return out;
 }

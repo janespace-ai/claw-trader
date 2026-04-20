@@ -22,7 +22,11 @@ export interface CandlePoint {
 export interface OverlayLine {
   /** Unique id; used for React key + updates. */
   id: string;
-  data: { ts: number; value: number }[];
+  /** `value: null` marks a whitespace (warmup) point that still owns
+   *  a logical index but renders nothing. Consumers can pass the raw
+   *  sparse output from indicator math directly, or a null-padded
+   *  version aligned to the candles grid. */
+  data: { ts: number; value: number | null }[];
   color?: string;
   lineWidth?: 1 | 2 | 3 | 4;
 }
@@ -328,10 +332,11 @@ export function Candles({
         ser.applyOptions({ color: resolvedColor, lineWidth: ov.lineWidth ?? 2 });
       }
       ser.setData(
-        ov.data.map((p) => ({
-          time: p.ts as UTCTimestamp,
-          value: p.value,
-        })),
+        ov.data.map((p) =>
+          p.value == null || !Number.isFinite(p.value)
+            ? { time: p.ts as UTCTimestamp }
+            : { time: p.ts as UTCTimestamp, value: p.value },
+        ),
       );
     }
     // Overlays can pull the visible y-range into larger-number territory

@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react';
 
 interface Props {
-  /** Top bar content (fixed 52px height by default). */
-  topbar: ReactNode;
+  /** Top bar content (fixed 52px height by default). Omit to skip —
+   *  screens that don't need a workspace-level header row (e.g. the
+   *  Strategy Design screen after its CTA moved into the AI panel
+   *  header) can leave it off entirely. */
+  topbar?: ReactNode;
   /** Left rail (symbol watchlist, etc). Omit to skip. */
   leftRail?: ReactNode;
   /** Main area (charts, tables, tabs). */
@@ -36,13 +39,15 @@ export function WorkspaceShell({
 }: Props) {
   return (
     <div className="flex flex-col h-full w-full bg-surface-primary">
-      {/* Topbar */}
-      <div
-        className="flex-shrink-0 bg-surface-secondary border-b border-border-subtle"
-        style={{ height: topbarHeight }}
-      >
-        {topbar}
-      </div>
+      {/* Topbar — only rendered when the caller supplies one. */}
+      {topbar != null && (
+        <div
+          className="flex-shrink-0 bg-surface-secondary border-b border-border-subtle"
+          style={{ height: topbarHeight }}
+        >
+          {topbar}
+        </div>
+      )}
       {/* Body: left rail + main + right rail */}
       <div className="flex flex-1 overflow-hidden">
         {leftRail && (
