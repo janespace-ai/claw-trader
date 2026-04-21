@@ -11,6 +11,7 @@ import {
 } from '@/components/primitives';
 import { AIPanel } from '@/components/chat/AIPanel';
 import { cremote } from '@/services/remote/contract-client';
+import { FriendlyError } from '@/components/ui/FriendlyError';
 import { useScreenerRunStore } from '@/stores/screenerRunStore';
 import { useStrategyStore } from '@/stores/strategyStore';
 import { ScreenerTopbar } from './screener/ScreenerTopbar';
@@ -157,7 +158,13 @@ export function ScreenerScreen() {
         }
         main={
           <div className="flex flex-col gap-4 p-4">
-            {error && <div className="text-xs text-accent-red">{error}</div>}
+            {error && (
+              <FriendlyError
+                variant="card"
+                label={t('nav.screener')}
+                error={error}
+              />
+            )}
             {focusedSymbol ? (
               <ClawChart.Candles data={klines} markers={markers} height={380} showVolume />
             ) : (

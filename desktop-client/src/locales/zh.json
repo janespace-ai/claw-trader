@@ -314,5 +314,19 @@
   "chart.resize_pane": "调整 {{name}} 指标高度",
   "ai.thinking": "AI 思考中…",
   "code.copy": "复制",
-  "code.copied": "已复制"
+  "code.copied": "已复制",
+  "errors.friendly.details": "查看原始报错",
+  "errors.friendly.generic.title": "出现错误",
+  "errors.friendly.docker.title": "后端沙箱未就绪",
+  "errors.friendly.docker.hint": "回测引擎需要在 Docker 容器中运行用户代码。请先启动 Docker Desktop（或授予访问 daemon socket 的权限）后重试。",
+  "errors.friendly.network.title": "无法连接后端",
+  "errors.friendly.network.hint": "请检查远程回测引擎是否正在运行，以及「设置 → 远程引擎」中的 URL 是否正确。",
+  "errors.friendly.range.title": "时间范围错误",
+  "errors.friendly.range.hint": "客户端提交的起止时间与服务器要求的格式不匹配。请重试，若持续出现请反馈。",
+  "errors.friendly.auth.title": "身份验证失败",
+  "errors.friendly.auth.hint": "请在「设置 → AI 与 API Keys」中检查您的 API Key。",
+  "errors.friendly.user_code.title": "策略代码运行出错",
+  "errors.friendly.user_code.hint": "后端尝试运行这段代码时抛出了异常。展开下方详情查看，或让 AI 帮忙修复。",
+  "errors.friendly.timeout.title": "任务超时",
+  "errors.friendly.timeout.hint": "后端未能按时完成。请重试，或缩短回看窗口后再试。"
 }
