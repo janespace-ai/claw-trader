@@ -86,7 +86,14 @@ export async function runScreenerFromCode(code: string, opts: RunOptions = {}): 
     if (signal?.aborted) {
       return emit({ phase: 'failed', error: 'aborted' });
     }
-    let poll: { status?: string; error?: string; result?: { results?: ScreenerRowResult[] } };
+    // `error` can be a plain string (legacy) or the canonical
+    // `{ code, message }` body (contract). Type reflects both so the
+    // describe() path below normalizes either shape to a string.
+    let poll: {
+      status?: string;
+      error?: string | { code?: string; message?: string };
+      result?: { results?: ScreenerRowResult[] };
+    };
     try {
       poll = (await remote.screenerResult(start.task_id)) as typeof poll;
     } catch (err: unknown) {
@@ -105,7 +112,7 @@ export async function runScreenerFromCode(code: string, opts: RunOptions = {}): 
       });
     }
     if (poll?.status === 'failed') {
-      return emit({ phase: 'failed', error: poll.error || 'screener failed' });
+      return emit({ phase: 'failed', error: describe(poll.error) || 'screener failed' });
     }
     await sleep(pollIntervalMs);
   }
@@ -117,11 +124,23 @@ function sleep(ms: number): Promise<void> {
 }
 
 function describe(err: unknown): string {
+  if (err == null) return '';
   if (err instanceof Error) return err.message;
   if (typeof err === 'string') return err;
-  try {
-    return JSON.stringify(err);
-  } catch {
-    return String(err);
+  // Canonical API error body: `{ code, message }`. Preserve both so the
+  // status row reads "INTERNAL_ERROR: <msg>" rather than "[object Object]".
+  if (typeof err === 'object') {
+    const b = err as { code?: unknown; message?: unknown };
+    const msg = typeof b.message === 'string' ? b.message : '';
+    const code = typeof b.code === 'string' ? b.code : '';
+    if (code && msg) return `${code}: ${msg}`;
+    if (msg) return msg;
+    if (code) return code;
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
   }
+  return String(err);
 }
