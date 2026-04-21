@@ -312,5 +312,7 @@
   "timeframe.settings": "Chart settings",
   "chart.resize_main": "Resize chart",
   "chart.resize_pane": "Resize {{name}} pane",
-  "ai.thinking": "Thinking…"
+  "ai.thinking": "Thinking…",
+  "code.copy": "Copy",
+  "code.copied": "Copied"
 }

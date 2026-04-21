@@ -21,16 +21,26 @@ interface Segment {
 }
 
 /** Split a message body into text + ```lang blocks so we can render code
- *  with syntax highlighting while keeping prose flowing. */
+ *  with syntax highlighting while keeping prose flowing.
+ *
+ *  The info-string after the opening fence may contain extra words
+ *  (e.g. ```json summary) — we accept anything up to end-of-line and
+ *  treat the first token as the language. An unclosed fence (streaming
+ *  partial where the closing ``` hasn't arrived yet) is rendered as
+ *  a code block anyway so users see syntax-highlighted progress. */
 function parseSegments(raw: string): Segment[] {
   const out: Segment[] = [];
-  const fence = /```(\w*)\n([\s\S]*?)```/g;
+  // Match ```<info>\n<body>``` OR ```<info>\n<body>$ (unterminated tail).
+  const fence = /```([^\n]*)\n([\s\S]*?)(?:```|$)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = fence.exec(raw))) {
     if (m.index > last) out.push({ kind: 'text', content: raw.slice(last, m.index) });
-    out.push({ kind: 'code', content: m[2], lang: m[1] || 'python' });
+    const info = m[1].trim();
+    const lang = (info.split(/\s+/)[0] || 'text').toLowerCase();
+    out.push({ kind: 'code', content: m[2], lang });
     last = m.index + m[0].length;
+    if (fence.lastIndex === m.index) fence.lastIndex++; // guard against zero-width
   }
   if (last < raw.length) out.push({ kind: 'text', content: raw.slice(last) });
   return out;
