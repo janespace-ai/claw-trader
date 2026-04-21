@@ -1,6 +1,7 @@
 // Renderer-side remote API wrapper. Delegates to main via IPC.
 
 import type { BacktestConfig } from '@/types/domain';
+import { toRawMessage } from '@/services/errors/friendly';
 
 export const remote = {
   setBaseURL: (url: string) => window.claw.remote.setBaseURL(url),
@@ -52,7 +53,14 @@ export async function pollBacktestResult(
     const status = await remote.backtestStatus(taskId);
     onProgress(status);
     if (status.status === 'done') return remote.backtestResult(taskId);
-    if (status.status === 'failed') throw new Error(status.error || 'backtest failed');
+    if (status.status === 'failed') {
+      // `status.error` can be a plain string OR the canonical backend
+      // `{code, message}` body. `new Error(obj)` would coerce the
+      // object to "[object Object]" — normalize to a readable string
+      // first so the downstream FriendlyError mapper can classify it
+      // (docker / network / user_code / ...).
+      throw new Error(toRawMessage(status.error) || 'backtest failed');
+    }
     await new Promise((r) => setTimeout(r, interval));
   }
 }
