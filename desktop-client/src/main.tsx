@@ -12,6 +12,7 @@ import './services/i18n';
 import { applyTheme, initThemeWatcher } from './services/theme';
 import { installTestBridge } from './services/test-bridge';
 import App from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // DEV-only test bridge for Playwright visual-regression specs.
 installTestBridge();
@@ -30,7 +31,9 @@ async function bootstrap() {
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </React.StrictMode>,
   );
 }
