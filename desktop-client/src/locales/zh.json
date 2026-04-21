@@ -311,5 +311,6 @@
   "timeframe.screenshot": "截图",
   "timeframe.settings": "图表设置",
   "chart.resize_main": "调整图表大小",
-  "chart.resize_pane": "调整 {{name}} 指标高度"
+  "chart.resize_pane": "调整 {{name}} 指标高度",
+  "ai.thinking": "AI 思考中…"
 }

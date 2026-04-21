@@ -291,7 +291,7 @@ export function AIPanel() {
         onLoad={loadConversation}
       />
 
-      <MessageList messages={messages} partial={partial} />
+      <MessageList messages={messages} partial={partial} streaming={streaming} />
 
       <div className="px-3 py-2 border-t border-border-subtle">
         <div className="flex items-end gap-2 bg-surface-tertiary rounded-lg p-2">

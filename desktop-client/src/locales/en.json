@@ -311,5 +311,6 @@
   "timeframe.screenshot": "Screenshot",
   "timeframe.settings": "Chart settings",
   "chart.resize_main": "Resize chart",
-  "chart.resize_pane": "Resize {{name}} pane"
+  "chart.resize_pane": "Resize {{name}} pane",
+  "ai.thinking": "Thinking…"
 }
