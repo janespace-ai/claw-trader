@@ -311,5 +311,22 @@
   "timeframe.screenshot": "Screenshot",
   "timeframe.settings": "Chart settings",
   "chart.resize_main": "Resize chart",
-  "chart.resize_pane": "Resize {{name}} pane"
+  "chart.resize_pane": "Resize {{name}} pane",
+  "ai.thinking": "Thinking…",
+  "code.copy": "Copy",
+  "code.copied": "Copied",
+  "errors.friendly.details": "View details",
+  "errors.friendly.generic.title": "Something went wrong",
+  "errors.friendly.docker.title": "Backend can't launch the sandbox container",
+  "errors.friendly.docker.hint": "The backtest-engine process on the backend machine needs to call the local Docker daemon to spin up an isolated container that will run the AI-generated code, but it can't reach Docker (not running, or no permission on /var/run/docker.sock). Start Docker Desktop; if it's already running, add the backend's user to the `docker` group or restart the backend with sufficient privileges.",
+  "errors.friendly.network.title": "Can't reach the backend",
+  "errors.friendly.network.hint": "Check that the remote backtest engine is running and the URL in Settings → Remote Engine is correct.",
+  "errors.friendly.range.title": "Invalid time range",
+  "errors.friendly.range.hint": "The start/end timestamps the client sent don't match the server's expected format. Retry, or report this if it keeps happening.",
+  "errors.friendly.auth.title": "Authentication failed",
+  "errors.friendly.auth.hint": "Check your API key in Settings → AI & API Keys.",
+  "errors.friendly.user_code.title": "The strategy code crashed",
+  "errors.friendly.user_code.hint": "The backend tried to run this snippet and it raised. Expand the details below or ask the AI to fix it.",
+  "errors.friendly.timeout.title": "The task timed out",
+  "errors.friendly.timeout.hint": "The backend didn't finish in time. Try again, or run with a shorter lookback."
 }

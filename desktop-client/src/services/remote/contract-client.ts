@@ -119,7 +119,24 @@ export const cremote = {
     config: BacktestConfig;
     strategy_id?: string;
   }): Promise<TaskResponse> {
-    const res = await iface().fetch('/api/backtest/start', { method: 'POST', body });
+    // Contract drift workaround: `openapi.yaml` declares `from`/`to` as
+    // `integer`, but the running Go backend's struct is `string` (see
+    // `backtest-engine/internal/model/backtest.go` — it parses Unix
+    // seconds, RFC3339, or YYYY-MM-DD from a string). JSON-binding a
+    // number therefore fails with `INVALID_RANGE: bind request: Mismatch
+    // type string with value number`. Coerce to string on the wire so
+    // TS types stay aligned with the spec while runtime matches the
+    // actual backend. Remove once backtest-engine lands the int switch.
+    const { config } = body;
+    const wireBody = {
+      ...body,
+      config: {
+        ...config,
+        from: String(config.from),
+        to: String(config.to),
+      },
+    };
+    const res = await iface().fetch('/api/backtest/start', { method: 'POST', body: wireBody });
     return adaptTaskResponse(res);
   },
 

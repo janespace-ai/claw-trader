@@ -1,4 +1,6 @@
+import { useTranslation } from 'react-i18next';
 import { useAutoRunStore } from '@/stores/autoRunStore';
+import { FriendlyError } from '@/components/ui/FriendlyError';
 
 interface Props {
   /** Index of the assistant message this row lives under. Only shows
@@ -9,6 +11,7 @@ interface Props {
 /** Tiny status row embedded under an assistant bubble while the chat-
  *  triggered screener is running / after it finishes. */
 export function AutoRunStatus({ messageIndex }: Props) {
+  const { t } = useTranslation();
   const status = useAutoRunStore((s) => s.status);
   const triggerIdx = useAutoRunStore((s) => s.triggerMessageIndex);
 
@@ -37,10 +40,11 @@ export function AutoRunStatus({ messageIndex }: Props) {
   }
   if (status.phase === 'failed') {
     return (
-      <div className="flex items-start gap-2 text-[11px] text-accent-red mt-1">
-        <span>⚠</span>
-        <span>Screener failed: {status.error}</span>
-      </div>
+      <FriendlyError
+        variant="inline"
+        label={t('nav.screener')}
+        error={status.error}
+      />
     );
   }
   return null;

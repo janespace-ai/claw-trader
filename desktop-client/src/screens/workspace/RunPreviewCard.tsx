@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
+import { FriendlyError } from '@/components/ui/FriendlyError';
 
 interface Props {
   onRunPreview: () => void;
@@ -39,9 +40,11 @@ export function RunPreviewCard({ onRunPreview, isRunning, lastError }: Props) {
       </div>
 
       {lastError && (
-        <div className="text-[11px] text-accent-red rounded bg-accent-red-dim px-2 py-1">
-          {lastError}
-        </div>
+        <FriendlyError
+          variant="card"
+          label={t('workspace.design.run_preview')}
+          error={lastError}
+        />
       )}
 
       <button

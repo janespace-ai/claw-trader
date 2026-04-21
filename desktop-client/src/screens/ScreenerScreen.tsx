@@ -11,6 +11,7 @@ import {
 } from '@/components/primitives';
 import { AIPanel } from '@/components/chat/AIPanel';
 import { cremote } from '@/services/remote/contract-client';
+import { FriendlyError } from '@/components/ui/FriendlyError';
 import { useScreenerRunStore } from '@/stores/screenerRunStore';
 import { useStrategyStore } from '@/stores/strategyStore';
 import { ScreenerTopbar } from './screener/ScreenerTopbar';
@@ -67,20 +68,25 @@ export function ScreenerScreen() {
   }, [focusedSymbol, interval]);
 
   // --- Build watchlist items from results --------------------------------
+  // `score` is contract-required as a number but the backend's python
+  // runner can omit it when a filter() call blows up out-of-band. Defend
+  // against null/undefined/non-number here so the whole screen doesn't
+  // crash with a `Cannot read properties of undefined (reading 'toFixed')`.
   const { passed, failed } = useMemo(() => {
     const p: WatchlistItem[] = [];
     const f: WatchlistItem[] = [];
     for (const r of results) {
+      const score = typeof r.score === 'number' && Number.isFinite(r.score) ? r.score : 0;
       const item: WatchlistItem = {
         symbol: r.symbol,
         badge: r.rank != null ? `#${r.rank}` : undefined,
-        stat: r.score.toFixed(2),
+        stat: score.toFixed(2),
         statColor:
-          r.score >= 0.8
+          score >= 0.8
             ? 'var(--accent-green)'
-            : r.score >= 0.5
+            : score >= 0.5
               ? 'var(--accent-primary)'
-              : r.score > 0
+              : score > 0
                 ? 'var(--accent-yellow)'
                 : 'var(--accent-red)',
         disabled: !r.passed,
@@ -152,7 +158,13 @@ export function ScreenerScreen() {
         }
         main={
           <div className="flex flex-col gap-4 p-4">
-            {error && <div className="text-xs text-accent-red">{error}</div>}
+            {error && (
+              <FriendlyError
+                variant="card"
+                label={t('nav.screener')}
+                error={error}
+              />
+            )}
             {focusedSymbol ? (
               <ClawChart.Candles data={klines} markers={markers} height={380} showVolume />
             ) : (

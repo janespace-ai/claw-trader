@@ -10,12 +10,42 @@ import type { IpcMain } from 'electron';
 
 let baseURL = '';
 
+/** Coerce an unknown value to a human-readable string. Objects go
+ *  through `JSON.stringify` instead of defaulting to `[object Object]`
+ *  so the 4xx validation details actually reach the renderer — the
+ *  previous implementation fell back to `body?.error ?? JSON.stringify(body)`
+ *  which silently produced `[object Object]` whenever the backend
+ *  returned a nested error object. */
+function asString(v: unknown): string {
+  if (v == null) return '';
+  if (typeof v === 'string') return v;
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return String(v);
+  }
+}
+
 async function fetchJSON(url: string, init?: RequestInit) {
   const resp = await fetch(url, init);
   const ct = resp.headers.get('content-type') ?? '';
   const body = ct.includes('json') ? await resp.json() : await resp.text();
   if (!resp.ok) {
-    const msg = typeof body === 'string' ? body : (body?.error ?? JSON.stringify(body));
+    // Prefer a named error field (FastAPI → `detail`, Claw backend →
+    // `message` / `error`) before falling back to stringifying the
+    // whole body. Every branch guarantees a string so the Error
+    // message never degrades to `[object Object]`.
+    let msg: string;
+    if (typeof body === 'string') {
+      msg = body;
+    } else {
+      const b = body as Record<string, unknown> | null | undefined;
+      msg =
+        asString(b?.message) ||
+        asString(b?.detail) ||
+        asString(b?.error) ||
+        JSON.stringify(body);
+    }
     const err = new Error(`${resp.status} ${msg}`);
     (err as any).status = resp.status;
     (err as any).body = body;
