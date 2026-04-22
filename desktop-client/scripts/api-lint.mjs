@@ -113,13 +113,23 @@ for (const [, ops] of Object.entries(spec.paths ?? {})) {
 
 const exampleFiles = readdirSync(EXAMPLES_DIR).filter((f) => f.endsWith('.json'));
 
+// File-name convention:
+//   <operationId>.json               — canonical happy-path (200) fixture.
+//                                      MUST validate against the 200 schema.
+//   <operationId>-<variant>.json     — alternative example (error responses,
+//                                      edge cases).  Operation must exist,
+//                                      but we do NOT type-check against the
+//                                      200 schema (that would fail for an
+//                                      ErrorResponse-shaped payload).
 for (const file of exampleFiles) {
-  const opId = basename(file, '.json');
+  const stem = basename(file, '.json');
+  const dashIdx = stem.indexOf('-');
+  const opId = dashIdx === -1 ? stem : stem.slice(0, dashIdx);
+  const isVariant = dashIdx !== -1;
   if (!opSchemas.has(opId)) {
     err(`examples/${file}: no matching operationId "${opId}" in openapi.yaml`);
     continue;
   }
-  const schema = opSchemas.get(opId);
   let data;
   try {
     data = JSON.parse(readFileSync(join(EXAMPLES_DIR, file), 'utf8'));
@@ -127,6 +137,8 @@ for (const file of exampleFiles) {
     err(`examples/${file}: invalid JSON: ${e.message}`);
     continue;
   }
+  if (isVariant) continue; // variants live outside the 200 schema
+  const schema = opSchemas.get(opId);
   const validate = ajv.compile(schema);
   if (!validate(data)) {
     err(`examples/${file}: schema mismatch`);

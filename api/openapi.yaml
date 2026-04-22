@@ -98,6 +98,8 @@ components:
         - SCREENER_NOT_FOUND
         - TASK_NOT_FOUND
         - COMPLIANCE_FAILED
+        - AI_REJECTED
+        - AI_REVIEW_UNAVAILABLE
         - SANDBOX_ERROR
         - SANDBOX_TIMEOUT
         - DATA_UNAVAILABLE
@@ -837,6 +839,15 @@ paths:
     post:
       operationId: startBacktest
       summary: Submit a backtest
+      description: |
+        Validates and dispatches a backtest job.  The code goes through
+        two gates before execution:
+
+          - Gate 1 (AST): forbidden-module/builtins check → 400 `COMPLIANCE_FAILED` on fail.
+          - Gate 2 (AI review): DeepSeek security+correctness review → 403 `AI_REJECTED` on fail,
+            503 `AI_REVIEW_UNAVAILABLE` when the reviewer is down.
+
+        Rejections at either gate short-circuit: no row is written to `claw.backtest_runs`.
       requestBody:
         required: true
         content:
@@ -855,7 +866,21 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/TaskResponse" }
         "400":
-          description: Validation error
+          description: Validation error or Gate 1 (AST compliance) rejection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: |
+            Gate 2 (AI review) rejected the submitted code.  `details`
+            contains `{reason, model, dimensions: {security, correctness}}`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "503":
+          description: |
+            Gate 2 is enabled but the AI reviewer is temporarily unavailable
+            (no API key, network, upstream error).  Retry later.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -930,6 +955,9 @@ paths:
     post:
       operationId: startScreener
       summary: Run a screener
+      description: |
+        Symmetric to `/api/backtest/start`: Gate 1 (AST) + Gate 2 (AI review)
+        both run before dispatch.  See that endpoint for rejection semantics.
       requestBody:
         required: true
         content:
@@ -951,6 +979,21 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/TaskResponse" }
+        "400":
+          description: Validation error or Gate 1 rejection
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Gate 2 (AI review) rejected the submitted code.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "503":
+          description: Gate 2 reviewer temporarily unavailable.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   /api/screener/result/{task_id}:
     get:

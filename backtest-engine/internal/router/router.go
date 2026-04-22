@@ -70,8 +70,9 @@ func Register(h *server.Hertz, st *store.Store, bs *service.BacktestService, ss 
 
 	internal := h.Group("/internal")
 	{
-		internal.POST("/cb/progress", ch.Progress)
-		internal.POST("/cb/complete", ch.Complete)
-		internal.POST("/cb/error", ch.Error)
+		// Canonical shape: sandbox-service workers post with task_id in path.
+		internal.POST("/cb/progress/:task_id", ch.Progress)
+		internal.POST("/cb/complete/:task_id", ch.Complete)
+		internal.POST("/cb/error/:task_id", ch.Error)
 	}
 }

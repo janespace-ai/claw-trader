@@ -25,6 +25,14 @@ const (
 	CodeScreenerNotFound        Code = "SCREENER_NOT_FOUND"
 	CodeTaskNotFound            Code = "TASK_NOT_FOUND"
 	CodeComplianceFailed        Code = "COMPLIANCE_FAILED"
+	// CodeAIRejected — Gate 2 (AI code review) rejected the submission.
+	// Details payload SHOULD include {reason, dimensions, model}.
+	CodeAIRejected              Code = "AI_REJECTED"
+	// CodeAIReviewUnavailable — Gate 2 is configured on but unreachable
+	// (missing API key, network, disabled at startup).  Fail-closed: the
+	// submission is rejected but the user-facing message is different
+	// from AI_REJECTED — the code itself isn't at fault.
+	CodeAIReviewUnavailable     Code = "AI_REVIEW_UNAVAILABLE"
 	CodeSandboxError            Code = "SANDBOX_ERROR"
 	CodeSandboxTimeout          Code = "SANDBOX_TIMEOUT"
 	CodeDataUnavailable         Code = "DATA_UNAVAILABLE"
@@ -85,6 +93,14 @@ func statusFor(code Code) int {
 		return 400
 	case CodeComplianceFailed:
 		return 400
+	case CodeAIRejected:
+		// 403 — "we understand your request, we refuse it".  Distinct from
+		// 400 (request malformed) so clients can branch on the semantic.
+		return 403
+	case CodeAIReviewUnavailable:
+		// 503 — retry-able.  The code might well pass the review once the
+		// model comes back up; don't make the user edit their strategy.
+		return 503
 	case CodeSymbolNotFound, CodeStrategyNotFound, CodeStrategyVersionNotFound,
 		CodeBacktestNotFound, CodeScreenerNotFound, CodeTaskNotFound:
 		return 404

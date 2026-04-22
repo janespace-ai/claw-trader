@@ -55,6 +55,21 @@ interface Rule {
 }
 
 const RULES: Rule[] = [
+  // Gate 2 — AI code review rejected the submission.  Must come BEFORE the
+  // generic 403/forbidden rule so "AI_REJECTED" doesn't get swallowed.
+  {
+    test: /AI_REJECTED/,
+    titleKey: 'errors.friendly.ai_rejected.title',
+    hintKey: 'errors.friendly.ai_rejected.hint',
+  },
+  // Gate 2 unavailable (missing key, network to DeepSeek down, 503).  Also
+  // precedes the generic network rule because the user-facing guidance
+  // differs ("retry later" vs "check your connection").
+  {
+    test: /AI_REVIEW_UNAVAILABLE/,
+    titleKey: 'errors.friendly.ai_unavailable.title',
+    hintKey: 'errors.friendly.ai_unavailable.hint',
+  },
   // Docker sandbox not available
   {
     test: /docker\.sock|docker daemon|create container|cannot connect to the docker daemon/i,

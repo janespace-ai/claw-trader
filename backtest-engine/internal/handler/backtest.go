@@ -59,6 +59,23 @@ func (h *BacktestHandler) Start(ctx context.Context, c *app.RequestContext) {
 				WithDetails(map[string]any{"violations": compErr.Violations}))
 			return
 		}
+		var aiRejErr *service.AIRejectedError
+		if stderrors.As(err, &aiRejErr) {
+			RespondError(c, apierr.New(apierr.CodeAIRejected, "code rejected by AI reviewer").
+				WithDetails(map[string]any{
+					"reason":     aiRejErr.Reason,
+					"model":      aiRejErr.Model,
+					"dimensions": aiRejErr.Dimensions,
+				}))
+			return
+		}
+		var aiUnavailErr *service.AIUnavailableError
+		if stderrors.As(err, &aiUnavailErr) {
+			// Do not leak the internal cause to the user.  Ops sees it in logs via the wrapped error.
+			RespondError(c, apierr.Wrap(err, apierr.CodeAIReviewUnavailable,
+				"ai reviewer temporarily unavailable; please retry"))
+			return
+		}
 		// Single-in-flight conflict or other service error.
 		he := apierr.Wrap(err, apierr.CodeInternalError, err.Error())
 		he.Status = http.StatusConflict

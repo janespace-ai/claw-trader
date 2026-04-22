@@ -3,34 +3,44 @@ package service
 import (
 	"context"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
+	"github.com/janespace-ai/claw-trader/backtest-engine/internal/aireview"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/compliance"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/config"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/model"
-	"github.com/janespace-ai/claw-trader/backtest-engine/internal/sandbox"
+	"github.com/janespace-ai/claw-trader/backtest-engine/internal/sandboxclient"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/store"
 )
 
-// BacktestService owns the single-task lifecycle: compliance -> DB record -> launch sandbox.
+// BacktestService owns the single-task lifecycle:
+//
+//	compliance (Gate 1) → AI review (Gate 2) → DB record → dispatch to sandbox-service
+//
+// "Dispatch" is now a single HTTP POST to sandbox-service — workers there
+// pick up the job and stream progress / complete / error via the
+// ``/internal/cb/...`` callbacks already handled by ``handler.CallbackHandler``.
+// We no longer track a container ID or block on Monitor: the run row
+// transitions via callbacks, and sandbox-service's own GC fails stuck jobs.
 type BacktestService struct {
-	cfg       config.Config
-	store     *store.Store
+	cfg        config.Config
+	store      *store.Store
 	compliance *compliance.Checker
-	sandbox   *sandbox.Manager
-
-	mu        sync.Mutex
-	running   map[string]string // task_id -> container_id
+	aireview   *aireview.Service     // Gate 2; nil when disabled in config
+	sbox       *sandboxclient.Client // dispatch target
 }
 
 // NewBacktestService wires the orchestrator.
-func NewBacktestService(cfg config.Config, st *store.Store, cc *compliance.Checker, sm *sandbox.Manager) *BacktestService {
+//
+// ``air`` may be nil — the service treats that as "Gate 2 is disabled" and
+// goes straight from Gate 1 to the sandbox dispatch.  Useful for dev
+// environments without a DeepSeek key.
+func NewBacktestService(cfg config.Config, st *store.Store, cc *compliance.Checker, air *aireview.Service, sb *sandboxclient.Client) *BacktestService {
 	return &BacktestService{
-		cfg: cfg, store: st, compliance: cc, sandbox: sm,
-		running: map[string]string{},
+		cfg: cfg, store: st, compliance: cc, aireview: air, sbox: sb,
 	}
 }
 
@@ -54,13 +64,40 @@ func (s *BacktestService) SubmitBacktest(ctx context.Context, opts SubmitOptions
 		return "", fmt.Errorf("another backtest is running: %s", existingID)
 	}
 
-	// 1. Compliance check.
+	// 1. Compliance check (Gate 1 — AST).
 	verdict, err := s.compliance.Check(ctx, opts.Code)
 	if err != nil {
 		return "", fmt.Errorf("compliance check: %w", err)
 	}
 	if !verdict.OK {
 		return "", &ComplianceError{Violations: verdict.Errors}
+	}
+
+	// 1b. AI review (Gate 2 — LLM).  Fail-closed: a reject or an unavailable
+	// service both short-circuit BEFORE we write a backtest_runs row — we
+	// don't want the runs table to fill up with rejected strategies.
+	if s.aireview != nil && s.aireview.Enabled() {
+		aiMode := opts.Mode
+		if aiMode == model.ModeSingle {
+			aiMode = "backtest"
+		}
+		aiVerdict, err := s.aireview.Review(ctx, opts.Code, aiMode, "" /* no runID yet */)
+		if err != nil {
+			if stderrors.Is(err, aireview.ErrUnavailable) {
+				return "", &AIUnavailableError{}
+			}
+			// Any unexpected service-level error is treated as unavailable —
+			// Review() itself converts model failures into reject verdicts,
+			// so reaching here means we couldn't even get that far.
+			return "", &AIUnavailableError{Cause: err.Error()}
+		}
+		if !aiVerdict.IsApproved() {
+			return "", &AIRejectedError{
+				Reason:     aiVerdict.Reason,
+				Model:      aiVerdict.Model,
+				Dimensions: aiVerdict.Dimensions,
+			}
+		}
 	}
 
 	// 2. Persist pending run record.
@@ -78,79 +115,67 @@ func (s *BacktestService) SubmitBacktest(ctx context.Context, opts SubmitOptions
 		return "", fmt.Errorf("create run: %w", err)
 	}
 
-	// 3. Launch sandbox asynchronously. We detach from the request ctx.
-	go s.launchSandbox(runID, opts.Mode, opts.Code, opts.Config)
+	// 3. Dispatch to sandbox-service.  Synchronous POST — the service only
+	// queues, so this returns in single-digit ms.  Any /run error fails the
+	// run row immediately so the user sees the failure in the same request.
+	if err := s.dispatch(ctx, runID, opts.Mode, opts.Code, opts.Config); err != nil {
+		fin := time.Now().UTC()
+		_ = s.store.UpdateBacktestStatus(ctx, runID, model.StatusFailed, nil, &fin,
+			fmt.Sprintf("dispatch: %v", err))
+		return "", fmt.Errorf("dispatch: %w", err)
+	}
+	// Flip to running as soon as the job is accepted — the worker will post
+	// ``progress`` / ``complete`` / ``error`` callbacks from there.
+	started := time.Now().UTC()
+	_ = s.store.UpdateBacktestStatus(ctx, runID, model.StatusRunning, &started, nil, "")
 
 	return runID, nil
 }
 
-// launchSandbox handles the out-of-request lifecycle of a backtest container.
-func (s *BacktestService) launchSandbox(runID, mode, code string, cfg model.BacktestConfig) {
-	bg := context.Background()
-	started := time.Now().UTC()
-	_ = s.store.UpdateBacktestStatus(bg, runID, model.StatusRunning, &started, nil, "")
-
+// dispatch builds the sandbox-service /run request from a backtest Job.
+//
+// Kept in a helper so screener and backtest share the envelope shape without
+// copy-paste; the only things that vary are ``mode`` and the per-mode
+// ``config`` map.
+func (s *BacktestService) dispatch(ctx context.Context, runID, mode, code string, cfg model.BacktestConfig) error {
 	jobCfg := map[string]any{
-		"symbols":         cfg.Symbols,
-		"interval":        cfg.Interval,
-		"from":            cfg.From,
-		"to":              cfg.To,
-		"initial_capital": cfg.InitialCapital,
-		"commission":      cfg.Commission,
-		"slippage":        cfg.Slippage,
-		"fill_mode":       cfg.FillMode,
+		"symbols":               cfg.Symbols,
+		"interval":              cfg.Interval,
+		"from":                  cfg.From,
+		"to":                    cfg.To,
+		"initial_capital":       cfg.InitialCapital,
+		"commission":            cfg.Commission,
+		"slippage":              cfg.Slippage,
+		"fill_mode":             cfg.FillMode,
 		"max_optimization_runs": s.cfg.Backtest.MaxOptimizationRuns,
 	}
+	// Normalize sandbox-side mode: 'single' -> 'backtest', everything else stays.
+	sandboxMode := mode
+	if sandboxMode == model.ModeSingle {
+		sandboxMode = "backtest"
+	}
 
-	job := sandbox.Job{
-		TaskID:      runID,
-		Mode:        mode, // 'single' or 'optimization' — translates to 'backtest' or 'optimization' runner modes
-		Code:        code,
-		Config:      jobCfg,
-		CallbackURL: s.cfg.Sandbox.CallbackBase,
-		DB: sandbox.DBInfo{
+	_, err := s.sbox.Run(ctx, sandboxclient.RunRequest{
+		JobID:           runID,
+		TaskID:          runID,
+		Mode:            sandboxMode,
+		Code:            code,
+		Config:          jobCfg,
+		CallbackBaseURL: s.cfg.Sandbox.CallbackBase,
+		DB: sandboxclient.DBCreds{
 			Host:     s.cfg.Database.Host,
 			Port:     s.cfg.Database.Port,
 			User:     s.cfg.Readonly.User,
 			Password: s.cfg.Readonly.Password,
 			Name:     s.cfg.Database.Name,
 		},
-	}
-	// Normalize sandbox-side mode: 'single' -> 'backtest', everything else stays.
-	if job.Mode == model.ModeSingle {
-		job.Mode = "backtest"
-	}
-
-	cid, err := s.sandbox.Launch(bg, sandbox.LaunchParams{TaskID: runID, Job: job})
+	})
 	if err != nil {
-		fin := time.Now().UTC()
-		_ = s.store.UpdateBacktestStatus(bg, runID, model.StatusFailed, nil, &fin,
-			fmt.Sprintf("launch sandbox: %v", err))
-		return
+		log.Printf("[backtest] dispatch failed run=%s: %v", runID, err)
+		return err
 	}
-
-	s.mu.Lock()
-	s.running[runID] = cid
-	s.mu.Unlock()
-
-	// Wait for the container to exit (or timeout).
-	exitCode, waitErr := s.sandbox.Monitor(bg, cid)
-	if waitErr != nil {
-		fin := time.Now().UTC()
-		_ = s.store.UpdateBacktestStatus(bg, runID, model.StatusFailed, nil, &fin,
-			fmt.Sprintf("sandbox: %v", waitErr))
-	} else if exitCode != 0 {
-		// The runner.py should have already POSTed an error callback, but we still
-		// record the non-zero exit in case it failed before the callback.
-		logs, _ := s.sandbox.Logs(bg, cid, 200)
-		log.Printf("[backtest] run=%s exit=%d logs=%s", runID, exitCode, truncate(logs, 1000))
-	}
-
-	s.mu.Lock()
-	delete(s.running, runID)
-	s.mu.Unlock()
-
-	_ = s.sandbox.Cleanup(bg, cid)
+	log.Printf("[backtest] dispatched run=%s mode=%s", runID, sandboxMode)
+	return nil
 }
 
 // HandleProgress merges a progress update from a sandbox callback.
@@ -182,9 +207,33 @@ func (e *ComplianceError) Error() string {
 	return fmt.Sprintf("%s (line %d): %s", v.Rule, v.Line, v.Message)
 }
 
-func truncate(s string, n int) string {
-	if len(s) <= n {
-		return s
+// AIRejectedError signals Gate 2 rejection.  The handler maps this to
+// HTTP 403 + AI_REJECTED.  Reason / Dimensions / Model are surfaced to the
+// user verbatim so they can see WHICH dimension tripped.
+type AIRejectedError struct {
+	Reason     string
+	Model      string
+	Dimensions map[string]string
+}
+
+func (e *AIRejectedError) Error() string {
+	if e.Reason != "" {
+		return "ai review rejected: " + e.Reason
 	}
-	return s[:n] + "…"
+	return "ai review rejected"
+}
+
+// AIUnavailableError signals Gate 2 is required but the reviewer is not
+// usable right now.  The handler maps this to HTTP 503 + AI_REVIEW_UNAVAILABLE.
+// ``Cause`` is for ops logs only — it is NOT returned to the user, who gets
+// a generic "please retry" message.
+type AIUnavailableError struct {
+	Cause string
+}
+
+func (e *AIUnavailableError) Error() string {
+	if e.Cause != "" {
+		return "ai review unavailable: " + e.Cause
+	}
+	return "ai review unavailable"
 }

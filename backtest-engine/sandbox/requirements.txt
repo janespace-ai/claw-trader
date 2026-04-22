@@ -1,5 +1,0 @@
-numpy==1.26.4
-pandas==2.2.2
-ta-lib==0.4.32
-psycopg2-binary==2.9.9
-requests==2.32.3
