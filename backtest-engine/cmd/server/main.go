@@ -12,10 +12,11 @@ import (
 
 	"github.com/cloudwego/hertz/pkg/app/server"
 
+	"github.com/janespace-ai/claw-trader/backtest-engine/internal/aireview"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/compliance"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/config"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/router"
-	"github.com/janespace-ai/claw-trader/backtest-engine/internal/sandbox"
+	"github.com/janespace-ai/claw-trader/backtest-engine/internal/sandboxclient"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/service"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/store"
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/version"
@@ -36,7 +37,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	log.Printf("config loaded: db=%s:%d sandbox_image=%s", cfg.Database.Host, cfg.Database.Port, cfg.Sandbox.Image)
+	log.Printf("config loaded: db=%s:%d sandbox_service=%s", cfg.Database.Host, cfg.Database.Port, cfg.Sandbox.ServiceURL)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -62,19 +63,33 @@ func main() {
 	}
 	defer cc.Close()
 
-	// Sandbox manager (Docker).
-	sm, err := sandbox.New(cfg.Sandbox, cfg.Readonly)
-	if err != nil {
-		log.Fatalf("sandbox: %v", err)
+	// sandbox-service client.  The old per-task Docker launcher (internal/sandbox/)
+	// has been removed; all job execution now flows through HTTP POST /run.
+	sbox := sandboxclient.New(cfg.Sandbox.ServiceURL,
+		time.Duration(cfg.Sandbox.TimeoutSec)*time.Second)
+	// Best-effort readiness probe so we fail early if sandbox-service is down.
+	// Non-fatal: the backtest-engine can still start (e.g. for /api/klines),
+	// submits will just get dispatch errors until sandbox-service is back.
+	probeCtx, probeCancel := context.WithTimeout(ctx, 5*time.Second)
+	if h, err := sbox.Healthz(probeCtx); err != nil {
+		log.Printf("warning: sandbox-service not ready: %v", err)
+	} else {
+		log.Printf("sandbox-service ready: workers=%d/%d", h.WorkersReady, h.WorkersTotal)
 	}
-	defer sm.Close()
-	if err := sm.EnsureNetwork(ctx); err != nil {
-		log.Printf("warning: could not ensure sandbox network %q: %v", cfg.Sandbox.Network, err)
+	probeCancel()
+
+	// Gate 2 AI reviewer.  Always constructed — it's cheap and self-disables
+	// when config.ai_review.enabled=false or the API key is missing.  Start()
+	// runs a one-off model-drift cache purge; any error is logged but not fatal.
+	air := aireview.NewService(cfg.AIReview, st.Pool(), cfg.Database.Schema)
+	if err := air.Start(ctx); err != nil {
+		log.Printf("warning: aireview start: %v", err)
 	}
+	log.Printf("ai_review: enabled=%v model=%s", air.Enabled(), cfg.AIReview.Model)
 
 	// Services.
-	bs := service.NewBacktestService(*cfg, st, cc, sm)
-	ss := service.NewScreenerService(*cfg, st, cc, sm)
+	bs := service.NewBacktestService(*cfg, st, cc, air, sbox)
+	ss := service.NewScreenerService(*cfg, st, cc, air, sbox)
 	as := service.NewAnalysisService(st)
 
 	// Hertz server.

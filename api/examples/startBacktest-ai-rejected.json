@@ -1,0 +1,14 @@
+{
+  "error": {
+    "code": "AI_REJECTED",
+    "message": "code rejected by AI reviewer",
+    "details": {
+      "reason": "uses os.system to spawn an arbitrary shell command",
+      "model": "deepseek-reasoner",
+      "dimensions": {
+        "security": "fail",
+        "correctness": "pass"
+      }
+    }
+  }
+}

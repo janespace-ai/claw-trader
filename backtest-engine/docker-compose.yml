@@ -1,5 +1,10 @@
 # Shares TimescaleDB with data-aggregator: start data-aggregator first (or `make db-up`)
 # so networks `claw-net` / `claw-sandbox-net` and container `timescaledb` exist.
+#
+# As of the sandbox-service migration, backtest-engine no longer launches
+# Docker containers directly — there is no docker.sock mount.  All user-code
+# execution is delegated to the sandbox-service container
+# (see ../sandbox-service/docker-compose.yml or the root compose).
 services:
   backtest-engine:
     build:
@@ -8,27 +13,46 @@ services:
     image: claw-backtest-engine:latest
     container_name: claw-backtest-engine
     restart: unless-stopped
+    depends_on:
+      - sandbox-service
     environment:
       BACKTEST_DATABASE_HOST: timescaledb
       BACKTEST_DATABASE_PORT: 5432
       BACKTEST_DATABASE_USER: claw
       BACKTEST_DATABASE_PASSWORD: claw
       BACKTEST_DATABASE_NAME: claw
-      # readonly user must be created via migration; password below is what the sandbox will use
+      # readonly user must be created via migration; password below is what sandbox-service workers use
       BACKTEST_READONLY_USER: claw_readonly
       BACKTEST_READONLY_PASSWORD: claw_readonly
-      BACKTEST_SANDBOX_IMAGE: claw-sandbox:latest
-      BACKTEST_SANDBOX_NETWORK: claw-sandbox-net
-      # Internal callback base URL — containers reach this host via the bridge network
+      # sandbox-service dispatch target (internal network name).
+      BACKTEST_SANDBOX_SERVICE_URL: http://sandbox-service:8090
+      # Callback URL that sandbox-service workers post progress/complete/error to.
       BACKTEST_CALLBACK_BASE: http://claw-backtest-engine:8081
-    volumes:
-      # Mount docker socket so the service can launch sandbox containers.
-      - /var/run/docker.sock:/var/run/docker.sock
+      # Gate 2 AI reviewer — leave DEEPSEEK_API_KEY empty to run with Gate 1 only.
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      BACKTEST_AI_REVIEW_ENABLED: "${BACKTEST_AI_REVIEW_ENABLED:-false}"
     ports:
       - "8081:8081"
     networks:
       - claw-net
       - claw-sandbox-net
+
+  sandbox-service:
+    build:
+      context: ../sandbox-service
+      dockerfile: Dockerfile
+    image: claw-sandbox-service:latest
+    container_name: claw-sandbox-service
+    restart: unless-stopped
+    environment:
+      # DB readonly URL — sandbox-service workers open a DBReader with this.
+      CLAW_READONLY_DB_URL: postgresql://claw_readonly:claw_readonly@timescaledb:5432/claw
+      SANDBOX_POOL__POOL_SIZE: "4"
+      SANDBOX_POOL__RECYCLE_AFTER_JOBS: "50"
+      SANDBOX_HTTP__PORT: "8090"
+    networks:
+      - claw-net            # needs timescaledb access
+      - claw-sandbox-net    # backtest-engine reaches us here
 
 networks:
   claw-net:
@@ -36,4 +60,9 @@ networks:
     name: claw-net
   claw-sandbox-net:
     external: true
+    # Historically "internal: true" on this network kept sandbox containers
+    # isolated from the internet.  With the long-lived service model, the
+    # network still scopes who can reach sandbox-service (only backtest-engine
+    # needs to) — the `internal: true` flag is set on the network definition
+    # in the root compose / data-aggregator stack.
     name: claw-sandbox-net

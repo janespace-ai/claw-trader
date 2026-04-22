@@ -10,7 +10,15 @@ import (
 	"github.com/janespace-ai/claw-trader/backtest-engine/internal/service"
 )
 
-// CallbackHandler serves /internal/cb/{progress,complete,error} from sandbox containers.
+// CallbackHandler serves /internal/cb/{progress,complete,error}/:task_id
+// from sandbox-service workers.
+//
+// Historical note: the legacy per-task Docker runner posted to
+// `/internal/cb/{channel}` with task_id in the body.  The new sandbox-service
+// puts the job_id in the URL path (it's already an identifier — no reason
+// to duplicate it in the body).  Handlers read from the path param and
+// fall back to the body field for compatibility if anyone still posts the
+// old shape.
 type CallbackHandler struct {
 	backtest *service.BacktestService
 	screener *service.ScreenerService
@@ -31,15 +39,16 @@ type progressPayload struct {
 	Message    string `json:"message"`
 }
 
-// Progress handles POST /internal/cb/progress.
+// Progress handles POST /internal/cb/progress/:task_id.
 func (h *CallbackHandler) Progress(ctx context.Context, c *app.RequestContext) {
 	var p progressPayload
 	if err := c.BindJSON(&p); err != nil {
 		c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
+	taskID := resolveTaskID(c, p.TaskID)
 	// Route to the right service by attempting both; whichever matches a row wins.
-	_ = h.backtest.HandleProgress(ctx, p.TaskID, p)
+	_ = h.backtest.HandleProgress(ctx, taskID, p)
 	c.JSON(http.StatusOK, map[string]string{"ok": "1"})
 }
 
@@ -49,18 +58,19 @@ type completePayload struct {
 	Result json.RawMessage `json:"result"`
 }
 
-// Complete handles POST /internal/cb/complete.
+// Complete handles POST /internal/cb/complete/:task_id.
 func (h *CallbackHandler) Complete(ctx context.Context, c *app.RequestContext) {
 	var p completePayload
 	if err := c.BindJSON(&p); err != nil {
 		c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
+	taskID := resolveTaskID(c, p.TaskID)
 	var dispatchErr error
 	if p.Mode == "screener" {
-		dispatchErr = h.screener.HandleComplete(ctx, p.TaskID, p.Result)
+		dispatchErr = h.screener.HandleComplete(ctx, taskID, p.Result)
 	} else {
-		dispatchErr = h.backtest.HandleComplete(ctx, p.TaskID, p.Result)
+		dispatchErr = h.backtest.HandleComplete(ctx, taskID, p.Result)
 	}
 	if dispatchErr != nil {
 		c.JSON(http.StatusInternalServerError, map[string]string{"error": dispatchErr.Error()})
@@ -76,17 +86,28 @@ type errorPayload struct {
 	Traceback string `json:"traceback"`
 }
 
-// Error handles POST /internal/cb/error.
+// Error handles POST /internal/cb/error/:task_id.
 func (h *CallbackHandler) Error(ctx context.Context, c *app.RequestContext) {
 	var p errorPayload
 	if err := c.BindJSON(&p); err != nil {
 		c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
+	taskID := resolveTaskID(c, p.TaskID)
 	if p.Mode == "screener" {
-		_ = h.screener.HandleError(ctx, p.TaskID, p.Error)
+		_ = h.screener.HandleError(ctx, taskID, p.Error)
 	} else {
-		_ = h.backtest.HandleError(ctx, p.TaskID, p.Error)
+		_ = h.backtest.HandleError(ctx, taskID, p.Error)
 	}
 	c.JSON(http.StatusOK, map[string]string{"ok": "1"})
+}
+
+// resolveTaskID prefers the URL path param (canonical) but falls back to the
+// body field if no path param was captured — handy during the migration when
+// both URL shapes might briefly coexist, and harmless afterwards.
+func resolveTaskID(c *app.RequestContext, fromBody string) string {
+	if id := c.Param("task_id"); id != "" {
+		return id
+	}
+	return fromBody
 }

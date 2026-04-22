@@ -16,12 +16,14 @@ CLAW_TEST_DSN ?= postgres://claw:claw@localhost:5432/claw?sslmode=disable
 AGGREGATOR_COMPOSE := data-aggregator/docker-compose.yml
 AGGREGATOR_COMPOSE_TEST := data-aggregator/docker-compose.test.yml
 
-SANDBOX_DIR := backtest-engine/sandbox
+SANDBOX_DIR := sandbox-service
 SANDBOX_VENV := $(SANDBOX_DIR)/.venv
 SANDBOX_INSTALLED := $(SANDBOX_DIR)/.installed
 
 .DEFAULT_GOAL := help
-.PHONY: help test test-ci test-aggregator test-backtest test-sandbox test-desktop test-e2e db-up db-down db-reap sync-aggregator-migrations
+.PHONY: help test test-ci test-aggregator test-backtest test-sandbox test-desktop test-e2e \
+	db-up db-down db-reap sync-aggregator-migrations \
+	sandbox-service-build sandbox-service-up sandbox-service-down sandbox-service-logs
 
 help: ## Print this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -41,17 +43,40 @@ test-aggregator: ## Go tests for data-aggregator (requires db-up)
 test-backtest: sync-aggregator-migrations ## Go tests for backtest-engine (requires db-up)
 	cd backtest-engine && CLAW_TEST_DSN='$(CLAW_TEST_DSN)' go test ./...
 
-## ---- Python sandbox ----
+## ---- Python sandbox (sandbox-service) ----
 
-test-sandbox: $(SANDBOX_INSTALLED) ## pytest for backtest-engine/sandbox/framework
+test-sandbox: $(SANDBOX_INSTALLED) ## pytest for sandbox-service
 	$(SANDBOX_VENV)/bin/pytest $(SANDBOX_DIR)/tests/
 
-$(SANDBOX_INSTALLED): $(SANDBOX_DIR)/requirements-test.txt
-	@echo "--- (re)creating sandbox venv ---"
+$(SANDBOX_INSTALLED): $(SANDBOX_DIR)/pyproject.toml
+	@echo "--- (re)creating sandbox-service venv ---"
 	python3 -m venv $(SANDBOX_VENV)
 	$(SANDBOX_VENV)/bin/pip install -q --upgrade pip
-	$(SANDBOX_VENV)/bin/pip install -q -r $(SANDBOX_DIR)/requirements-test.txt
+	$(SANDBOX_VENV)/bin/pip install -q -e "$(SANDBOX_DIR)[dev]"
 	touch $@
+
+sandbox-service-build: ## Build the sandbox-service docker image
+	docker build -t claw-sandbox-service:latest $(SANDBOX_DIR)
+
+sandbox-service-up: ## Start sandbox-service (via backtest-engine compose — depends_on wires it in)
+	docker compose -f backtest-engine/docker-compose.yml up -d sandbox-service
+
+sandbox-service-down: ## Stop sandbox-service
+	docker compose -f backtest-engine/docker-compose.yml stop sandbox-service
+
+sandbox-service-logs: ## Tail sandbox-service logs
+	docker compose -f backtest-engine/docker-compose.yml logs -f sandbox-service
+
+## ---- Ops CLI ----
+
+ai-cache-stats: ## Show Gate 2 AI review cache counts + model drift
+	cd backtest-engine && go run ./cmd/claw-engine-cli -config config.yaml ai-cache stats
+
+ai-cache-clear: ## Emergency: wipe Gate 2 cache (forces fresh review of everything)
+	cd backtest-engine && go run ./cmd/claw-engine-cli -config config.yaml ai-cache clear
+
+ai-cache-purge-drift: ## Drop cache rows with stale model without restart
+	cd backtest-engine && go run ./cmd/claw-engine-cli -config config.yaml ai-cache purge-drift
 
 ## ---- Desktop client ----
 

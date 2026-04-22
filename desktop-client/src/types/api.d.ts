@@ -121,7 +121,17 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Submit a backtest */
+        /**
+         * Submit a backtest
+         * @description Validates and dispatches a backtest job.  The code goes through
+         *     two gates before execution:
+         *
+         *       - Gate 1 (AST): forbidden-module/builtins check → 400 `COMPLIANCE_FAILED` on fail.
+         *       - Gate 2 (AI review): DeepSeek security+correctness review → 403 `AI_REJECTED` on fail,
+         *         503 `AI_REVIEW_UNAVAILABLE` when the reviewer is down.
+         *
+         *     Rejections at either gate short-circuit: no row is written to `claw.backtest_runs`.
+         */
         post: operations["startBacktest"];
         delete?: never;
         options?: never;
@@ -189,7 +199,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Run a screener */
+        /**
+         * Run a screener
+         * @description Symmetric to `/api/backtest/start`: Gate 1 (AST) + Gate 2 (AI review)
+         *     both run before dispatch.  See that endpoint for rejection semantics.
+         */
         post: operations["startScreener"];
         delete?: never;
         options?: never;
@@ -403,7 +417,7 @@ export interface components {
          *     is safe.
          * @enum {string}
          */
-        ErrorCode: "INVALID_INTERVAL" | "INVALID_SYMBOL" | "INVALID_RANGE" | "SYMBOL_NOT_FOUND" | "STRATEGY_NOT_FOUND" | "STRATEGY_VERSION_NOT_FOUND" | "BACKTEST_NOT_FOUND" | "SCREENER_NOT_FOUND" | "TASK_NOT_FOUND" | "COMPLIANCE_FAILED" | "SANDBOX_ERROR" | "SANDBOX_TIMEOUT" | "DATA_UNAVAILABLE" | "RATE_LIMITED" | "UPSTREAM_UNREACHABLE" | "INTERNAL_ERROR" | "PARAM_GRID_TOO_LARGE" | "LLM_PROVIDER_FAILED" | "LLM_BUDGET_EXCEEDED";
+        ErrorCode: "INVALID_INTERVAL" | "INVALID_SYMBOL" | "INVALID_RANGE" | "SYMBOL_NOT_FOUND" | "STRATEGY_NOT_FOUND" | "STRATEGY_VERSION_NOT_FOUND" | "BACKTEST_NOT_FOUND" | "SCREENER_NOT_FOUND" | "TASK_NOT_FOUND" | "COMPLIANCE_FAILED" | "AI_REJECTED" | "AI_REVIEW_UNAVAILABLE" | "SANDBOX_ERROR" | "SANDBOX_TIMEOUT" | "DATA_UNAVAILABLE" | "RATE_LIMITED" | "UPSTREAM_UNREACHABLE" | "INTERNAL_ERROR" | "PARAM_GRID_TOO_LARGE" | "LLM_PROVIDER_FAILED" | "LLM_BUDGET_EXCEEDED";
         ErrorBody: {
             code: components["schemas"]["ErrorCode"];
             /** @description Human-readable; not the identifier. Use `code` for branching. */
@@ -968,8 +982,32 @@ export interface operations {
                     "application/json": components["schemas"]["TaskResponse"];
                 };
             };
-            /** @description Validation error */
+            /** @description Validation error or Gate 1 (AST compliance) rejection */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /**
+             * @description Gate 2 (AI review) rejected the submitted code.  `details`
+             *     contains `{reason, model, dimensions: {security, correctness}}`.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /**
+             * @description Gate 2 is enabled but the AI reviewer is temporarily unavailable
+             *     (no API key, network, upstream error).  Retry later.
+             */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1080,6 +1118,33 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskResponse"];
+                };
+            };
+            /** @description Validation error or Gate 1 rejection */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gate 2 (AI review) rejected the submitted code. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Gate 2 reviewer temporarily unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

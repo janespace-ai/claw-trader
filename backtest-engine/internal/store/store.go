@@ -495,6 +495,19 @@ func (s *Store) HasRunningBacktest(ctx context.Context) (bool, string, error) {
 	return true, id, nil
 }
 
+// CountRunningBacktests returns the number of backtest runs currently in
+// 'running' state.  Used by `GET /api/engine/status` for `active_tasks`.
+// With the long-lived sandbox-service, we no longer track in-flight jobs in
+// process memory; the runs table is the source of truth.
+func (s *Store) CountRunningBacktests(ctx context.Context) (int, error) {
+	var n int
+	sql := fmt.Sprintf(`SELECT COUNT(*) FROM %[1]s.backtest_runs WHERE status = 'running'`, s.schema)
+	if err := s.pool.QueryRow(ctx, sql).Scan(&n); err != nil {
+		return 0, err
+	}
+	return n, nil
+}
+
 // ---------------- ScreenerRun CRUD ----------------
 
 // CreateScreenerRun inserts a screener task row.

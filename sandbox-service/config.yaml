@@ -1,0 +1,56 @@
+# sandbox-service configuration.
+#
+# Loaded at startup via src/api/config.py.  Env-var overrides use the prefix
+# `SANDBOX_` + uppercased dotted path, e.g. `SANDBOX_POOL__POOL_SIZE=8` sets
+# pool.pool_size.  (Double underscore is the section separator so it doesn't
+# collide with single-underscore key names like `recycle_after_jobs`.)
+
+pool:
+  # Number of long-lived Python worker subprocesses forked at boot.
+  # Each worker handles jobs sequentially; N workers = N concurrent jobs.
+  pool_size: 4
+
+  # Retire a worker after this many completed jobs (Master forks a replacement).
+  # Trades a tiny warm-up cost for resetting numpy/pandas heap fragmentation.
+  recycle_after_jobs: 50
+
+  # Max seconds to wait for workers to drain on SIGTERM before force-killing.
+  shutdown_grace_seconds: 60
+
+  # How long the Master remembers a job's status after it finishes.
+  # GET /status/{job_id} after this returns `not_found`.
+  status_retention_seconds: 3600
+
+# Per-job resource limits applied inside each worker before exec'ing user code.
+# Implemented via Linux rlimit; see spec `sandbox-service` for rationale.
+job_limits:
+  memory_mb: 2048        # RLIMIT_AS (virtual memory)
+  cpu_seconds: 1800      # RLIMIT_CPU (30 min)
+  max_processes: 32      # RLIMIT_NPROC
+  max_file_size_bytes: 0 # RLIMIT_FSIZE — 0 disables all writes
+
+# TimescaleDB connection for user code to pull k-lines.
+# MUST use the `claw_readonly` account.  DO NOT point at the main `claw` user.
+db:
+  url: "${CLAW_READONLY_DB_URL}"  # e.g. postgresql://claw_readonly:pw@timescaledb:5432/claw
+
+# Callback destinations.  Workers POST progress/complete/error here.
+# `allowlist_hosts` guards against a bad/forged `callback_base_url` in a /run
+# request — only hosts in this list are dialled.
+callback:
+  allowlist_hosts:
+    - "backtest-engine"    # docker service name on claw-sandbox-net
+    - "localhost"          # local dev
+  retry_delays_seconds: [1, 3, 10]
+  on_disk_queue_path: "/var/lib/claw-sandbox/callback_queue.sqlite"
+  flusher_interval_seconds: 30
+
+# HTTP server.
+http:
+  host: "0.0.0.0"     # fine because the container is on an internal-only network
+  port: 8090
+
+# Structured logging.
+logging:
+  level: "INFO"
+  format: "json"

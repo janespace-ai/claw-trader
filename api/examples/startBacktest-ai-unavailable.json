@@ -1,0 +1,7 @@
+{
+  "error": {
+    "code": "AI_REVIEW_UNAVAILABLE",
+    "message": "ai reviewer temporarily unavailable; please retry",
+    "details": {}
+  }
+}

@@ -15,8 +15,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o /out/backtest-engine ./cmd/server
 
 # --- Runtime stage ---
+# python3 is still needed at runtime — the Gate 1 compliance checker invokes
+# `python3 <embedded_ast_script.py>`.  No docker-cli anymore: job execution
+# is delegated to sandbox-service via HTTP.
 FROM alpine:3.19
-RUN apk --no-cache add ca-certificates tzdata docker-cli python3 && \
+RUN apk --no-cache add ca-certificates tzdata python3 && \
     adduser -D -u 10002 app
 
 WORKDIR /app
@@ -24,7 +27,6 @@ COPY --from=builder /out/backtest-engine /app/backtest-engine
 COPY internal/store/migrations /app/migrations
 COPY config.yaml /app/config.yaml
 
-# app user needs access to docker socket; host must grant group via docker-compose
 USER app
 
 EXPOSE 8081

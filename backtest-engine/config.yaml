@@ -16,23 +16,32 @@ readonly:
   user: "claw_readonly"
   password: "claw_readonly"
 
+# sandbox dispatch — all job execution happens inside the long-lived
+# sandbox-service container (see ../sandbox-service/).  This engine only
+# forwards /run requests and receives /internal/cb/{channel}/:task_id callbacks.
+#
+# Resource limits (memory / CPU / FSIZE) are now enforced inside sandbox-service
+# via rlimits; configure them in sandbox-service/config.yaml, not here.
 sandbox:
-  image: "claw-sandbox:latest"
-  network: "claw-sandbox-net"
+  service_url: "http://sandbox-service:8090"
+  # URL sandbox-service workers POST progress/complete/error to (i.e. this engine).
   callback_base: "http://claw-backtest-engine:8081"
-  # Resource limits
-  memory_mb: 2048
-  cpu_cores: 2
-  pids_limit: 100
-  timeout_sec: 1800        # 30 min hard kill
-  # tmpfs mount for /workspace — user code lands here
-  workspace_size_mb: 64
-  cleanup_delay_sec: 10
-  # Only allow inbound to these internal hosts from the sandbox network
-  # (enforced at Docker network level; documented here for operators)
-  allowed_hosts:
-    - "timescaledb:5432"
-    - "claw-backtest-engine:8081"
+  # Per-request timeout for /run, /status, /healthz.  Small on purpose —
+  # /run only enqueues, so any delay here means sandbox-service is unhealthy.
+  timeout_sec: 10
+
+# ai_review (Gate 2 — LLM code reviewer).  Disabled out-of-the-box; flip
+# enabled=true once DEEPSEEK_API_KEY is set via env.
+ai_review:
+  enabled: false
+  # api_key is NEVER committed to config.yaml — set DEEPSEEK_API_KEY in env
+  # (or BACKTEST_AI_REVIEW_API_KEY) and the loader picks it up at boot.
+  api_key: ""
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-reasoner"
+  timeout_seconds: 30
+  cache_ttl_days: 30
+  prompt_version: "v1"
 
 compliance:
   # Python modules explicitly allowed in user-submitted code.

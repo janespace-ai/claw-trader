@@ -58,4 +58,26 @@ describe('toFriendlyError rules', () => {
     expect(fe.title).toBe('errors.friendly.generic.title');
     expect(fe.detail).toBe('some totally unknown failure');
   });
+
+  test('AI_REJECTED (403) → ai_rejected rule, not auth', () => {
+    // The raw message from backtest-engine is
+    // `AI_REJECTED: code rejected by AI reviewer` which also contains the
+    // substring "403" via HTTP status.  Gate 2 rule must win over auth rule.
+    const fe = toFriendlyError(
+      { code: 'AI_REJECTED', message: 'code rejected by AI reviewer' },
+      t,
+    );
+    expect(fe.title).toBe('errors.friendly.ai_rejected.title');
+    expect(fe.hint).toBe('errors.friendly.ai_rejected.hint');
+    expect(fe.detail).toContain('AI_REJECTED');
+  });
+
+  test('AI_REVIEW_UNAVAILABLE → ai_unavailable rule, not network', () => {
+    const fe = toFriendlyError(
+      { code: 'AI_REVIEW_UNAVAILABLE', message: 'ai reviewer temporarily unavailable; please retry' },
+      t,
+    );
+    expect(fe.title).toBe('errors.friendly.ai_unavailable.title');
+    expect(fe.hint).toBe('errors.friendly.ai_unavailable.hint');
+  });
 });
