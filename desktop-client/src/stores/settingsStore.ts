@@ -5,7 +5,7 @@ import type { AILangPolicy } from '@/services/i18n';
 import type { CandleConvention, ThemePref } from '@/services/theme';
 
 /**
- * Last-resort fallback for the backtest-engine URL.
+ * Last-resort fallback for the service-api URL.
  *
  * The actual resolution order at runtime is:
  *   1. SQLite user setting (`remote.baseURL`) — set via the Settings UI

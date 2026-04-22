@@ -10,7 +10,7 @@ Synced on 2026-04-19 from archived delta specs in `openspec/changes/archive/`.
 
 系统 SHALL 提供 `GET /api/engine/status` 接口,返回后端自我描述的 metadata,供 Settings 页的 "Remote Engine" 卡片渲染。响应 shape 为 `EngineStatus`:
 
-- `version: string` — backtest-engine 版本(例如 `"0.1.0"`)
+- `version: string` — service-api 版本(例如 `"0.1.0"`)
 - `data_aggregator_version: string | null` — aggregator 版本,若已知
 - `supported_markets: string[]` — 例如 `["futures"]`
 - `supported_intervals: string[]` — 例如 `["5m","15m","30m","1h","4h","1d"]`
@@ -53,7 +53,7 @@ Synced on 2026-04-19 from archived delta specs in `openspec/changes/archive/`.
 
 ---
 
-### From change: `backtest-engine-engine-status`
+### From change: `service-api-engine-status`
 
 ## ADDED Requirements
 
@@ -70,7 +70,7 @@ Synced on 2026-04-19 from archived delta specs in `openspec/changes/archive/`.
 
 #### Scenario: Aggregator 不可达时 version 为 null
 
-- **WHEN** backtest-engine 调用 aggregator `/healthz` 超时 500ms
+- **WHEN** service-api 调用 aggregator `/healthz` 超时 500ms
 - **THEN** `data_aggregator_version: null`,`last_aggregator_sync_at` 仍从 DB 读取(独立 query)
 - **THEN** 响应整体仍 200,不因 aggregator 不可达而失败
 
@@ -87,7 +87,7 @@ Synced on 2026-04-19 from archived delta specs in `openspec/changes/archive/`.
 
 ### Requirement: 版本号注入
 
-`backtest-engine` 二进制 SHALL 在编译时注入 `version.Version` 字符串(例如 `"0.1.0"` 或 `"git-<sha>"`)。Dockerfile 和 Makefile SHALL 使用 `-ldflags "-X .../version.Version=$(git describe --always)"`。
+`service-api` 二进制 SHALL 在编译时注入 `version.Version` 字符串(例如 `"0.1.0"` 或 `"git-<sha>"`)。Dockerfile 和 Makefile SHALL 使用 `-ldflags "-X .../version.Version=$(git describe --always)"`。
 
 开发模式下(未注入)默认为 `"dev"`。
 

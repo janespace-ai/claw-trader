@@ -38,7 +38,7 @@ def settings() -> Settings:
                         shutdown_grace_seconds=0, status_retention_seconds=3600),
         job_limits=JobLimits(),
         db=DBConfig(url="postgresql://claw_readonly:x@localhost/claw"),
-        callback=CallbackConfig(allowlist_hosts=("backtest-engine", "localhost")),
+        callback=CallbackConfig(allowlist_hosts=("service-api", "localhost")),
         http=HttpConfig(),
         logging=LoggingConfig(),
     )
@@ -91,7 +91,7 @@ def _valid_body(**overrides: object) -> dict:
         "mode": "backtest",
         "code": "x = 1",
         "config": {},
-        "callback_base_url": "http://backtest-engine:8081",
+        "callback_base_url": "http://service-api:8081",
         "db": {"host": "ts", "port": 5432, "user": "ro", "password": "x", "name": "claw"},
     }
     body.update(overrides)  # type: ignore[arg-type]

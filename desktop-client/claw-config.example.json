@@ -1,4 +1,4 @@
 {
-  "_comment": "Copy this to <userData>/claw-config.json to override the built-in backtest-engine URL without rebuilding the app. On macOS that path is ~/Library/Application Support/Claw Trader/claw-config.json; see CONFIGURATION.md for Linux and Windows paths. The user's Settings-page override still wins once set.",
+  "_comment": "Copy this to <userData>/claw-config.json to override the built-in service-api URL without rebuilding the app. On macOS that path is ~/Library/Application Support/Claw Trader/claw-config.json; see CONFIGURATION.md for Linux and Windows paths. The user's Settings-page override still wins once set.",
   "remoteBaseURL": "http://localhost:8081"
 }

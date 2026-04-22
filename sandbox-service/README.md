@@ -1,12 +1,12 @@
 # claw-sandbox-service
 
 Long-lived Python sandbox with a prefork worker pool.  Replaces the previous
-"one Docker container per backtest" model; `backtest-engine` now pushes jobs
+"one Docker container per backtest" model; `service-api` now pushes jobs
 to this service over HTTP rather than shelling out to the Docker daemon.
 
 ## Why a separate service?
 
-- Removes `/var/run/docker.sock` from `backtest-engine` (no more equivalent-
+- Removes `/var/run/docker.sock` from `service-api` (no more equivalent-
   root exposure, no more Docker daemon permission errors).
 - Avoids ~800 ms–2 s cold-start per job — workers pre-import
   numpy / pandas / ta-lib / `claw` framework once at boot.
@@ -27,7 +27,7 @@ sandbox-service/
 │   ├── api/                 # FastAPI app (POST /run, GET /status, /healthz)
 │   ├── pool/                # Master + worker lifecycle, rlimit, recycle
 │   ├── worker/              # Job runner (loads user code, runs strategy/screener)
-│   ├── callback/            # HTTP client to backtest-engine's /internal/cb/*
+│   ├── callback/            # HTTP client to service-api's /internal/cb/*
 │   └── claw/                # Migrated framework code (Strategy / Screener / DBReader / …)
 └── tests/                   # pytest
 ```
@@ -50,8 +50,8 @@ docker compose up sandbox-service
 ```
 
 `sandbox-service` joins the internal `claw-sandbox-net` network along with
-`backtest-engine` and `timescaledb`.  It does **not** publish a port to the
-host — only `backtest-engine` can reach it.
+`service-api` and `timescaledb`.  It does **not** publish a port to the
+host — only `service-api` can reach it.
 
 ## Configuration
 

@@ -153,7 +153,7 @@ Applying this change SHALL only touch these paths:
 - `openspec/changes/add-trilingual-readme/**` (the change itself, created by the proposal flow)
 - `openspec/specs/trilingual-readme/` (created on archive sync)
 
-No files under `desktop-client/`, `data-aggregator/`, `backtest-engine/`, or `design/` SHALL be modified.
+No files under `desktop-client/`, `data-aggregator/`, `service-api/`, or `design/` SHALL be modified.
 
 #### Scenario: Git diff scope check
 

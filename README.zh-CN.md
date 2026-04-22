@@ -63,22 +63,16 @@ docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build
 
 第一次启动会拉一小段历史 K 线,让你立刻有东西可以回测。
 
-**2. 构建策略沙箱镜像(首次运行,需要几分钟编译):**
+**2. 启动 API 服务与沙箱:**
+
+与步骤 1 共用同一 TimescaleDB（共享 Docker 网络 `claw-net` / `claw-sandbox-net`）。若只启动 `service-api`，请先在仓库根目录执行 `make db-up` 拉起数据库。这份 compose 同时构建 `service-api`(Go,API + 编排)和 `sandbox-service`(Python,真正执行用户策略的地方)。
 
 ```bash
-docker build -t claw-sandbox:latest backtest-engine/sandbox/
-```
-
-**3. 启动回测引擎:**
-
-与步骤 1 共用同一 TimescaleDB（共享 Docker 网络 `claw-net` / `claw-sandbox-net`）。若只启动 `backtest-engine`，请先在仓库根目录执行 `make db-up` 拉起数据库。
-
-```bash
-cd ../backtest-engine
+cd ../service-api
 docker compose up -d --build
 ```
 
-**4. 打开桌面客户端:**
+**3. 打开桌面客户端:**
 
 ```bash
 cd ../desktop-client
@@ -108,7 +102,7 @@ pnpm dev
               │ HTTP 8081
               ▼
               ┌─────────────────────────┐
-              │ backtest-engine         │
+              │ service-api         │
               │ (Go + Hertz)            │
               │  • /api/backtest/*      │
               │  • /api/screener/*      │
@@ -143,7 +137,7 @@ pnpm dev
   └───────────────────────────────────────┘
 ```
 
-三个服务、一个数据库、每次回测起一个沙箱。`data-aggregator` 是一个**无头 worker**:启动时自动检查数据完整性并补齐缺失,前端不直接访问它。`backtest-engine` 是桌面端唯一对接的入口,既负责回测编排,也兼任市场数据的只读网关。沙箱使用一个只读的数据库账号:用户提交的 Python 代码可以查询历史 K 线,但写不动、删不掉。
+三个服务、一个数据库、每次回测起一个沙箱。`data-aggregator` 是一个**无头 worker**:启动时自动检查数据完整性并补齐缺失,前端不直接访问它。`service-api` 是桌面端唯一对接的入口,既负责回测编排,也兼任市场数据的只读网关。沙箱使用一个只读的数据库账号:用户提交的 Python 代码可以查询历史 K 线,但写不动、删不掉。
 
 本仓库使用 [OpenSpec](openspec/) 做 proposal 驱动的开发——每个值得记录的改动都在 `openspec/` 下留有 proposal、design 和 spec。
 
@@ -186,13 +180,15 @@ API Key 自备,只存在你本机。
 
 ```
 claw-trader/
-├── data-aggregator/    Go 服务 · 拉取并存储历史 K 线
-├── backtest-engine/    Go 服务 + Python 沙箱 · 执行策略
-├── desktop-client/     Electron + React · UI
-├── design/             Pencil (.pen) 设计稿 — 深色与浅色主题
-├── docs/screenshots/   README 使用的展示图
-├── openspec/           Proposal、design、spec — 为什么和怎么做
-└── LICENSE             MIT
+├── data-aggregator/   Go 服务 · 拉取并存储历史 K 线
+├── service-api/       Go 服务 · HTTP API + AI/AST 代码审查 + 编排
+├── sandbox-service/   Python 服务 · 长驻 prefork 进程池 · 真正执行用户代码
+├── desktop-client/    Electron + React · UI
+├── api/               OpenAPI 契约(跨服务共享)
+├── docs/              文档 + 设计稿(.pen) + 截图
+├── scripts/           辅助脚本(pre-commit、e2e、golden-file 刷新等)
+├── openspec/          Proposal、design、spec — 为什么和怎么做
+└── LICENSE            MIT
 ```
 
 ## 贡献

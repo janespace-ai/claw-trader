@@ -2,7 +2,7 @@
 
 Headless worker that keeps the shared TimescaleDB populated with Gate.io
 futures K-line data. It has no frontend-facing API; the desktop client reads
-market data through `backtest-engine`, which queries the same database.
+market data through `service-api`, which queries the same database.
 
 ## What it does on startup
 
@@ -43,9 +43,9 @@ docker compose up -d --force-recreate data-aggregator
 ## What it exposes
 
 Only `GET /healthz`, bound to `127.0.0.1` by default. No `/api/*` routes.
-Every frontend-facing read now lives on `backtest-engine`:
+Every frontend-facing read now lives on `service-api`:
 
-| Old route (aggregator)     | New route (backtest-engine) |
+| Old route (aggregator)     | New route (service-api) |
 |----------------------------|-----------------------------|
 | `GET /api/klines`          | `GET :8081/api/klines`      |
 | `GET /api/symbols`         | `GET :8081/api/symbols`     |

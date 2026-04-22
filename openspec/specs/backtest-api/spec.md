@@ -2,7 +2,7 @@
 
 ## Purpose
 
-TBD — created by archiving change backtest-engine. Update Purpose after archive.
+TBD — created by archiving change service-api. Update Purpose after archive.
 ## Requirements
 ### Requirement: 提交回测任务 API
 
@@ -288,7 +288,7 @@ TBD — created by archiving change backtest-engine. Update Purpose after archiv
 
 `GET /api/backtest/status/{task_id}` 和 `GET /api/backtest/result/{task_id}` 在契约中 SHALL 返回 `TaskResponse`(见 `api-contract` 能力)的 shape,`result` 字段由回测领域特定 schema narrow(equity curve、metrics、trades、per-symbol 拆分)。
 
-当前后端实现可能尚未完全对齐该 shape;本 change 仅冻结**契约目标**,实际后端对齐由后续 `backtest-engine-align-contract` change 负责。前端通过 `cremote` 的 adapter 层过渡。
+当前后端实现可能尚未完全对齐该 shape;本 change 仅冻结**契约目标**,实际后端对齐由后续 `service-api-align-contract` change 负责。前端通过 `cremote` 的 adapter 层过渡。
 
 #### Scenario: 契约中 status endpoint 返回 canonical shape
 
@@ -407,7 +407,7 @@ TBD — created by archiving change backtest-engine. Update Purpose after archiv
 
 ---
 
-### From change: `backtest-engine-align-contract`
+### From change: `service-api-align-contract`
 
 ## MODIFIED Requirements
 
@@ -494,7 +494,7 @@ TBD — created by archiving change backtest-engine. Update Purpose after archiv
 
 ---
 
-### From change: `backtest-engine-multi-symbol-support`
+### From change: `service-api-multi-symbol-support`
 
 ## MODIFIED Requirements
 

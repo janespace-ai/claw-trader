@@ -6,7 +6,7 @@
 // Call-site migration is opportunistic: new UI code uses `cremote`; old
 // code continues to use `remote` from `./client.ts` until each screen is
 // migrated. Eventually `./client.ts` + `./legacy-adapter.ts` both go
-// away (during `backtest-engine-align-contract`).
+// away (during `service-api-align-contract`).
 
 import type { components } from '@/types/api';
 import { adaptTaskResponse, adaptPaginated, adaptError } from './legacy-adapter';
@@ -121,12 +121,12 @@ export const cremote = {
   }): Promise<TaskResponse> {
     // Contract drift workaround: `openapi.yaml` declares `from`/`to` as
     // `integer`, but the running Go backend's struct is `string` (see
-    // `backtest-engine/internal/model/backtest.go` — it parses Unix
+    // `service-api/internal/model/backtest.go` — it parses Unix
     // seconds, RFC3339, or YYYY-MM-DD from a string). JSON-binding a
     // number therefore fails with `INVALID_RANGE: bind request: Mismatch
     // type string with value number`. Coerce to string on the wire so
     // TS types stay aligned with the spec while runtime matches the
-    // actual backend. Remove once backtest-engine lands the int switch.
+    // actual backend. Remove once service-api lands the int switch.
     const { config } = body;
     const wireBody = {
       ...body,

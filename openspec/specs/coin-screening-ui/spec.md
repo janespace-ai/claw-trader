@@ -15,7 +15,7 @@ TBD — created by archiving change desktop-client. Update Purpose after archive
 - **WHEN** 用户在对话中说「帮我找成交量前 50、日线 SMA20 以上的币」
 - **THEN** AI 生成继承 Screener 基类的 Python 代码
 - **THEN** 对话面板展示选币条件摘要供用户确认
-- **THEN** 用户确认后提交到远程 backtest-engine 执行
+- **THEN** 用户确认后提交到远程 service-api 执行
 
 #### Scenario: 远程执行并返回结果
 

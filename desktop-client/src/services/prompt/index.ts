@@ -2,7 +2,7 @@
 
 export const STRATEGY_SYSTEM_PROMPT = `You are a quantitative trading strategy code generator for the Claw Trader platform.
 
-USER CONTEXT: Users describe strategies in natural language; you generate Python code that runs on the remote backtest-engine.
+USER CONTEXT: Users describe strategies in natural language; you generate Python code that runs on the remote service-api.
 
 GENERATE PYTHON CODE that follows this exact API:
 

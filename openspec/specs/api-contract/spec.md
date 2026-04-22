@@ -8,7 +8,7 @@ Synced on 2026-04-19 from archived delta specs in `openspec/changes/archive/`.
 
 ### Requirement: 单一机器可读契约文件
 
-仓库 SHALL 在根目录维护一份 `api/openapi.yaml`,遵循 OpenAPI 3.1 规范,作为**所有** backend-facing HTTP 接口的**唯一机器可读真源**。任何服务(`backtest-engine`、未来的 `data-aggregator` 对外接口等)暴露的 HTTP endpoint SHALL 在该文件中有对应的 operation 定义,包含完整的 request/response schema。
+仓库 SHALL 在根目录维护一份 `api/openapi.yaml`,遵循 OpenAPI 3.1 规范,作为**所有** backend-facing HTTP 接口的**唯一机器可读真源**。任何服务(`service-api`、未来的 `data-aggregator` 对外接口等)暴露的 HTTP endpoint SHALL 在该文件中有对应的 operation 定义,包含完整的 request/response schema。
 
 #### Scenario: 新增 endpoint 必须先更新契约
 
@@ -132,7 +132,7 @@ Mock SHALL 支持三种 profile,由 `CLAW_MOCK_PROFILE` env 控制:
 - **WHEN** 开发者运行 `pnpm dev:mock`(或者 `VITE_USE_MOCKS=1 pnpm dev`)
 - **THEN** Vite dev server + Electron 启动
 - **THEN** 渲染进程 fetch `/api/*` 被 MSW 拦截,返回 `api/examples/` 的 fixtures
-- **THEN** 不需要任何真实 backtest-engine / Timescale 运行
+- **THEN** 不需要任何真实 service-api / Timescale 运行
 
 #### Scenario: Vitest 默认启用 MSW Node server
 
@@ -164,7 +164,7 @@ Mock SHALL 支持三种 profile,由 `CLAW_MOCK_PROFILE` env 控制:
 
 ---
 
-### From change: `backtest-engine-align-contract`
+### From change: `service-api-align-contract`
 
 ## MODIFIED Requirements
 
@@ -181,7 +181,7 @@ Mock SHALL 支持三种 profile,由 `CLAW_MOCK_PROFILE` env 控制:
 
 #### Scenario: 现有 legacy 输出完全退役
 
-- **WHEN** 扫描 backtest-engine 代码
+- **WHEN** 扫描 service-api 代码
 - **THEN** 无 handler 生成 legacy 扁平形态(`s3_progress`、`api_progress` 作为 root 字段等)
 - **THEN** 所有 task 响应走统一 `RespondTask` helper
 
@@ -191,7 +191,7 @@ Mock SHALL 支持三种 profile,由 `CLAW_MOCK_PROFILE` env 控制:
 
 #### Scenario: 所有 handler 使用受控 code
 
-- **WHEN** 审计 backtest-engine 所有 handler 的错误路径
+- **WHEN** 审计 service-api 所有 handler 的错误路径
 - **THEN** 每个错误路径映射到 `errors/errors.go` 中的一个 Code 常量
 - **THEN** 未分类错误默认映射到 `INTERNAL_ERROR`
 - **THEN** 前端 `cremote` 接到的错误体直接是 canonical,无需 adapter 做 legacy 解码

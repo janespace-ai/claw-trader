@@ -65,22 +65,16 @@ docker compose -f docker-compose.yml -f docker-compose.test.yml up -d --build
 
 First run pulls a small slice of historical K-lines so you have something to backtest immediately.
 
-**2. Build the strategy sandbox (first time only, takes a few minutes):**
+**2. Start the API service + sandbox:**
+
+Uses the same TimescaleDB as step 1 (shared Docker networks `claw-net` / `claw-sandbox-net`). If you only start `service-api`, run `make db-up` from the repo root first so the database is up.  The compose file here builds BOTH `service-api` (Go, API + orchestration) AND `sandbox-service` (Python, where user strategies actually run).
 
 ```bash
-docker build -t claw-sandbox:latest backtest-engine/sandbox/
-```
-
-**3. Start the backtest engine:**
-
-Uses the same TimescaleDB as step 1 (shared Docker networks `claw-net` / `claw-sandbox-net`). If you only start `backtest-engine`, run `make db-up` from the repo root first so the database is up.
-
-```bash
-cd ../backtest-engine
+cd ../service-api
 docker compose up -d --build
 ```
 
-**4. Open the desktop app:**
+**3. Open the desktop app:**
 
 ```bash
 cd ../desktop-client
@@ -110,7 +104,7 @@ The app opens against your local services. On first launch it asks for an AI API
               │ HTTP 8081
               ▼
               ┌─────────────────────────┐
-              │ backtest-engine         │
+              │ service-api         │
               │ (Go + Hertz)            │
               │  • /api/backtest/*      │
               │  • /api/screener/*      │
@@ -145,7 +139,7 @@ The app opens against your local services. On first launch it asks for an AI API
   └───────────────────────────────────────┘
 ```
 
-Three services, one database, one sandbox per backtest run. `data-aggregator` is a **headless worker**: on startup it checks data completeness and backfills what's missing; the frontend never talks to it directly. `backtest-engine` is the single entry point the desktop client hits, serving both backtest orchestration and read-only market-data endpoints. The sandbox gets a read-only DB user — user-submitted Python can query historical candles but can't write or delete anything.
+Three services, one database, one sandbox per backtest run. `data-aggregator` is a **headless worker**: on startup it checks data completeness and backfills what's missing; the frontend never talks to it directly. `service-api` is the single entry point the desktop client hits, serving both backtest orchestration and read-only market-data endpoints. The sandbox gets a read-only DB user — user-submitted Python can query historical candles but can't write or delete anything.
 
 The repo uses [OpenSpec](openspec/) for proposal-driven development — every notable change has a proposal, a design doc, and a spec under `openspec/`.
 
@@ -188,13 +182,15 @@ Bring your own API key. It stays on your machine.
 
 ```
 claw-trader/
-├── data-aggregator/    Go service · pulls & stores historical K-lines
-├── backtest-engine/    Go service + Python sandbox · runs strategies
-├── desktop-client/     Electron + React · the UI
-├── design/             Pencil (.pen) mockups — dark + light themes
-├── docs/screenshots/   Hero images used in this README
-├── openspec/           Proposals, designs, specs — the how and why
-└── LICENSE             MIT
+├── data-aggregator/   Go service · pulls & stores historical K-lines
+├── service-api/       Go service · HTTP API + AI/AST gates + orchestration
+├── sandbox-service/   Python service · long-lived prefork pool · runs user code
+├── desktop-client/    Electron + React · the UI
+├── api/               OpenAPI contract (shared across services)
+├── docs/              Project docs + design (.pen) mockups + screenshots
+├── scripts/           Helper scripts (pre-commit, e2e, golden-file refresh)
+├── openspec/          Proposals, designs, specs — the how and why
+└── LICENSE            MIT
 ```
 
 ## Contributing

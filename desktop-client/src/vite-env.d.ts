@@ -4,7 +4,7 @@
 // into the renderer bundle at build time. Add new VITE_* vars here as
 // they're introduced.
 interface ImportMetaEnv {
-  /** Build-time default for the backtest-engine URL. Overridden at
+  /** Build-time default for the service-api URL. Overridden at
    *  runtime by <userData>/claw-config.json, and always beaten by the
    *  user's Settings-page override persisted in SQLite.  */
   readonly VITE_REMOTE_BASE_URL?: string;

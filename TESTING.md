@@ -9,7 +9,7 @@ How to run tests, add new ones, and keep the infrastructure healthy.
 ## Prerequisites
 
 - Docker (for the Timescale container used by DB-backed tests)
-- Go 1.22+ — aggregator and backtest-engine
+- Go 1.22+ — aggregator and service-api
 - Python 3.9+ — sandbox tests (any venv-capable Python)
 - Node 20+ — desktop-client
 - `jq` — used by the E2E runner (`brew install jq` on macOS)
@@ -30,13 +30,13 @@ First `make test` takes ~90s (pytest creates a venv). Subsequent runs are fast.
 | `make test` | Default: aggregator + backtest + sandbox + desktop |
 | `make test-ci` | Alias of `test` — future GHA hook point |
 | `make test-aggregator` | `go test ./...` in data-aggregator |
-| `make test-backtest` | `go test ./...` in backtest-engine (auto-syncs aggregator migrations first) |
+| `make test-backtest` | `go test ./...` in service-api (auto-syncs aggregator migrations first) |
 | `make test-sandbox` | pytest against the Python sandbox framework |
 | `make test-desktop` | `npx vitest run` in desktop-client |
 | `make test-e2e` | docker-based end-to-end smoke; **not** part of `make test` |
 | `make db-up` / `make db-down` | Start / stop shared Timescale |
 | `make db-reap` | Drop orphan `test_*` schemas (left by panicked tests) |
-| `make sync-aggregator-migrations` | Copy aggregator migrations into backtest-engine testdata + refresh CHECKSUMS |
+| `make sync-aggregator-migrations` | Copy aggregator migrations into service-api testdata + refresh CHECKSUMS |
 | `make help` | Print the menu |
 
 ## Environment
@@ -84,18 +84,18 @@ func TestSomething(t *testing.T) {
 }
 ```
 
-For **backtest-engine**, `testdb.New(t)` also applies a snapshot of aggregator's migrations so shared tables (`futures_*`, `symbols`, `gaps`) exist — run `make sync-aggregator-migrations` if you ever see a "snapshot out of sync" failure from the contract test.
+For **service-api**, `testdb.New(t)` also applies a snapshot of aggregator's migrations so shared tables (`futures_*`, `symbols`, `gaps`) exist — run `make sync-aggregator-migrations` if you ever see a "snapshot out of sync" failure from the contract test.
 
 ### HTTP handler test (Hertz)
 
 ```go
-// backtest-engine/internal/handler/x_test.go
+// service-api/internal/handler/x_test.go
 package handler
 
 import (
     "testing"
-    "github.com/janespace-ai/claw-trader/backtest-engine/internal/testdb"
-    "github.com/janespace-ai/claw-trader/backtest-engine/internal/testhttp"
+    "github.com/janespace-ai/claw-trader/service-api/internal/testdb"
+    "github.com/janespace-ai/claw-trader/service-api/internal/testhttp"
 )
 
 func TestMyHandler(t *testing.T) {
@@ -111,7 +111,7 @@ func TestMyHandler(t *testing.T) {
 
 ### Python (sandbox) test
 
-Tests go under `backtest-engine/sandbox/tests/`. `conftest.py` already wires the framework into `sys.path` so you can `from claw.metrics import compute`. Run `make test-sandbox` (creates a venv on first run).
+Tests go under `sandbox-service/tests/`. `conftest.py` already wires the framework into `sys.path` so you can `from claw.metrics import compute`. Run `make test-sandbox` (creates a venv on first run).
 
 ### TypeScript (desktop-client) test
 
@@ -153,11 +153,12 @@ The hook does NOT run tests (too slow). Bypass a single commit with `git commit 
 .
 ├── Makefile                      ← canonical entry point
 ├── data-aggregator/              ← Go: stdlib testing, schema-isolated testdb
-├── backtest-engine/              ← Go: same pattern + shared-schema contract
-├── backtest-engine/sandbox/      ← Python: pytest in a private .venv
+├── service-api/                  ← Go: same pattern + shared-schema contract
+├── sandbox-service/              ← Python: pytest in a private .venv
 ├── desktop-client/               ← TS: Vitest + jsdom
-├── e2e/run.sh                    ← bash: real docker stack, real Gate.io
-└── scripts/
-    ├── pre-commit                ← opt-in fast checks
-    └── refresh-golden-files.sh   ← manual Gate.io fixture re-capture
+├── scripts/
+│   ├── e2e.sh                    ← bash: real docker stack, real Gate.io
+│   ├── pre-commit                ← opt-in fast checks
+│   └── refresh-golden-files.sh   ← manual Gate.io fixture re-capture
+└── openspec/                     ← proposals / specs (not test code)
 ```

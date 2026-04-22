@@ -1,6 +1,6 @@
 # claw-sandbox-service — long-lived Python sandbox with prefork worker pool.
 #
-# Base image pattern mirrors backtest-engine/sandbox/Dockerfile because we
+# Base image pattern mirrors service-api/sandbox/Dockerfile because we
 # need the same native ta-lib compiled from source, and we want the same
 # numpy/pandas/ta-lib ABI so user code behaves identically after migration.
 FROM python:3.11-slim-bookworm
@@ -27,7 +27,7 @@ RUN set -eux; \
     make install; \
     # ta-lib 0.6.x ships libta-lib.{so,a} (hyphen); ta-lib==0.4.32 python wheel
     # still links -lta_lib (underscore). Symlink legacy names so the wrapper
-    # wheel compiles (same workaround used in backtest-engine sandbox image).
+    # wheel compiles (same workaround used in service-api sandbox image).
     ln -sf libta-lib.so /usr/lib/libta_lib.so; \
     ln -sf libta-lib.a  /usr/lib/libta_lib.a; \
     cd /; rm -rf /tmp/ta-lib*; \

@@ -40,8 +40,8 @@ test-ci: test ## Alias of `test` — single hook for future CI
 test-aggregator: ## Go tests for data-aggregator (requires db-up)
 	cd data-aggregator && CLAW_TEST_DSN='$(CLAW_TEST_DSN)' go test ./...
 
-test-backtest: sync-aggregator-migrations ## Go tests for backtest-engine (requires db-up)
-	cd backtest-engine && CLAW_TEST_DSN='$(CLAW_TEST_DSN)' go test ./...
+test-backtest: sync-aggregator-migrations ## Go tests for service-api (requires db-up)
+	cd service-api && CLAW_TEST_DSN='$(CLAW_TEST_DSN)' go test ./...
 
 ## ---- Python sandbox (sandbox-service) ----
 
@@ -58,25 +58,25 @@ $(SANDBOX_INSTALLED): $(SANDBOX_DIR)/pyproject.toml
 sandbox-service-build: ## Build the sandbox-service docker image
 	docker build -t claw-sandbox-service:latest $(SANDBOX_DIR)
 
-sandbox-service-up: ## Start sandbox-service (via backtest-engine compose — depends_on wires it in)
-	docker compose -f backtest-engine/docker-compose.yml up -d sandbox-service
+sandbox-service-up: ## Start sandbox-service (via service-api compose — depends_on wires it in)
+	docker compose -f service-api/docker-compose.yml up -d sandbox-service
 
 sandbox-service-down: ## Stop sandbox-service
-	docker compose -f backtest-engine/docker-compose.yml stop sandbox-service
+	docker compose -f service-api/docker-compose.yml stop sandbox-service
 
 sandbox-service-logs: ## Tail sandbox-service logs
-	docker compose -f backtest-engine/docker-compose.yml logs -f sandbox-service
+	docker compose -f service-api/docker-compose.yml logs -f sandbox-service
 
 ## ---- Ops CLI ----
 
 ai-cache-stats: ## Show Gate 2 AI review cache counts + model drift
-	cd backtest-engine && go run ./cmd/claw-engine-cli -config config.yaml ai-cache stats
+	cd service-api && go run ./cmd/claw-engine-cli -config config.yaml ai-cache stats
 
 ai-cache-clear: ## Emergency: wipe Gate 2 cache (forces fresh review of everything)
-	cd backtest-engine && go run ./cmd/claw-engine-cli -config config.yaml ai-cache clear
+	cd service-api && go run ./cmd/claw-engine-cli -config config.yaml ai-cache clear
 
 ai-cache-purge-drift: ## Drop cache rows with stale model without restart
-	cd backtest-engine && go run ./cmd/claw-engine-cli -config config.yaml ai-cache purge-drift
+	cd service-api && go run ./cmd/claw-engine-cli -config config.yaml ai-cache purge-drift
 
 ## ---- Desktop client ----
 
@@ -86,7 +86,7 @@ test-desktop: ## Vitest for desktop-client
 ## ---- E2E ----
 
 test-e2e: ## End-to-end smoke: rebuild stack, verify /api/klines, teardown
-	e2e/run.sh
+	scripts/e2e.sh
 
 ## ---- DB lifecycle ----
 
@@ -116,10 +116,10 @@ db-reap: ## Drop orphaned test_* schemas older than 1h
 
 ## ---- Utilities ----
 
-sync-aggregator-migrations: ## Copy data-aggregator migrations into backtest-engine testdata + refresh CHECKSUMS
-	@mkdir -p backtest-engine/internal/testdb/testdata/aggregator-migrations
+sync-aggregator-migrations: ## Copy data-aggregator migrations into service-api testdata + refresh CHECKSUMS
+	@mkdir -p service-api/internal/testdb/testdata/aggregator-migrations
 	@cp data-aggregator/internal/store/migrations/*.sql \
-		backtest-engine/internal/testdb/testdata/aggregator-migrations/
-	@cd backtest-engine/internal/testdb/testdata/aggregator-migrations && \
+		service-api/internal/testdb/testdata/aggregator-migrations/
+	@cd service-api/internal/testdb/testdata/aggregator-migrations && \
 		( for f in *.sql; do shasum -a 256 "$$f"; done ) > CHECKSUMS
 	@echo "Migration snapshot synced; CHECKSUMS updated."
