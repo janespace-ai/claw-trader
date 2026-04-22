@@ -1,7 +1,7 @@
 # Claw Trader API contract
 
 Single source of truth for the HTTP surface between `desktop-client` and
-`backtest-engine`. Everything in this directory is deliberately plain text
+`service-api`. Everything in this directory is deliberately plain text
 (YAML / JSON / Markdown) — no build artifacts, no generated binaries — so
 PR reviewers can read it.
 

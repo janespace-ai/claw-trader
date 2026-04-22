@@ -1,7 +1,7 @@
 # desktop-client configuration
 
 The only piece of configuration the desktop-client currently needs is the
-URL of the backtest-engine (the read gateway for market data, strategies,
+URL of the service-api (the read gateway for market data, strategies,
 and backtests). Nothing else is hardcoded today.
 
 ## Resolution order

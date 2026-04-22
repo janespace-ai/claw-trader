@@ -2,18 +2,18 @@
 
 ## Purpose
 
-TBD — created by archiving change backtest-engine. Update Purpose after archive.
+TBD — created by archiving change service-api. Update Purpose after archive.
 ## Requirements
 ### Requirement: 网络隔离策略
 
-系统 SHALL 确保 sandbox-service 容器无法访问外部网络，仅能连接 TimescaleDB（只读）和 backtest-engine 的 callback endpoint。
+系统 SHALL 确保 sandbox-service 容器无法访问外部网络，仅能连接 TimescaleDB（只读）和 service-api 的 callback endpoint。
 
 #### Scenario: 沙箱网络访问控制
 
 - **WHEN** sandbox-service 被部署
 - **THEN** 容器连接到专用 Docker network（`claw-sandbox-net`，`internal: true`）
 - **THEN** 容器可以通过该网络连接 TimescaleDB 5432 端口（只读用户）
-- **THEN** 容器可以通过该网络连接 backtest-engine 的 `/internal/cb/*` endpoint
+- **THEN** 容器可以通过该网络连接 service-api 的 `/internal/cb/*` endpoint
 - **THEN** 容器无法访问任何其他网络地址（包括外网）
 
 #### Scenario: 沙箱尝试访问外网
@@ -24,7 +24,7 @@ TBD — created by archiving change backtest-engine. Update Purpose after archiv
 
 ### Requirement: 沙箱与主服务 HTTP Callback
 
-系统 SHALL 通过 HTTP callback 机制让 sandbox-service 内的 worker 向 backtest-engine 报告执行进度和结果。callback base URL 由 backtest-engine 在任务请求体中透传。
+系统 SHALL 通过 HTTP callback 机制让 sandbox-service 内的 worker 向 service-api 报告执行进度和结果。callback base URL 由 service-api 在任务请求体中透传。
 
 #### Scenario: 报告回测进度
 
@@ -69,34 +69,34 @@ TBD — created by archiving change backtest-engine. Update Purpose after archiv
 
 ### Requirement: 任务分发到 sandbox-service
 
-系统 SHALL 通过 HTTP 把执行任务从 backtest-engine 推送给长驻的 sandbox-service 容器，由其内部 worker pool 处理。backtest-engine SHALL NOT 直接创建、管理、终止任何 Docker 容器；SHALL NOT 挂载 `/var/run/docker.sock`。
+系统 SHALL 通过 HTTP 把执行任务从 service-api 推送给长驻的 sandbox-service 容器，由其内部 worker pool 处理。service-api SHALL NOT 直接创建、管理、终止任何 Docker 容器；SHALL NOT 挂载 `/var/run/docker.sock`。
 
-#### Scenario: backtest-engine 推送任务
+#### Scenario: service-api 推送任务
 
 - **WHEN** 一个回测/选币任务通过所有 Gate 后进入执行阶段
-- **THEN** backtest-engine 调用 `POST http://sandbox-service:<port>/run` 推送任务
+- **THEN** service-api 调用 `POST http://sandbox-service:<port>/run` 推送任务
 - **THEN** sandbox-service 返回 `{ job_id, status: "queued" }`
-- **THEN** backtest-engine 把 `job_id` 关联到自己的 `task_id`，等待 callback
+- **THEN** service-api 把 `job_id` 关联到自己的 `task_id`，等待 callback
 
-#### Scenario: backtest-engine 无 Docker 客户端依赖
+#### Scenario: service-api 无 Docker 客户端依赖
 
-- **WHEN** 查看 `backtest-engine/go.mod`
+- **WHEN** 查看 `service-api/go.mod`
 - **THEN** 不存在 `github.com/docker/docker` 或 `github.com/docker/go-connections` 依赖
-- **THEN** `backtest-engine/internal/sandbox/` 目录被删除或仅保留 sandbox-service HTTP client wrapper
+- **THEN** `service-api/internal/sandbox/` 目录被删除或仅保留 sandbox-service HTTP client wrapper
 
 #### Scenario: docker-compose 无 socket 挂载
 
-- **WHEN** 查看 `docker-compose.yml` 中 `backtest-engine` service 的 `volumes`
+- **WHEN** 查看 `docker-compose.yml` 中 `service-api` service 的 `volumes`
 - **THEN** 无 `/var/run/docker.sock:/var/run/docker.sock` 条目
 
 ### Requirement: 任务执行超时
 
-系统 SHALL 为每个任务在 sandbox-service 侧应用 CPU 时间上限（`RLIMIT_CPU`，默认 1800s）。超时后 worker 被内核终止，Master 替补新 worker；对应 backtest-engine task 收到 `{ code: "SANDBOX_TIMEOUT" }` callback。
+系统 SHALL 为每个任务在 sandbox-service 侧应用 CPU 时间上限（`RLIMIT_CPU`，默认 1800s）。超时后 worker 被内核终止，Master 替补新 worker；对应 service-api task 收到 `{ code: "SANDBOX_TIMEOUT" }` callback。
 
 #### Scenario: 回测超时
 
 - **WHEN** 回测运行超过 30 分钟
 - **THEN** 内核发 SIGXCPU / SIGKILL
 - **THEN** Master 探测到 worker exit，补发 `error` callback `{ code: "SANDBOX_TIMEOUT" }`
-- **THEN** backtest-engine 将任务标记为 `failed`
+- **THEN** service-api 将任务标记为 `failed`
 

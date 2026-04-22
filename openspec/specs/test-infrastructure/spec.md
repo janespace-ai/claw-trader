@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the repo-wide test conventions, shared utilities, and entry points that make it possible to add tests across `data-aggregator`, `backtest-engine`, the Python sandbox framework, and `desktop-client` without each suite inventing its own plumbing. Introduced by the `add-test-infrastructure` change.
+Defines the repo-wide test conventions, shared utilities, and entry points that make it possible to add tests across `data-aggregator`, `service-api`, the Python sandbox framework, and `desktop-client` without each suite inventing its own plumbing. Introduced by the `add-test-infrastructure` change.
 
 ## Requirements
 
@@ -42,7 +42,7 @@ Defines the repo-wide test conventions, shared utilities, and entry points that 
 
 ### Requirement: 数据库迁移支持注入 schema 名
 
-两个 Go 服务(`data-aggregator`、`backtest-engine`)的迁移 SHALL 支持在运行时指定目标 schema 名,而不只是硬编码 `claw`。迁移 SQL 文件 SHALL 使用 `{{.Schema}}` 占位符替代裸 `claw.` 表前缀;迁移执行器 SHALL 在应用前通过 `text/template` 渲染占位符。
+两个 Go 服务(`data-aggregator`、`service-api`)的迁移 SHALL 支持在运行时指定目标 schema 名,而不只是硬编码 `claw`。迁移 SQL 文件 SHALL 使用 `{{.Schema}}` 占位符替代裸 `claw.` 表前缀;迁移执行器 SHALL 在应用前通过 `text/template` 渲染占位符。
 
 #### Scenario: 生产环境迁移行为不变
 
@@ -93,9 +93,9 @@ Defines the repo-wide test conventions, shared utilities, and entry points that 
 
 ### Requirement: 共享 schema 契约测试
 
-`backtest-engine` SHALL 包含一个契约测试,保证其 data-gateway 查询(`QueryKlines`、`ListActiveSymbols`、`QueryGaps`)的 SELECT 列名与 `data-aggregator` 当前迁移产生的表结构一致。迁移 SQL 文件 SHALL 由 `make sync-aggregator-migrations` 从 `data-aggregator/internal/store/migrations/` 复制到 `backtest-engine/internal/testdb/testdata/aggregator-migrations/`,测试 SHALL 首先校验该副本的校验和以防止漂移。
+`service-api` SHALL 包含一个契约测试,保证其 data-gateway 查询(`QueryKlines`、`ListActiveSymbols`、`QueryGaps`)的 SELECT 列名与 `data-aggregator` 当前迁移产生的表结构一致。迁移 SQL 文件 SHALL 由 `make sync-aggregator-migrations` 从 `data-aggregator/internal/store/migrations/` 复制到 `service-api/internal/testdb/testdata/aggregator-migrations/`,测试 SHALL 首先校验该副本的校验和以防止漂移。
 
-#### Scenario: aggregator 迁移改动后 backtest-engine 测试失败
+#### Scenario: aggregator 迁移改动后 service-api 测试失败
 
 - **WHEN** `data-aggregator` 的某迁移 SQL 文件被修改或新增
 - **WHEN** 开发者未运行 `make sync-aggregator-migrations` 就提交
@@ -111,7 +111,7 @@ Defines the repo-wide test conventions, shared utilities, and entry points that 
 
 ### Requirement: Python sandbox 合规检查测试
 
-`backtest-engine/sandbox/tests/` SHALL 存在 pytest 测试套件,覆盖:
+`service-api/sandbox/tests/` SHALL 存在 pytest 测试套件,覆盖:
 - 每一条 `config.yaml` 中列出的 `forbidden_builtins`(如 `exec`、`eval`、`__import__`)的 AST 检查器 SHALL 拒绝
 - 每一条 `forbidden_modules`(如 `os`、`subprocess`、`socket`)的 import SHALL 被拒绝
 - `module_whitelist` 中的合法 import 至少一项 SHALL 通过
@@ -160,7 +160,7 @@ Defines the repo-wide test conventions, shared utilities, and entry points that 
 
 ### Requirement: Docker E2E 烟雾测试
 
-仓库 SHALL 在 `e2e/` 目录下提供一个 shell 脚本 `run.sh`,`make test-e2e` SHALL 调用它。脚本 SHALL 启动完整 docker-compose 栈(Timescale + aggregator + backtest-engine),使用 `config.test.yaml` 的小规模配置,验证从空 DB 到 `/api/klines` 返回数据的黄金链路,然后 clean teardown。
+仓库 SHALL 在 `e2e/` 目录下提供一个 shell 脚本 `run.sh`,`make test-e2e` SHALL 调用它。脚本 SHALL 启动完整 docker-compose 栈(Timescale + aggregator + service-api),使用 `config.test.yaml` 的小规模配置,验证从空 DB 到 `/api/klines` 返回数据的黄金链路,然后 clean teardown。
 
 #### Scenario: 冷启动 E2E 成功
 
@@ -232,7 +232,7 @@ Defines the repo-wide test conventions, shared utilities, and entry points that 
 
 ### Requirement: 数据库迁移支持注入 schema 名
 
-两个 Go 服务(`data-aggregator`、`backtest-engine`)的迁移 SHALL 支持在运行时指定目标 schema 名,而不只是硬编码 `claw`。迁移 SQL 文件 SHALL 使用 `{{.Schema}}` 占位符替代裸 `claw.` 表前缀;迁移执行器 SHALL 在应用前通过 `text/template` 渲染占位符。
+两个 Go 服务(`data-aggregator`、`service-api`)的迁移 SHALL 支持在运行时指定目标 schema 名,而不只是硬编码 `claw`。迁移 SQL 文件 SHALL 使用 `{{.Schema}}` 占位符替代裸 `claw.` 表前缀;迁移执行器 SHALL 在应用前通过 `text/template` 渲染占位符。
 
 #### Scenario: 生产环境迁移行为不变
 
@@ -257,7 +257,7 @@ Defines the repo-wide test conventions, shared utilities, and entry points that 
 
 #### Scenario: 金样本覆盖关键响应形态
 
-- **WHEN** 查看 `data-aggregator/testdata/gateio/` 和 `backtest-engine/testdata/gateio/`
+- **WHEN** 查看 `data-aggregator/testdata/gateio/` 和 `service-api/testdata/gateio/`
 - **THEN** 目录下 SHALL 至少包含:
   - tickers 响应(1 个 JSON,至少 3 个合约)
   - candles 响应(1 个 JSON,包含可空的 `sum` 字段以测试 quote_volume 处理)
@@ -284,9 +284,9 @@ Defines the repo-wide test conventions, shared utilities, and entry points that 
 
 ### Requirement: 共享 schema 契约测试
 
-`backtest-engine` SHALL 包含一个契约测试,保证其 data-gateway 查询(`QueryKlines`、`ListActiveSymbols`、`QueryGaps`)的 SELECT 列名与 `data-aggregator` 当前迁移产生的表结构一致。迁移 SQL 文件 SHALL 由 `make sync-aggregator-migrations` 从 `data-aggregator/internal/store/migrations/` 复制到 `backtest-engine/testdata/aggregator-migrations/`,测试 SHALL 首先校验该副本的校验和以防止漂移。
+`service-api` SHALL 包含一个契约测试,保证其 data-gateway 查询(`QueryKlines`、`ListActiveSymbols`、`QueryGaps`)的 SELECT 列名与 `data-aggregator` 当前迁移产生的表结构一致。迁移 SQL 文件 SHALL 由 `make sync-aggregator-migrations` 从 `data-aggregator/internal/store/migrations/` 复制到 `service-api/testdata/aggregator-migrations/`,测试 SHALL 首先校验该副本的校验和以防止漂移。
 
-#### Scenario: aggregator 迁移改动后 backtest-engine 测试失败
+#### Scenario: aggregator 迁移改动后 service-api 测试失败
 
 - **WHEN** `data-aggregator` 的某迁移 SQL 文件被修改或新增
 - **WHEN** 开发者未运行 `make sync-aggregator-migrations` 就提交
@@ -302,7 +302,7 @@ Defines the repo-wide test conventions, shared utilities, and entry points that 
 
 ### Requirement: Python sandbox 合规检查测试
 
-`backtest-engine/sandbox/tests/` SHALL 存在 pytest 测试套件,覆盖:
+`service-api/sandbox/tests/` SHALL 存在 pytest 测试套件,覆盖:
 - 每一条 `config.yaml` 中列出的 `forbidden_builtins`(如 `exec`、`eval`、`__import__`)的 AST 检查器 SHALL 拒绝
 - 每一条 `forbidden_modules`(如 `os`、`subprocess`、`socket`)的 import SHALL 被拒绝
 - `module_whitelist` 中的合法 import 至少一项 SHALL 通过
@@ -351,7 +351,7 @@ Defines the repo-wide test conventions, shared utilities, and entry points that 
 
 ### Requirement: Docker E2E 烟雾测试
 
-仓库 SHALL 在 `e2e/` 目录下提供一个 shell 脚本 `run.sh`,`make test-e2e` SHALL 调用它。脚本 SHALL 启动完整 docker-compose 栈(Timescale + aggregator + backtest-engine),使用 `config.test.yaml` 的小规模配置,验证从空 DB 到 `/api/klines` 返回数据的黄金链路,然后 clean teardown。
+仓库 SHALL 在 `e2e/` 目录下提供一个 shell 脚本 `run.sh`,`make test-e2e` SHALL 调用它。脚本 SHALL 启动完整 docker-compose 栈(Timescale + aggregator + service-api),使用 `config.test.yaml` 的小规模配置,验证从空 DB 到 `/api/klines` 返回数据的黄金链路,然后 clean teardown。
 
 #### Scenario: 冷启动 E2E 成功
 

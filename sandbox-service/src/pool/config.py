@@ -31,7 +31,7 @@ class DBConfig:
 
 @dataclass(slots=True, frozen=True)
 class CallbackConfig:
-    allowlist_hosts: tuple[str, ...] = ("backtest-engine", "localhost")
+    allowlist_hosts: tuple[str, ...] = ("service-api", "localhost")
     retry_delays_seconds: tuple[int, ...] = (1, 3, 10)
     on_disk_queue_path: str = "/var/lib/claw-sandbox/callback_queue.sqlite"
     flusher_interval_seconds: int = 30

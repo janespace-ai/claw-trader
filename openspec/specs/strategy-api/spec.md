@@ -8,7 +8,7 @@ Synced on 2026-04-19 from archived delta specs in `openspec/changes/archive/`.
 
 ### Requirement: Strategy CRUD 契约化
 
-系统 SHALL 在 `api/openapi.yaml` 中以 canonical 形态定义策略 CRUD 端点,`operationId` 分别为 `createStrategy`、`listStrategies`、`getStrategy`。这些端点的后端实现由 `backtest-engine` 提供,本 change 仅冻结契约;运行时 legacy 响应由 `cremote` adapter 归一化。
+系统 SHALL 在 `api/openapi.yaml` 中以 canonical 形态定义策略 CRUD 端点,`operationId` 分别为 `createStrategy`、`listStrategies`、`getStrategy`。这些端点的后端实现由 `service-api` 提供,本 change 仅冻结契约;运行时 legacy 响应由 `cremote` adapter 归一化。
 
 `Strategy` schema SHALL 包含:`id: string (uuid)`、`name: string`、`code_type: "strategy" | "screener"`、`code: string`、`params_schema?: object`、`current_version: integer`、`created_at: integer (unix s)`、`updated_at: integer (unix s)`。
 
@@ -82,13 +82,13 @@ Synced on 2026-04-19 from archived delta specs in `openspec/changes/archive/`.
 
 ---
 
-### From change: `backtest-engine-strategy-versions`
+### From change: `service-api-strategy-versions`
 
 ## ADDED Requirements
 
 ### Requirement: Strategy 版本模型落地
 
-`backtest-engine` 的数据模型 SHALL 将策略版本拆分为独立表:
+`service-api` 的数据模型 SHALL 将策略版本拆分为独立表:
 
 - `{{.Schema}}.strategies`:`id, name, code_type, current_version, status, is_favorite, tags, created_at, updated_at`
 - `{{.Schema}}.strategy_versions`:`strategy_id, version, code, summary, params_schema, parent_version, created_at`,主键 `(strategy_id, version)`

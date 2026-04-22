@@ -99,7 +99,7 @@ Synced on 2026-04-19 from archived delta specs in `openspec/changes/archive/`.
 
 ---
 
-### From change: `backtest-engine-analysis-endpoints`
+### From change: `service-api-analysis-endpoints`
 
 ## ADDED Requirements
 
@@ -204,7 +204,7 @@ Synced on 2026-04-19 from archived delta specs in `openspec/changes/archive/`.
 
 ### Requirement: LLM provider 抽象 + OpenAI 初始实现
 
-`backtest-engine/internal/llm/` SHALL 定义 `Provider` interface。至少 1 个 impl(OpenAI)SHALL 落地。配置通过 `config.yaml` 的 `llm:` 段:
+`service-api/internal/llm/` SHALL 定义 `Provider` interface。至少 1 个 impl(OpenAI)SHALL 落地。配置通过 `config.yaml` 的 `llm:` 段:
 
 ```yaml
 llm:

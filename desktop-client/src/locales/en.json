@@ -318,7 +318,7 @@
   "errors.friendly.details": "View details",
   "errors.friendly.generic.title": "Something went wrong",
   "errors.friendly.docker.title": "Backend can't launch the sandbox container",
-  "errors.friendly.docker.hint": "The backtest-engine process on the backend machine needs to call the local Docker daemon to spin up an isolated container that will run the AI-generated code, but it can't reach Docker (not running, or no permission on /var/run/docker.sock). Start Docker Desktop; if it's already running, add the backend's user to the `docker` group or restart the backend with sufficient privileges.",
+  "errors.friendly.docker.hint": "The service-api process on the backend machine needs to call the local Docker daemon to spin up an isolated container that will run the AI-generated code, but it can't reach Docker (not running, or no permission on /var/run/docker.sock). Start Docker Desktop; if it's already running, add the backend's user to the `docker` group or restart the backend with sufficient privileges.",
   "errors.friendly.ai_rejected.title": "AI review rejected this code",
   "errors.friendly.ai_rejected.hint": "The second-line AI reviewer flagged the submitted code as unsafe or incorrect before it could execute. Expand the details to see which dimension failed (security or correctness) and the reason the model gave. Revise the code (or ask the AI assistant to fix it) and resubmit.",
   "errors.friendly.ai_unavailable.title": "AI code reviewer is temporarily unavailable",

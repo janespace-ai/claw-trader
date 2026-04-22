@@ -56,7 +56,7 @@ TBD — created by archiving change desktop-client. Update Purpose after archive
 
 ### Requirement: 回测与远程 API 对接
 
-系统 SHALL 通过 backtest-engine HTTP API 执行所有回测任务。
+系统 SHALL 通过 service-api HTTP API 执行所有回测任务。
 
 #### Scenario: 提交回测任务
 
@@ -84,7 +84,7 @@ TBD — created by archiving change desktop-client. Update Purpose after archive
 
 ### Requirement: 远程服务连接管理
 
-系统 SHALL 管理与远程 backtest-engine 的连接状态。
+系统 SHALL 管理与远程 service-api 的连接状态。
 
 #### Scenario: 配置远程服务地址
 

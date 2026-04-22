@@ -60,7 +60,7 @@ describe('toFriendlyError rules', () => {
   });
 
   test('AI_REJECTED (403) → ai_rejected rule, not auth', () => {
-    // The raw message from backtest-engine is
+    // The raw message from service-api is
     // `AI_REJECTED: code rejected by AI reviewer` which also contains the
     // substring "403" via HTTP status.  Gate 2 rule must win over auth rule.
     const fe = toFriendlyError(

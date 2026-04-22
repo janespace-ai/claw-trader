@@ -1,0 +1,68 @@
+# Shares TimescaleDB with data-aggregator: start data-aggregator first (or `make db-up`)
+# so networks `claw-net` / `claw-sandbox-net` and container `timescaledb` exist.
+#
+# As of the sandbox-service migration, service-api (formerly backtest-engine) no longer launches
+# Docker containers directly — there is no docker.sock mount.  All user-code
+# execution is delegated to the sandbox-service container
+# (see ../sandbox-service/docker-compose.yml or the root compose).
+services:
+  service-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: claw-service-api:latest
+    container_name: claw-service-api
+    restart: unless-stopped
+    depends_on:
+      - sandbox-service
+    environment:
+      SERVICE_API_DATABASE_HOST: timescaledb
+      SERVICE_API_DATABASE_PORT: 5432
+      SERVICE_API_DATABASE_USER: claw
+      SERVICE_API_DATABASE_PASSWORD: claw
+      SERVICE_API_DATABASE_NAME: claw
+      # readonly user must be created via migration; password below is what sandbox-service workers use
+      SERVICE_API_READONLY_USER: claw_readonly
+      SERVICE_API_READONLY_PASSWORD: claw_readonly
+      # sandbox-service dispatch target (internal network name).
+      SERVICE_API_SANDBOX_SERVICE_URL: http://sandbox-service:8090
+      # Callback URL that sandbox-service workers post progress/complete/error to.
+      SERVICE_API_CALLBACK_BASE: http://claw-service-api:8081
+      # Gate 2 AI reviewer — leave DEEPSEEK_API_KEY empty to run with Gate 1 only.
+      DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
+      SERVICE_API_AI_REVIEW_ENABLED: "${SERVICE_API_AI_REVIEW_ENABLED:-false}"
+    ports:
+      - "8081:8081"
+    networks:
+      - claw-net
+      - claw-sandbox-net
+
+  sandbox-service:
+    build:
+      context: ../sandbox-service
+      dockerfile: Dockerfile
+    image: claw-sandbox-service:latest
+    container_name: claw-sandbox-service
+    restart: unless-stopped
+    environment:
+      # DB readonly URL — sandbox-service workers open a DBReader with this.
+      CLAW_READONLY_DB_URL: postgresql://claw_readonly:claw_readonly@timescaledb:5432/claw
+      SANDBOX_POOL__POOL_SIZE: "4"
+      SANDBOX_POOL__RECYCLE_AFTER_JOBS: "50"
+      SANDBOX_HTTP__PORT: "8090"
+    networks:
+      - claw-net            # needs timescaledb access
+      - claw-sandbox-net    # service-api reaches us here
+
+networks:
+  claw-net:
+    external: true
+    name: claw-net
+  claw-sandbox-net:
+    external: true
+    # Historically "internal: true" on this network kept sandbox containers
+    # isolated from the internet.  With the long-lived service model, the
+    # network still scopes who can reach sandbox-service (only service-api
+    # needs to) — the `internal: true` flag is set on the network definition
+    # in the root compose / data-aggregator stack.
+    name: claw-sandbox-net

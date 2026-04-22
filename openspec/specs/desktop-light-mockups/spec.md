@@ -95,7 +95,7 @@ After drawing a screen, the author SHALL capture a screenshot via `mcp__pencil__
 
 ### Requirement: Runtime code is untouched
 
-This change SHALL NOT modify any file outside `design/trader.pen` and the `openspec/` change directory. Specifically, no source under `desktop-client/`, `data-aggregator/`, `backtest-engine/`, `docker/`, or config roots is edited.
+This change SHALL NOT modify any file outside `design/trader.pen` and the `openspec/` change directory. Specifically, no source under `desktop-client/`, `data-aggregator/`, `service-api/`, `docker/`, or config roots is edited.
 
 #### Scenario: Git diff scope check
 

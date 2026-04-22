@@ -2,11 +2,11 @@
 
 ## Purpose
 
-TBD — created by archiving change backtest-engine. Update Purpose after archive.
+TBD — created by archiving change service-api. Update Purpose after archive.
 ## Requirements
 ### Requirement: Screener 基类 API
 
-系统 SHALL 提供 `Screener` 基类，用户继承并实现 `filter()` 方法来定义选币逻辑。每个币种独立调用 `filter()`，返回是否通过筛选及评分。基类代码由 sandbox-service 容器持有，不再由 backtest-engine 挂载给一次性容器。
+系统 SHALL 提供 `Screener` 基类，用户继承并实现 `filter()` 方法来定义选币逻辑。每个币种独立调用 `filter()`，返回是否通过筛选及评分。基类代码由 sandbox-service 容器持有，不再由 service-api 挂载给一次性容器。
 
 #### Scenario: 最小化选币实现
 

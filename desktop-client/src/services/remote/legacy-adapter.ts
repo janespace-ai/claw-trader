@@ -1,6 +1,6 @@
 // Adapter layer: normalizes today's drifted backend responses into the
 // canonical shapes declared in `api/openapi.yaml`. Lives only until
-// `backtest-engine-align-contract` ships; after that, this file is
+// `service-api-align-contract` ships; after that, this file is
 // deleted (the cremote client calls real handlers directly).
 //
 // Each adapter is a thin normalization: it accepts whatever the real

@@ -39,7 +39,7 @@ db:
 # request — only hosts in this list are dialled.
 callback:
   allowlist_hosts:
-    - "backtest-engine"    # docker service name on claw-sandbox-net
+    - "service-api"    # docker service name on claw-sandbox-net
     - "localhost"          # local dev
   retry_delays_seconds: [1, 3, 10]
   on_disk_queue_path: "/var/lib/claw-sandbox/callback_queue.sqlite"

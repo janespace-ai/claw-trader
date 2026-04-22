@@ -26,8 +26,8 @@ run() {
 echo "[pre-commit] fast checks"
 run "cd data-aggregator && go build ./..."
 run "cd data-aggregator && go vet ./..."
-run "cd backtest-engine && go build ./..."
-run "cd backtest-engine && go vet ./..."
+run "cd service-api && go build ./..."
+run "cd service-api && go vet ./..."
 
 if [[ -d desktop-client/node_modules ]]; then
   run "cd desktop-client && npx tsc --noEmit"

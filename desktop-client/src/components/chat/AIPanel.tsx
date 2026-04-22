@@ -109,7 +109,7 @@ export function AIPanel() {
         if (!strategyId) {
           // Create strategy + implicit v1 on backend. The backend
           // currently doesn't auto-create v1 yet (that's the
-          // backtest-engine-strategy-versions change) — in the
+          // service-api-strategy-versions change) — in the
           // meantime we still record the strategy row.
           const created = await cremote.createStrategy({
             name: parsed.summary.name || draftName || 'Untitled',

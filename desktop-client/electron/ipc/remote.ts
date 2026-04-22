@@ -1,6 +1,6 @@
 import type { IpcMain } from 'electron';
 
-/** Remote backtest-engine API client. Runs in main process so renderer
+/** Remote service-api API client. Runs in main process so renderer
  *  doesn't have to deal with CORS / cookies / connection retries.
  *
  *  The baseURL is seeded by registerRemoteHandlers() from the resolved

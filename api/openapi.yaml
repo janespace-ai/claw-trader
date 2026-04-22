@@ -3,7 +3,7 @@ info:
   title: Claw Trader backend API
   version: 1.0.0
   description: |
-    Contract between `desktop-client` (consumer) and `backtest-engine`
+    Contract between `desktop-client` (consumer) and `service-api`
     (producer). Frozen canonical shapes; backend alignment is tracked
     as follow-up work. See `api/README.md` for workflow and
     `api/errors.md` for the error-code dictionary.
@@ -13,7 +13,7 @@ info:
 
 servers:
   - url: http://localhost:8081
-    description: Local backtest-engine (default)
+    description: Local service-api (default)
   - url: http://{host}:{port}
     description: Custom
     variables:
