@@ -1,4 +1,7 @@
-"""Indicator helpers built on numpy/pandas. ta-lib is also available in the sandbox."""
+"""Indicator helpers built on numpy/pandas (no ta-lib dep — keeps the
+sandbox image minimal). If you need ta-lib's wider catalogue, add the
+``ta-lib`` wheel to sandbox-service's pyproject.toml and the AST module
+whitelist in service-api/config.yaml."""
 
 from __future__ import annotations
 

@@ -176,7 +176,7 @@ Bring your own API key. It stays on your machine.
 - **Languages**: Go (services), Python 3.11 (strategies), TypeScript + React (client)
 - **Storage**: [TimescaleDB](https://www.timescale.com/) (Postgres + time-series)
 - **Charting**: [TradingView Lightweight Charts](https://www.tradingview.com/lightweight-charts/)
-- **Indicators**: [TA-Lib](https://github.com/TA-Lib/ta-lib)
+- **Indicators**: pure numpy / pandas (`claw.indicators`) — keeps the sandbox image small
 
 ## Project layout
 

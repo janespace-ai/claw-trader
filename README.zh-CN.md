@@ -174,7 +174,7 @@ API Key 自备,只存在你本机。
 - **语言**:Go(服务)、Python 3.11(策略)、TypeScript + React(客户端)
 - **存储**:[TimescaleDB](https://www.timescale.com/)(PostgreSQL + 时序扩展)
 - **图表**:[TradingView Lightweight Charts](https://www.tradingview.com/lightweight-charts/)
-- **指标**:[TA-Lib](https://github.com/TA-Lib/ta-lib)
+- **指标**:纯 numpy / pandas 实现(`claw.indicators`)——保持沙箱镜像精简
 
 ## 目录结构
 

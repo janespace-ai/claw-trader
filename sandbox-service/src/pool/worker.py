@@ -3,7 +3,7 @@
 Lifecycle:
 
 1.  Master forks the process; ``worker_main`` is called in the child.
-2.  Warm up: import the heavy libs (numpy / pandas / ta-lib) so the first
+2.  Warm up: import the heavy libs (numpy / pandas / claw) so the first
     real job doesn't eat ~1 s of import time.
 3.  Apply rlimits (memory / CPU / FSIZE) for the child process itself.
 4.  Loop on the job queue:
@@ -139,18 +139,15 @@ def worker_main(
 def _warmup() -> None:
     """Pre-import heavy deps so the first job doesn't pay the cold-import toll.
 
-    ta-lib can be missing on dev machines (notably macOS without Homebrew);
-    swallow ImportError and log so ``pytest`` still runs tests that don't
-    exercise indicators.
+    ta-lib is intentionally NOT in the image — claw's indicators are pure
+    numpy/pandas (see ``claw.indicators``).  If a future feature needs it,
+    add ``ta-lib>=0.5`` (manylinux wheel) to ``pyproject.toml`` and restore
+    the warmup here.
     """
     import importlib  # noqa: PLC0415
 
     for mod in ("numpy", "pandas"):
         importlib.import_module(mod)
-    try:
-        importlib.import_module("talib")
-    except ImportError as exc:
-        log.warning({"event": "warmup_skip_talib", "reason": str(exc)})
 
     # claw framework itself — loading engine/data triggers the rest.
     for mod in ("claw", "claw.strategy", "claw.screener", "claw.engine", "claw.data"):

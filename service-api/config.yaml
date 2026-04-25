@@ -48,7 +48,8 @@ compliance:
   module_whitelist:
     - "numpy"
     - "pandas"
-    - "talib"
+    # ta-lib is NOT installed in sandbox-service; users should use claw.indicators.
+    # If you re-add ta-lib to the sandbox image, also re-add "talib" here.
     - "math"
     - "datetime"
     - "collections"
