@@ -8,6 +8,19 @@
 # back via a manylinux wheel (ta-lib>=0.5) when actually needed.
 FROM python:3.11-slim-bookworm
 
+# Mirror override — for builds in regions where the PyPI default CDN is slow
+# (e.g. mainland China, where PyPI to a Tencent Cloud VM can hit single-digit
+# kB/s).  Default stays on PyPI so CI / international contributors aren't
+# coupled to a regional mirror.
+#
+# Override via:
+#   docker compose build --build-arg PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple/
+#
+# Or persistently in service-api/.env (compose forwards it as build-arg):
+#   PIP_INDEX_URL=https://mirrors.cloud.tencent.com/pypi/simple/
+ARG PIP_INDEX_URL=https://pypi.org/simple/
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
