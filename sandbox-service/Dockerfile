@@ -10,19 +10,28 @@ FROM python:3.11-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
-# ---- Python deps (single layer; pure wheels so no build tools needed) ----
+# Both pyproject.toml AND src/ must be present before pip install: setuptools
+# discovers packages via [tool.setuptools.packages.find] where=["src"], and
+# fails the wheel build if src/ isn't there.  We deliberately copy them
+# together so a touch in src/ invalidates this layer and re-runs pip — the
+# BuildKit pip cache mount below means the re-run is ~30s when wheels are
+# already downloaded (vs ~3min cold).
 COPY pyproject.toml /app/pyproject.toml
-RUN set -eux; \
+COPY src /app/src
+
+# ---- Python deps (pure wheels so no build tools needed) ----
+# `--mount=type=cache` requires BuildKit; harmless on legacy builders (just
+# means each fresh build re-downloads wheels).  Enable buildx for the speedup.
+RUN --mount=type=cache,target=/root/.cache/pip \
+    set -eux; \
     pip install --upgrade pip; \
     pip install /app
 
-# ---- App source ----
-COPY src /app/src
+# ---- Runtime config (separate layer so config tweaks don't bust pip) ----
 COPY config.yaml /app/config.yaml
 
 # Mount point for on-disk callback queue; compose can override with a named volume.
