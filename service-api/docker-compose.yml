@@ -41,6 +41,10 @@ services:
     build:
       context: ../sandbox-service
       dockerfile: Dockerfile
+      args:
+        # Forward PIP_INDEX_URL to the Dockerfile so regional builds (e.g.
+        # Tencent Cloud) can swap to a closer mirror via service-api/.env.
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple/}
     image: claw-sandbox-service:latest
     container_name: claw-sandbox-service
     restart: unless-stopped
