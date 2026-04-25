@@ -7,6 +7,7 @@ import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
 import { useCoinListStore } from '@/stores/coinListStore';
 import { useAutoRunStore } from '@/stores/autoRunStore';
+import { useScreenerRunStore } from '@/stores/screenerRunStore';
 import { startChatStream } from '@/services/llm/client';
 import { systemPromptFor } from '@/services/prompt';
 import { strategistSystemPrompt } from '@/services/prompt/personas/strategist';
@@ -43,6 +44,7 @@ export function AIPanel() {
   const draftName = useWorkspaceDraftStore((s) => s.name);
   const setSymbols = useCoinListStore((s) => s.set);
   const setAutoRunStatus = useAutoRunStore((s) => s.setStatus);
+  const seedScreenerResults = useScreenerRunStore((s) => s.seed);
 
   /** True when the app is currently in the Strategy Design workspace —
    *  the Strategist persona's auto-save flow should engage. */
@@ -68,12 +70,20 @@ export function AIPanel() {
         onUpdate: (state) => {
           setAutoRunStatus(state, messageIndex);
           if (state.phase === 'done') {
+            // coinListStore drives the top symbol bar; screenerRunStore drives
+            // the LEFT "通过" panel + chart markers + watchlist.  Both need
+            // the result or the user sees the AI claim "11 matched" while
+            // the actual list stays empty.
             setSymbols(state.symbols);
+            seedScreenerResults({
+              results: state.results,
+              focusedSymbol: state.symbols[0] ?? null,
+            });
           }
         },
       });
     },
-    [currentTab, setAutoRunStatus, setSymbols],
+    [currentTab, setAutoRunStatus, setSymbols, seedScreenerResults],
   );
 
   const loadConversation = (c: Conversation) => {
