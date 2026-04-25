@@ -30,8 +30,15 @@ def apply(limits: JobLimits) -> None:
     if hasattr(resource, "RLIMIT_NPROC"):
         _set(resource.RLIMIT_NPROC, limits.max_processes, limits.max_processes)
 
-    # File size written — 0 effectively disables all writes.
-    _set(resource.RLIMIT_FSIZE, limits.max_file_size_bytes, limits.max_file_size_bytes)
+    # File size written.  0 means "do not set RLIMIT_FSIZE" (inherit unlimited):
+    # the worker opens a SQLite callback spill queue before jobs run; FSIZE=0
+    # would forbid any file growth and breaks sqlite with disk I/O errors.
+    if limits.max_file_size_bytes > 0:
+        _set(
+            resource.RLIMIT_FSIZE,
+            limits.max_file_size_bytes,
+            limits.max_file_size_bytes,
+        )
 
 
 def _set(rtype: int, soft: int, hard: int) -> None:

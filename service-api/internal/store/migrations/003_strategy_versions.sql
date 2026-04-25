@@ -34,23 +34,37 @@ ALTER TABLE {{.Schema}}.strategies
 
 -- 3. Backfill: each pre-existing strategies row gets a v1 version
 --    row with its original code + params_schema, iff no version row
---    exists yet for that strategy. Re-running this migration is a
---    no-op.
-INSERT INTO {{.Schema}}.strategy_versions
-    (strategy_id, version, code, summary, params_schema, parent_version, created_at)
-SELECT
-    s.id,
-    1,
-    s.code,
-    'Initial version',
-    s.params_schema,
-    NULL,
-    s.created_at
-FROM {{.Schema}}.strategies s
-WHERE NOT EXISTS (
-    SELECT 1 FROM {{.Schema}}.strategy_versions sv
-    WHERE sv.strategy_id = s.id
-);
+--    exists yet for that strategy.
+--
+--    service-api re-applies all migration files on every boot; after the
+--    first successful run `code` / `params_schema` are dropped (step 4).
+--    Guard the INSERT so re-runs do not reference removed columns.
+DO $strategy_versions_backfill$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = '{{.Schema}}'
+          AND table_name = 'strategies'
+          AND column_name = 'code'
+    ) THEN
+        INSERT INTO {{.Schema}}.strategy_versions
+            (strategy_id, version, code, summary, params_schema, parent_version, created_at)
+        SELECT
+            s.id,
+            1,
+            s.code,
+            'Initial version',
+            s.params_schema,
+            NULL,
+            s.created_at
+        FROM {{.Schema}}.strategies s
+        WHERE NOT EXISTS (
+            SELECT 1 FROM {{.Schema}}.strategy_versions sv
+            WHERE sv.strategy_id = s.id
+        );
+    END IF;
+END
+$strategy_versions_backfill$;
 
 -- 4. Drop the legacy columns from `strategies` — their data now lives
 --    on `strategy_versions`. Existing callers read via the join.

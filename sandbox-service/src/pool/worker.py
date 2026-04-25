@@ -23,7 +23,9 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import replace
 from multiprocessing import Queue
+from pathlib import Path
 from queue import Empty
 from typing import Any
 
@@ -71,7 +73,15 @@ def worker_main(
     from callback.client import CallbackClient  # noqa: PLC0415
     from worker.job_runner import DBCreds, Job, run_job  # noqa: PLC0415
 
-    callback_client = CallbackClient(callback_cfg)
+    # One SQLite file per worker: concurrent WAL/open on the same path from
+    # multiple processes triggers sqlite3.OperationalError: disk I/O error on
+    # typical container overlays.
+    qpath = Path(callback_cfg.on_disk_queue_path)
+    per_worker_cfg = replace(
+        callback_cfg,
+        on_disk_queue_path=str(qpath.parent / f"{qpath.stem}_w{worker_id}{qpath.suffix}"),
+    )
+    callback_client = CallbackClient(per_worker_cfg)
     jobs_done = 0
 
     while True:

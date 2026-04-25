@@ -27,7 +27,8 @@ job_limits:
   memory_mb: 2048        # RLIMIT_AS (virtual memory)
   cpu_seconds: 1800      # RLIMIT_CPU (30 min)
   max_processes: 32      # RLIMIT_NPROC
-  max_file_size_bytes: 0 # RLIMIT_FSIZE — 0 disables all writes
+  # RLIMIT_FSIZE — 0 = do not cap (worker needs SQLite callback queue); >0 = max bytes per written file
+  max_file_size_bytes: 0
 
 # TimescaleDB connection for user code to pull k-lines.
 # MUST use the `claw_readonly` account.  DO NOT point at the main `claw` user.
