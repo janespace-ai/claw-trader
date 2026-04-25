@@ -9,7 +9,7 @@ to this service over HTTP rather than shelling out to the Docker daemon.
 - Removes `/var/run/docker.sock` from `service-api` (no more equivalent-
   root exposure, no more Docker daemon permission errors).
 - Avoids ~800 ms–2 s cold-start per job — workers pre-import
-  numpy / pandas / ta-lib / `claw` framework once at boot.
+  numpy / pandas / `claw` framework once at boot.
 - Resource limits are applied per-job via Linux `rlimit` inside each worker,
   not by spinning up a container.
 
@@ -20,7 +20,7 @@ rationale.
 
 ```
 sandbox-service/
-├── Dockerfile               # ta-lib built from source + pip install
+├── Dockerfile               # python:3.11-slim + pure-wheel pip install (~3 min build)
 ├── config.yaml              # pool size, job limits, DB url, callback allowlist
 ├── pyproject.toml           # deps + tooling
 ├── src/

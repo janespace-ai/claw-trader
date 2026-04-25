@@ -1,8 +1,11 @@
 # claw-sandbox-service — long-lived Python sandbox with prefork worker pool.
 #
-# Base image pattern mirrors service-api/sandbox/Dockerfile because we
-# need the same native ta-lib compiled from source, and we want the same
-# numpy/pandas/ta-lib ABI so user code behaves identically after migration.
+# All deps are pure-Python or ship as manylinux wheels (numpy, pandas,
+# psycopg-binary), so we don't need build-essential or any compile step.
+# Build time: ~2-3 minutes (was ~25 minutes when ta-lib was compiled from
+# source).  ta-lib was dropped in commit drop-talib-from-sandbox — claw's
+# indicators module is implemented in numpy/pandas directly; bring ta-lib
+# back via a manylinux wheel (ta-lib>=0.5) when actually needed.
 FROM python:3.11-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
@@ -12,30 +15,11 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# ---- Native ta-lib + Python deps (single layer so build tools can be purged) ----
+# ---- Python deps (single layer; pure wheels so no build tools needed) ----
 COPY pyproject.toml /app/pyproject.toml
 RUN set -eux; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
-        build-essential wget ca-certificates; \
-    cd /tmp; \
-    wget -q https://github.com/TA-Lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6.4-src.tar.gz; \
-    tar xzf ta-lib-0.6.4-src.tar.gz; \
-    cd ta-lib-0.6.4; \
-    ./configure --prefix=/usr; \
-    make -j"$(nproc)"; \
-    make install; \
-    # ta-lib 0.6.x ships libta-lib.{so,a} (hyphen); ta-lib==0.4.32 python wheel
-    # still links -lta_lib (underscore). Symlink legacy names so the wrapper
-    # wheel compiles (same workaround used in service-api sandbox image).
-    ln -sf libta-lib.so /usr/lib/libta_lib.so; \
-    ln -sf libta-lib.a  /usr/lib/libta_lib.a; \
-    cd /; rm -rf /tmp/ta-lib*; \
-    # Install service deps from pyproject.  Use pip's PEP 621 support.
     pip install --upgrade pip; \
-    pip install /app; \
-    apt-get purge -y --auto-remove build-essential wget; \
-    rm -rf /var/lib/apt/lists/*
+    pip install /app
 
 # ---- App source ----
 COPY src /app/src

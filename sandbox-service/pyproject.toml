@@ -17,7 +17,6 @@ dependencies = [
     "psycopg[binary]==3.2.3",
     "numpy==1.26.4",
     "pandas==2.2.2",
-    "ta-lib==0.4.32",
     "pyyaml==6.0.2",
 ]
 
