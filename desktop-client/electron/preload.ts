@@ -45,11 +45,6 @@ const bridge = {
       list: (filter?: unknown) => invoke('db:backtestResults:list', filter),
       get: (id: string) => invoke('db:backtestResults:get', id),
     },
-    coinLists: {
-      save: (list: unknown) => invoke('db:coinLists:save', list),
-      list: () => invoke('db:coinLists:list'),
-      get: (id: string) => invoke('db:coinLists:get', id),
-    },
     settings: {
       get: <T = string>(key: string) => invoke<T>('db:settings:get', key),
       set: (key: string, value: unknown) => invoke('db:settings:set', key, value),

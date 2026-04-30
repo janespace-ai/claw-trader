@@ -7,22 +7,20 @@
 
 import { useAppStore } from '@/stores/appStore';
 import { useWorkspaceStore, type WorkspaceMode } from '@/stores/workspaceStore';
-import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
 import { useSignalReviewStore } from '@/stores/signalReviewStore';
 import { useOptimLensStore } from '@/stores/optimlensStore';
-import { useScreenerRunStore } from '@/stores/screenerRunStore';
 import type { AppRoute } from '@/types/navigation';
-import type { StrategySummary } from '@/services/prompt/personas/parsers';
 import type { components } from '@/types/api';
 
 type SignalVerdict = components['schemas']['SignalVerdict'];
 type SignalSummary = components['schemas']['SignalReviewResult']['summary'];
 
-interface StrategistDraftSeed {
-  strategyId?: string;
-  summary: StrategySummary;
-  code: string;
-}
+// `seedStrategistDraft` and `seedScreenerRun` were removed in Group 14
+// cleanup along with their underlying stores (`workspaceDraftStore` and
+// `screenerRunStore`).  When the new `strategySessionStore` lands
+// (Group 3 of unified-strategy-workspace), re-introduce a single
+// `seedStrategySession` helper that covers both the draft + the
+// per-session symbol list.
 
 interface PreviewSeed {
   taskId: string;
@@ -43,27 +41,9 @@ export function installTestBridge(): void {
         useWorkspaceStore.getState().enterDesign();
       }
     },
-    /** Seed a strategist draft for deterministic visual-regression shots. */
-    seedStrategistDraft(draft: StrategistDraftSeed) {
-      useWorkspaceDraftStore.getState().setDraft({
-        strategyId: draft.strategyId,
-        summary: draft.summary,
-        code: draft.code,
-      });
-    },
     /** Flip the Workspace view mode (Chart ↔ Grid). */
     setWorkspaceViewMode(mode: 'chart' | 'grid') {
       useWorkspaceStore.getState().setViewMode(mode);
-    },
-    /** Seed the screener run store with deterministic results. */
-    seedScreenerRun(seed: {
-      focusedSymbol?: string;
-      results: components['schemas']['ScreenerRowResult'][];
-    }) {
-      useScreenerRunStore.getState().seed({
-        results: seed.results,
-        focusedSymbol: seed.focusedSymbol ?? null,
-      });
     },
     /** Seed an OptimLens entry for Deep screen visual specs. */
     seedOptimLens(seed: {

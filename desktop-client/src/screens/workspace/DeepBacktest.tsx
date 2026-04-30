@@ -10,11 +10,9 @@ import {
   type MonthlyReturn,
 } from '@/components/primitives';
 import { TradesTab } from '@/components/workspace/TradesTab';
-import { CrossSymbolGrid } from '@/components/workspace/CrossSymbolGrid';
 import { cremote } from '@/services/remote/contract-client';
 import { useAppStore } from '@/stores/appStore';
 import { useOptimLensStore } from '@/stores/optimlensStore';
-import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { DeepTopbar } from './DeepTopbar';
 import { ImprovementList } from './ImprovementList';
@@ -48,10 +46,15 @@ export function DeepBacktest() {
   const currentStrategyId = useWorkspaceStore((s) => s.currentStrategyId);
   const viewMode = useWorkspaceStore((s) => s.viewMode);
   const setViewMode = useWorkspaceStore((s) => s.setViewMode);
-  const draftCode = useWorkspaceDraftStore((s) => s.code);
-  const draftSummary = useWorkspaceDraftStore((s) => s.summary);
-  const draftName = useWorkspaceDraftStore((s) => s.name);
-  const draftParams = useWorkspaceDraftStore((s) => s.params);
+  // workspaceDraftStore was removed in Group 14 cleanup.  Group 4-7 of
+  // unified-strategy-workspace will replace these reads with the new
+  // `useStrategySessionStore` selectors.  Stub for now so DeepBacktest
+  // still compiles as a "view full report" drill-down surface.
+  type DraftSummaryShape = { name?: string; params?: Record<string, unknown> };
+  const draftCode = null as string | null;
+  const draftSummary = null as DraftSummaryShape | null;
+  const draftName = '';
+  const draftParams: Record<string, unknown> = {};
   const navigate = useAppStore((s) => s.navigate);
 
   const [tab, setTab] = useState<Tab>(readInitialTab());
@@ -140,8 +143,8 @@ export function DeepBacktest() {
 
   // --- Optimize flow -----------------------------------------------------
   const paramsSchema: Record<string, unknown> = useMemo(() => {
-    if (draftSummary?.params) return draftSummary.params;
-    return draftParams ?? {};
+    if (draftSummary?.params) return draftSummary.params as Record<string, unknown>;
+    return draftParams;
   }, [draftSummary, draftParams]);
 
   const handleOptimizeSubmit = useCallback(
@@ -204,42 +207,15 @@ export function DeepBacktest() {
       }
       main={
         <div className="flex flex-col gap-4 p-4">
-          {viewMode === 'chart' ? (
-            <ClawChart.Equity data={equity} height={300} />
-          ) : (
-            <CrossSymbolGrid
-              cells={uniqueSymbols.map((sym) => {
-                const ts = allTrades.filter((t) => t.symbol === sym);
-                let cum = 1;
-                const eq = ts
-                  .slice()
-                  .sort((a, b) => (a.exit_ts ?? a.entry_ts) - (b.exit_ts ?? b.entry_ts))
-                  .map((t) => {
-                    cum *= 1 + (t.pnl_pct ?? 0);
-                    return { ts: t.exit_ts ?? t.entry_ts, value: cum };
-                  });
-                return {
-                  symbol: sym,
-                  equity: eq,
-                  returnPct: eq.length > 0 ? eq[eq.length - 1].value - 1 : 0,
-                  trades: ts.length,
-                };
-              })}
-              focusedSymbol={focusedSymbol}
-              onSingleClick={(s) => {
-                setFocus(s);
-                setViewMode('chart');
-              }}
-              onDoubleClick={(s) =>
-                navigate({
-                  kind: 'symbol-detail',
-                  symbol: s,
-                  returnTo: { kind: 'workspace' },
-                  backtestTaskId: currentTaskId ?? undefined,
-                })
-              }
-            />
-          )}
+          {/*
+            CrossSymbolGrid was removed in Group 14 cleanup.  The
+            multi-symbol grid view will be re-introduced (or replaced
+            by the new sortable per-symbol table from
+            multi-symbol-backtest-results capability) during Group 6 of
+            the unified-strategy-workspace change.  For now, only the
+            equity chart view is rendered.
+          */}
+          <ClawChart.Equity data={equity} height={300} />
           <MetricsGrid metrics={headline} minColWidth={160} />
           <div className="flex items-center gap-2 border-b border-border-subtle">
             {(

@@ -52,15 +52,6 @@ export function initDB(dbPath: string): void {
     );
     CREATE INDEX IF NOT EXISTS backtest_results_strategy_idx ON backtest_results(strategy_id);
 
-    CREATE TABLE IF NOT EXISTS coin_lists (
-      id          TEXT PRIMARY KEY,
-      name        TEXT,
-      symbols     TEXT NOT NULL,
-      screener_id TEXT,
-      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
     CREATE TABLE IF NOT EXISTS settings (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
@@ -229,34 +220,6 @@ export function registerDBHandlers(ipcMain: IpcMain): void {
     return row ? inflateBacktestResult(row) : null;
   });
 
-  // ---- coin_lists ----
-  ipcMain.handle('db:coinLists:save', (_e, list: any) => {
-    const d = requireDB();
-    const id = list.id ?? randomUUID();
-    const exists = d.prepare('SELECT id FROM coin_lists WHERE id = ?').get(id);
-    if (exists) {
-      d.prepare(
-        `UPDATE coin_lists SET name = ?, symbols = ?, screener_id = ?,
-         updated_at = datetime('now') WHERE id = ?`,
-      ).run(list.name ?? null, JSON.stringify(list.symbols ?? []), list.screener_id ?? null, id);
-    } else {
-      d.prepare(
-        `INSERT INTO coin_lists (id, name, symbols, screener_id) VALUES (?, ?, ?, ?)`,
-      ).run(id, list.name ?? null, JSON.stringify(list.symbols ?? []), list.screener_id ?? null);
-    }
-    return id;
-  });
-
-  ipcMain.handle('db:coinLists:list', () => {
-    const rows = requireDB().prepare('SELECT * FROM coin_lists ORDER BY updated_at DESC').all();
-    return rows.map(inflateCoinList);
-  });
-
-  ipcMain.handle('db:coinLists:get', (_e, id: string) => {
-    const row = requireDB().prepare('SELECT * FROM coin_lists WHERE id = ?').get(id);
-    return row ? inflateCoinList(row) : null;
-  });
-
   // ---- settings ----
   ipcMain.handle('db:settings:get', (_e, key: string) => {
     const row: any = requireDB().prepare('SELECT value FROM settings WHERE key = ?').get(key);
@@ -308,9 +271,3 @@ function inflateBacktestResult(row: any) {
   };
 }
 
-function inflateCoinList(row: any) {
-  return {
-    ...row,
-    symbols: row.symbols ? JSON.parse(row.symbols) : [],
-  };
-}

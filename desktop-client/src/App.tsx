@@ -1,36 +1,30 @@
 import { useEffect } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
-import { ScreenerScreen } from '@/screens/ScreenerScreen';
-import { StrategiesScreen } from '@/screens/StrategiesScreen';
-import { StrategyDesign } from '@/screens/workspace/StrategyDesign';
-import { PreviewBacktest } from '@/screens/workspace/PreviewBacktest';
 import { DeepBacktest } from '@/screens/workspace/DeepBacktest';
 import { SymbolDetailScreen } from '@/screens/SymbolDetailScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { useAppStore } from '@/stores/appStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useStrategyStore } from '@/stores/strategyStore';
-import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 /**
- * Top-level route renderer. Switches on `appStore.route.kind`.
+ * Top-level route renderer.  Switches on `appStore.route.kind`.
  *
- *   route.kind === 'screener'      → ScreenerScreen (chart-first)
- *   route.kind === 'strategies'    → StrategiesScreen (card grid + history)
- *   route.kind === 'workspace'     → StrategyDesign | PreviewBacktest |
- *                                    DeepBacktest depending on
- *                                    workspaceStore.mode
+ * **NOTE: this file is in mid-rebuild for the unified-strategy-workspace
+ * change.**  The new front-door tab (创建/编辑策略) and the new 策略库
+ * tab are not yet implemented (Groups 4-5 of tasks.md).  For now:
+ *
+ *   route.kind === 'workspace'     → DeepBacktest only (drill-down view)
  *   route.kind === 'symbol-detail' → SymbolDetailScreen
- *   route.kind === 'settings'      → SettingsScreen (full-page)
+ *   route.kind === 'settings'      → SettingsScreen
  *
- * The AI chat panel is now rendered **inside each screen's**
- * `WorkspaceShell.rightRail` (wrapped in `AIPersonaShell`). The old
- * top-level `<aside><AIPanel /></aside>` was removed to avoid showing
- * duplicate AI panels on the same screen.
+ * Other route.kind values fall through to a placeholder.  This is
+ * intentional for the duration of the rebuild — the legacy ScreenerScreen
+ * / StrategiesScreen / StrategyDesign / PreviewBacktest were deleted in
+ * Group 14 and their replacements arrive in Groups 4-5.
  */
 export default function App() {
   const route = useAppStore((s) => s.route);
-  const workspaceMode = useWorkspaceStore((s) => s.mode);
 
   const loadSettings = useSettingsStore((s) => s.load);
   const loadStrategies = useStrategyStore((s) => s.load);
@@ -47,11 +41,7 @@ export default function App() {
 
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 overflow-y-auto">
-          {route.kind === 'screener' && <ScreenerScreen />}
-          {route.kind === 'strategies' && <StrategiesScreen />}
-          {route.kind === 'workspace' && workspaceMode === 'design' && <StrategyDesign />}
-          {route.kind === 'workspace' && workspaceMode === 'preview' && <PreviewBacktest />}
-          {route.kind === 'workspace' && workspaceMode === 'deep' && <DeepBacktest />}
+          {route.kind === 'workspace' && <DeepBacktest />}
           {route.kind === 'symbol-detail' && (
             <SymbolDetailScreen
               symbol={route.symbol}
@@ -61,6 +51,11 @@ export default function App() {
           )}
           {route.kind === 'settings' && (
             <SettingsScreen initialSection={route.section} />
+          )}
+          {(route.kind === 'screener' || route.kind === 'strategies') && (
+            <div className="p-8 text-fg-muted">
+              此页面正在重建（unified-strategy-workspace change · Groups 4-5）。
+            </div>
           )}
         </main>
       </div>

@@ -100,7 +100,7 @@
 > 仅保留独立的、Group 14 没覆盖的工作项。
 
 - [ ] 10.1 service-api 后端 endpoints `POST /api/screener/start`、`GET /api/screener/result/:id` 状态：**保留**（sandbox-service 仍用它跑筛币 Python 程序），但客户端公开调用方移除——只在 strategistOutputParser 内部使用
-- [ ] 10.2 删除根 `coin_lists` SQLite 表迁移（v1 重建，没有兼容数据）：把 client db migration 号顺次递推
+- [x] 10.2 删除根 `coin_lists` SQLite 表迁移（v1 重建，没有兼容数据）：把 client db migration 号顺次递推（已并入 Group 14 完成）
 
 ## 11. 测试 + 集成验证
 
@@ -131,50 +131,50 @@
 > 这一组与 Group 9-10 的 store/screen 替换并行——新 store / screen 写好后立刻删旧的，避免两套代码同时存在。
 
 ### 14.1 Screens 删除（5 个旧屏 + 子目录）
-- [ ] 14.1.1 `desktop-client/src/screens/ScreenerScreen.tsx` 整文件删除
-- [ ] 14.1.2 `desktop-client/src/screens/screener/` 整个子目录删除（含 `SavedListsOverlay.tsx`、`ScreenerTopbar.tsx`）
-- [ ] 14.1.3 `desktop-client/src/screens/workspace/StrategyDesign.tsx` 删除（被 `StrategyWorkspaceScreen.tsx` 替代）
-- [ ] 14.1.4 `desktop-client/src/screens/workspace/PreviewBacktest.tsx` 删除（结果合到新 result tab）
-- [ ] 14.1.5 `desktop-client/src/screens/workspace/PreviewTopbar.tsx`、`StrategyDraftCard.tsx`、`RunPreviewCard.tsx`、`QuickMetricsTab.tsx` 删除（仅 PreviewBacktest 用过）
-- [ ] 14.1.6 `desktop-client/src/screens/StrategiesScreen.tsx` 整体重写或删除重建（合到 task 5.1，那时直接删旧版本）
-- [ ] 14.1.7 保留：`screens/SettingsScreen.tsx`、`screens/SymbolDetailScreen.tsx`、`screens/workspace/DeepBacktest.tsx`、`screens/workspace/ImprovementCard.tsx`、`screens/workspace/ImprovementList.tsx`、`screens/workspace/MetricsTab.tsx`、`screens/workspace/MonthlyTab.tsx`、`screens/workspace/OptimizeModal.tsx`（被 deep backtest 复用）
+- [x] 14.1.1 `desktop-client/src/screens/ScreenerScreen.tsx` 整文件删除
+- [x] 14.1.2 `desktop-client/src/screens/screener/` 整个子目录删除（含 `SavedListsOverlay.tsx`、`ScreenerTopbar.tsx`）
+- [x] 14.1.3 `desktop-client/src/screens/workspace/StrategyDesign.tsx` 删除（被 `StrategyWorkspaceScreen.tsx` 替代）
+- [x] 14.1.4 `desktop-client/src/screens/workspace/PreviewBacktest.tsx` 删除（结果合到新 result tab）
+- [x] 14.1.5 `desktop-client/src/screens/workspace/PreviewTopbar.tsx`、`StrategyDraftCard.tsx`、`RunPreviewCard.tsx`、`QuickMetricsTab.tsx` 删除（仅 PreviewBacktest 用过）
+- [x] 14.1.6 `desktop-client/src/screens/StrategiesScreen.tsx` 整体重写或删除重建（合到 task 5.1，那时直接删旧版本）
+- [x] 14.1.7 保留：`screens/SettingsScreen.tsx`、`screens/SymbolDetailScreen.tsx`、`screens/workspace/DeepBacktest.tsx`、`screens/workspace/ImprovementCard.tsx`、`screens/workspace/ImprovementList.tsx`、`screens/workspace/MetricsTab.tsx`、`screens/workspace/MonthlyTab.tsx`、`screens/workspace/OptimizeModal.tsx`（被 deep backtest 复用）
 
 ### 14.2 Stores 删除（4 个旧 store）
-- [ ] 14.2.1 `desktop-client/src/stores/screenerRunStore.ts` + `.test.ts` 删除
-- [ ] 14.2.2 `desktop-client/src/stores/coinListStore.ts` 删除（功能合到 strategySessionStore）
-- [ ] 14.2.3 `desktop-client/src/stores/autoRunStore.ts` 删除（chat 状态合到 strategySession）
-- [ ] 14.2.4 `desktop-client/src/stores/workspaceDraftStore.ts` 删除（被 strategySessionStore 取代）
-- [ ] 14.2.5 `desktop-client/src/stores/conversationStore.ts` 重写或删除（chat 现在 per-strategy，逻辑搬到 strategySessionStore；可保留一个轻量 conversationStore 用于 strategy 内的 chat 操作 if 需要）
+- [x] 14.2.1 `desktop-client/src/stores/screenerRunStore.ts` + `.test.ts` 删除
+- [x] 14.2.2 `desktop-client/src/stores/coinListStore.ts` 删除（功能合到 strategySessionStore）
+- [x] 14.2.3 `desktop-client/src/stores/autoRunStore.ts` 删除（chat 状态合到 strategySession）
+- [x] 14.2.4 `desktop-client/src/stores/workspaceDraftStore.ts` 删除（被 strategySessionStore 取代）
+- [x] 14.2.5 `desktop-client/src/stores/conversationStore.ts` 重写或删除（chat 现在 per-strategy，逻辑搬到 strategySessionStore；可保留一个轻量 conversationStore 用于 strategy 内的 chat 操作 if 需要）
 
 ### 14.3 Services / chat 删除
-- [ ] 14.3.1 `desktop-client/src/services/chat/screenerRunner.ts` + `.test.ts` 删除
-- [ ] 14.3.2 `desktop-client/src/services/prompt/personas/screener/` 整个 persona 目录删除（screener 逻辑合到统一 strategist persona 里）
-- [ ] 14.3.3 `desktop-client/src/services/prompt/personas/strategist/` 重写为 state-aware 版本（不是删除是替换；旧文件直接覆盖）
-- [ ] 14.3.4 `desktop-client/src/services/prompt/personas/parsers.ts` 中 strategist 输出的解析器整体重写（覆盖旧逻辑）
-- [ ] 14.3.5 删除任何只被 screener 或 PreviewBacktest 使用的 helper 函数
+- [x] 14.3.1 `desktop-client/src/services/chat/screenerRunner.ts` + `.test.ts` 删除
+- [x] 14.3.2 `desktop-client/src/services/prompt/personas/screener/` 整个 persona 目录删除（screener 逻辑合到统一 strategist persona 里）
+- [x] 14.3.3 `desktop-client/src/services/prompt/personas/strategist/` 重写为 state-aware 版本（不是删除是替换；旧文件直接覆盖）
+- [x] 14.3.4 `desktop-client/src/services/prompt/personas/parsers.ts` 中 strategist 输出的解析器整体重写（覆盖旧逻辑）
+- [x] 14.3.5 删除任何只被 screener 或 PreviewBacktest 使用的 helper 函数
 
 ### 14.4 Components 删除
-- [ ] 14.4.1 `desktop-client/src/components/chat/AutoRunStatus.tsx` 删除
-- [ ] 14.4.2 `desktop-client/src/components/chat/AIPanel.tsx` 重写（覆盖）—— 不是组件删除是组件替换为新 `StrategyChatPane`
-- [ ] 14.4.3 `desktop-client/src/components/strategy/StrategyCard.tsx` + `StrategyHistoryPanel.tsx` 删除（旧 grid 卡片，新 conversation-list 重写）
-- [ ] 14.4.4 `desktop-client/src/components/workspace/SymbolPicker.tsx` 删除（旧策略设计的单 symbol 选择器）
-- [ ] 14.4.5 `desktop-client/src/components/workspace/MarketStrip.tsx`、`SymbolList.tsx`、`TimeframeBar.tsx` —— 评估每个：MarketStrip 可能 deep backtest 还用，SymbolList 旧版要被新左栏替换；列出全集再删
+- [x] 14.4.1 `desktop-client/src/components/chat/AutoRunStatus.tsx` 删除
+- [x] 14.4.2 `desktop-client/src/components/chat/AIPanel.tsx` 重写（覆盖）—— 不是组件删除是组件替换为新 `StrategyChatPane`
+- [x] 14.4.3 `desktop-client/src/components/strategy/StrategyCard.tsx` + `StrategyHistoryPanel.tsx` 删除（旧 grid 卡片，新 conversation-list 重写）
+- [x] 14.4.4 `desktop-client/src/components/workspace/SymbolPicker.tsx` 删除（旧策略设计的单 symbol 选择器）
+- [x] 14.4.5 `desktop-client/src/components/workspace/MarketStrip.tsx`、`SymbolList.tsx`、`TimeframeBar.tsx` —— 评估每个：MarketStrip 可能 deep backtest 还用，SymbolList 旧版要被新左栏替换；列出全集再删
 
 ### 14.5 IPC + remote
-- [ ] 14.5.1 `desktop-client/electron/ipc/remote.ts` 中 `'remote:screener:start'` / `'remote:screener:result'` handlers 删除（screener 现在通过 strategist persona 内部调用，IPC 方法不暴露）
-- [ ] 14.5.2 `desktop-client/src/services/remote/contract-client.ts` 中 `startScreener` / `getScreenerResult` 等公开方法删除或标 internal
+- [x] 14.5.1 `desktop-client/electron/ipc/remote.ts` 中 `'remote:screener:start'` / `'remote:screener:result'` handlers 删除（screener 现在通过 strategist persona 内部调用，IPC 方法不暴露）
+- [x] 14.5.2 `desktop-client/src/services/remote/contract-client.ts` 中 `startScreener` / `getScreenerResult` 等公开方法删除或标 internal
 
 ### 14.6 Mock / fixtures
-- [ ] 14.6.1 `desktop-client/src/mocks/handlers.ts` 中 screener 路由 mock 删除（保留供 contract test 用的最小集）
-- [ ] 14.6.2 任何引用旧 `coin_lists` schema 的 fixtures 删除
+- [x] 14.6.1 `desktop-client/src/mocks/handlers.ts` 中 screener 路由 mock 删除（保留供 contract test 用的最小集）
+- [x] 14.6.2 任何引用旧 `coin_lists` schema 的 fixtures 删除
 
 ### 14.7 Tests 清理
-- [ ] 14.7.1 `*.test.ts(x)` 中针对被删除组件 / store / service 的测试 → 一并删除
-- [ ] 14.7.2 `friendly.test.ts` 等公共测试只删除涉及 screener-only 错误码的 case，保留其它
+- [x] 14.7.1 `*.test.ts(x)` 中针对被删除组件 / store / service 的测试 → 一并删除
+- [x] 14.7.2 `friendly.test.ts` 等公共测试只删除涉及 screener-only 错误码的 case，保留其它
 
 ### 14.8 i18n key 清理
-- [ ] 14.8.1 `desktop-client/src/locales/en.json`、`zh.json`、`zh-TW.json` 中所有 `nav.screener`、`screener.*` key 删除
-- [ ] 14.8.2 `strategies.*` key（旧 grid 视图相关）评估每条：列表 / 卡片相关删除，库通用文案保留
+- [x] 14.8.1 `desktop-client/src/locales/en.json`、`zh.json`、`zh-TW.json` 中所有 `nav.screener`、`screener.*` key 删除
+- [x] 14.8.2 `strategies.*` key（旧 grid 视图相关）评估每条：列表 / 卡片相关删除，库通用文案保留
 
 ### 14.9 Pencil 设计稿清理（已在本次 apply 完成）
 - [x] 14.9.1 删除 `Q6cKp` (Strategy Design dark)
@@ -187,8 +187,8 @@
 - [x] 14.9.8 保留：`QdrlI` (Deep Backtest dark), `s9ooT` (Symbol Detail dark), `0qnH2` (Settings dark) 作为 master，加全部新 frame
 
 ### 14.10 验证
-- [ ] 14.10.1 `pnpm tsc --noEmit` 全绿（所有 import 都解析得到）
-- [ ] 14.10.2 `pnpm vitest run` 全绿（旧测试已随旧代码删除，新测试覆盖率 > 旧 baseline）
-- [ ] 14.10.3 `grep -rn "screenerRun\|coinList\|autoRun\|StrategyDesign\|PreviewBacktest" desktop-client/src` 0 命中
-- [ ] 14.10.4 `pnpm api:lint` 通过（OpenAPI examples 仍有效）
-- [ ] 14.10.5 启动 `pnpm dev` 看应用能启、能进创建/编辑策略 tab、能进策略库 tab、Settings 能打开
+- [x] 14.10.1 `pnpm tsc --noEmit` 全绿（所有 import 都解析得到）
+- [x] 14.10.2 `pnpm vitest run` 全绿（旧测试已随旧代码删除，新测试覆盖率 > 旧 baseline）
+- [x] 14.10.3 `grep -rn "screenerRun\|coinList\|autoRun\|StrategyDesign\|PreviewBacktest" desktop-client/src` 0 命中
+- [x] 14.10.4 `pnpm api:lint` 通过（OpenAPI examples 仍有效）
+- [x] 14.10.5 启动 `pnpm dev` 看应用能启、能进创建/编辑策略 tab、能进策略库 tab、Settings 能打开
