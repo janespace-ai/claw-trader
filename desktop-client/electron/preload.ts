@@ -49,6 +49,15 @@ const bridge = {
       get: <T = string>(key: string) => invoke<T>('db:settings:get', key),
       set: (key: string, value: unknown) => invoke('db:settings:set', key, value),
     },
+    strategyChats: {
+      insert: (args: { strategyId: string; role: string; content: string; metadata?: unknown }) =>
+        invoke<{ msg_idx: number }>('db:strategyChats:insert', args),
+      list: (strategyId: string) => invoke('db:strategyChats:list', strategyId),
+      countByStrategy: (strategyId: string) =>
+        invoke<number>('db:strategyChats:countByStrategy', strategyId),
+      migrateFromConversations: () =>
+        invoke<{ migrated: number }>('db:strategyChats:migrateFromConversations'),
+    },
   },
   llm: {
     stream: (params: unknown) => invoke<{ streamId: string }>('llm:stream', params),

@@ -56,6 +56,24 @@ export function initDB(dbPath: string): void {
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+
+    -- unified-strategy-workspace: per-strategy chat history
+    -- strategy_id is the server-side claw.strategies.id (uuid as text).
+    -- msg_idx is monotonically-increasing per strategy (0, 1, 2, ...).
+    -- role is one of 'user' | 'assistant' | 'system'.
+    -- metadata holds JSON for tool calls, code-block markers, diff
+    -- preview state, etc. — opaque to the persistence layer.
+    CREATE TABLE IF NOT EXISTS strategy_chats (
+      strategy_id  TEXT NOT NULL,
+      msg_idx      INTEGER NOT NULL,
+      role         TEXT NOT NULL CHECK(role IN ('user','assistant','system')),
+      content      TEXT NOT NULL,
+      created_at   INTEGER NOT NULL,
+      metadata     TEXT,
+      PRIMARY KEY (strategy_id, msg_idx)
+    );
+    CREATE INDEX IF NOT EXISTS strategy_chats_strategy_idx
+      ON strategy_chats(strategy_id, msg_idx);
   `);
 }
 
@@ -240,6 +258,74 @@ export function registerDBHandlers(ipcMain: IpcMain): void {
       )
       .run(key, payload);
   });
+
+  // ---- strategy_chats (unified-strategy-workspace) ----
+  // Append-only per Group 14 spec: no UPDATE / DELETE handlers exposed.
+  ipcMain.handle('db:strategyChats:insert', (
+    _e,
+    args: { strategyId: string; role: string; content: string; metadata?: unknown },
+  ) => {
+    const d = requireDB();
+    const last = d
+      .prepare(
+        'SELECT COALESCE(MAX(msg_idx), -1) AS max_idx FROM strategy_chats WHERE strategy_id = ?',
+      )
+      .get(args.strategyId) as { max_idx: number };
+    const nextIdx = (last?.max_idx ?? -1) + 1;
+    const meta = args.metadata == null ? null : JSON.stringify(args.metadata);
+    d.prepare(
+      `INSERT INTO strategy_chats (strategy_id, msg_idx, role, content, created_at, metadata)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(args.strategyId, nextIdx, args.role, args.content, Date.now(), meta);
+    return { msg_idx: nextIdx };
+  });
+
+  ipcMain.handle('db:strategyChats:list', (_e, strategyId: string) => {
+    const rows = requireDB()
+      .prepare(
+        `SELECT * FROM strategy_chats WHERE strategy_id = ? ORDER BY msg_idx ASC`,
+      )
+      .all(strategyId);
+    return rows.map(inflateStrategyChat);
+  });
+
+  ipcMain.handle('db:strategyChats:countByStrategy', (_e, strategyId: string) => {
+    const row = requireDB()
+      .prepare('SELECT COUNT(*) AS n FROM strategy_chats WHERE strategy_id = ?')
+      .get(strategyId) as { n: number };
+    return row?.n ?? 0;
+  });
+
+  // One-shot migration from the legacy `conversations` table — for each
+  // conversation that has a non-null strategy_id, copy each message into
+  // strategy_chats keyed on (strategy_id, msg_idx).  Idempotent: rows
+  // already in strategy_chats with matching pk are skipped.
+  ipcMain.handle('db:strategyChats:migrateFromConversations', () => {
+    const d = requireDB();
+    const convs = d
+      .prepare('SELECT * FROM conversations WHERE strategy_id IS NOT NULL')
+      .all() as Array<{ strategy_id: string; messages: string; updated_at: string }>;
+    let migrated = 0;
+    const insert = d.prepare(
+      `INSERT OR IGNORE INTO strategy_chats
+         (strategy_id, msg_idx, role, content, created_at, metadata)
+       VALUES (?, ?, ?, ?, ?, NULL)`,
+    );
+    for (const c of convs) {
+      let msgs: Array<{ role: string; content: string; ts?: number }>;
+      try {
+        msgs = JSON.parse(c.messages);
+      } catch {
+        continue;
+      }
+      msgs.forEach((m, i) => {
+        const ts = m.ts ?? Date.parse(c.updated_at) ?? Date.now();
+        const result = insert.run(c.strategy_id, i, m.role, m.content, ts);
+        if (result.changes > 0) migrated++;
+      });
+    }
+    return { migrated };
+  });
 }
 
 // -- row inflation helpers (parse JSON columns back to objects) --
@@ -256,6 +342,13 @@ function inflateConversation(row: any) {
   return {
     ...row,
     messages: row.messages ? JSON.parse(row.messages) : [],
+  };
+}
+
+function inflateStrategyChat(row: any) {
+  return {
+    ...row,
+    metadata: row.metadata ? JSON.parse(row.metadata) : null,
   };
 }
 
