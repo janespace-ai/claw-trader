@@ -18,13 +18,13 @@
 
 ## 2. 数据模型迁移（服务端 + 客户端 SQLite）
 
-- [ ] 2.1 写 `service-api/internal/store/migrations/006_strategies_workspace.sql`：ALTER claw.strategies + 添加 draft_*、saved_*、saved_at、last_backtest、is_archived_draft 列；UPDATE 把现有行 saved_code = code、saved_at = updated_at
-- [ ] 2.2 service-api 的 `model.Strategy` 结构体加新字段；store CRUD 方法（CreateStrategy/UpdateStrategy/GetStrategy/ListStrategies）适配
-- [ ] 2.3 service-api 加 `PATCH /api/strategies/:id`：仅写 draft_*、last_backtest，不动 saved_*；handler + service + 单测
-- [ ] 2.4 service-api 加 `POST /api/strategies/:id/save`：把 draft_* 复制到 saved_*，set saved_at = now；可选带 name 字段；handler + service + 单测
-- [ ] 2.5 service-api 加 `POST /api/strategies/:id/archive_draft`：set is_archived_draft = true
-- [ ] 2.6 客户端 SQLite migration：创建 `strategy_chats` 表（schema 见 design.md）；electron 端 `window.claw.db.strategyChats.{insert/list/migrate}` 接口
-- [ ] 2.7 客户端 `strategy_chats` 的从 `conversations` 表迁移脚本：1:1 mapping 的迁过去；orphan 留在 legacy 表
+- [x] 2.1 写 `service-api/internal/store/migrations/006_strategies_workspace.sql`：ALTER claw.strategies + 添加 draft_*、saved_*、saved_at、last_backtest、is_archived_draft 列；UPDATE 把现有行 saved_code = code、saved_at = updated_at
+- [x] 2.2 service-api 的 `model.Strategy` 结构体加新字段；store CRUD 方法（CreateStrategy/UpdateStrategy/GetStrategy/ListStrategies）适配
+- [x] 2.3 service-api 加 `PATCH /api/strategies/:id`：仅写 draft_*、last_backtest，不动 saved_*；handler + service + 单测
+- [x] 2.4 service-api 加 `POST /api/strategies/:id/save`：把 draft_* 复制到 saved_*，set saved_at = now；可选带 name 字段；handler + service + 单测
+- [x] 2.5 service-api 加 `POST /api/strategies/:id/archive_draft`：set is_archived_draft = true
+- [x] 2.6 客户端 SQLite migration：创建 `strategy_chats` 表（schema 见 design.md）；electron 端 `window.claw.db.strategyChats.{insert/list/migrate}` 接口
+- [x] 2.7 客户端 `strategy_chats` 的从 `conversations` 表迁移脚本：1:1 mapping 的迁过去；orphan 留在 legacy 表
 - [ ] 2.8 OpenAPI yaml 更新：Strategy schema 加新字段；新 endpoints 进 paths
 - [ ] 2.9 重新生成 desktop-client TS 类型 (`pnpm api:gen`)；`api-lint` 通过
 
