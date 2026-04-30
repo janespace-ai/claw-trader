@@ -25,7 +25,8 @@ readonly:
 sandbox:
   service_url: "http://sandbox-service:8090"
   # URL sandbox-service workers POST progress/complete/error to (i.e. this engine).
-  callback_base: "http://claw-service-api:8081"
+  # Service name (NOT container_name) so it matches sandbox-service's allowlist.
+  callback_base: "http://service-api:8081"
   # Per-request timeout for /run, /status, /healthz.  Small on purpose —
   # /run only enqueues, so any delay here means sandbox-service is unhealthy.
   timeout_sec: 10
