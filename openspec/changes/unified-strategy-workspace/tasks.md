@@ -52,11 +52,11 @@
 
 ## 5. 前端 UI — 策略库重设计
 
-- [ ] 5.1 重写 `screens/StrategiesScreen.tsx` 卡片视觉对齐 task 1.6
-- [ ] 5.2 新组件 `StrategyCard`：snippet / PnL pill / symbols badge / saved-or-draft badge / 相对时间
-- [ ] 5.3 过滤 chip 替换：旧的 favorite / archived → 新的 已保存 / 草稿 / 归档草稿（保留 favorite）
-- [ ] 5.4 [+ 创建新策略] 按钮 → 调 store 的 `archiveCurrentDraftAndOpenNew()`
-- [ ] 5.5 单测
+- [x] 5.1 重写 `screens/StrategiesScreen.tsx` 卡片视觉对齐 task 1.6
+- [x] 5.2 新组件 `StrategyCard`：snippet / PnL pill / symbols badge / saved-or-draft badge / 相对时间
+- [x] 5.3 过滤 chip 替换：旧的 favorite / archived → 新的 已保存 / 草稿 / 归档草稿（保留 favorite）
+- [x] 5.4 [+ 创建新策略] 按钮 → 调 store 的 `archiveCurrentDraftAndOpenNew()`
+- [x] 5.5 单测
 
 ## 6. 多币回测结果 UI
 

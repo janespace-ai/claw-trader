@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
 import { DeepBacktest } from '@/screens/workspace/DeepBacktest';
 import { StrategyWorkspaceScreen } from '@/screens/StrategyWorkspaceScreen';
+import { LibraryScreen } from '@/screens/LibraryScreen';
 import { SymbolDetailScreen } from '@/screens/SymbolDetailScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { useAppStore } from '@/stores/appStore';
@@ -49,10 +50,7 @@ export default function App() {
           ) : route.kind === 'workspace' ? (
             <StrategyWorkspaceScreen />
           ) : route.kind === 'library' ? (
-            <RebuildPlaceholder
-              title="策略库"
-              note="Group 5 will land the conversation-style strategy list here."
-            />
+            <LibraryScreen />
           ) : route.kind === 'symbol-detail' ? (
             <SymbolDetailScreen
               symbol={route.symbol}
