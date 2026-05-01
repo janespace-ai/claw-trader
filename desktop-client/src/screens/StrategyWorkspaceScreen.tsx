@@ -12,8 +12,17 @@ import {
 import { useSettingsStore } from '@/stores/settingsStore';
 import { cremote, toErrorBody } from '@/services/remote/contract-client';
 import { runStrategistTurn, type DiffPreviewMetadata } from '@/services/chat/strategistRunner';
-import { shouldProposeName } from '@/services/chat/strategistOutputParser';
+import {
+  shouldProposeName,
+  parseNaturalLanguageParamSweep,
+  validateSweepAgainstSchema,
+  type ParamSweepRequest,
+  type ScreenerFilter,
+} from '@/services/chat/strategistOutputParser';
 import type { ChatMessage as LLMMessage } from '@/types/domain';
+import type { components } from '@/types/api';
+
+type BacktestResultExtended = components['schemas']['BacktestResultExtended'];
 
 /**
  * The "创建/编辑策略" tab — the unified-strategy-workspace front door.
@@ -51,8 +60,11 @@ export function StrategyWorkspaceScreen() {
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
+  const [resolvedResult, setResolvedResult] = useState<BacktestResultExtended | null>(null);
+  const [resultLoading, setResultLoading] = useState(false);
 
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const lastPolledTaskIdRef = useRef<string | null>(null);
   void aiLanguagePolicy; // (Group 7 future: thread reply lang into prompt; v1 lets the model auto-detect)
 
   // When draft_symbols changes and there's no focused symbol, default
@@ -89,6 +101,14 @@ export function StrategyWorkspaceScreen() {
       }
     }
     await appendMessage('user', text);
+
+    // Group 8 short-circuit: detect natural-language param-sweep ASK
+    // before paying for an LLM roundtrip.  Pattern: "试 RSI 14, 21, 28".
+    const nlSweep = parseNaturalLanguageParamSweep(text);
+    if (nlSweep) {
+      await dispatchParamSweep(nlSweep);
+      return;
+    }
 
     const cfg = providers[defaultProvider];
     if (!cfg?.apiKey) {
@@ -171,19 +191,141 @@ export function StrategyWorkspaceScreen() {
       } else if (meta.mutation.kind === 'symbols') {
         await patchDraft({ draftSymbols: meta.mutation.symbols });
       } else if (meta.mutation.kind === 'filter') {
-        // Group 8 will wire `symbols-filter` to the actual screener
-        // dispatch.  For now, just acknowledge.
-        await appendMessage(
-          'assistant',
-          t('workspace.chat.filter_pending', {
-            defaultValue: '(symbols-filter 调度将在 Group 8 接入)',
-          }),
-        );
+        markDiffResolved(msg, 'applied');
+        await dispatchSymbolsFilter(meta.mutation.filter);
+        return; // dispatchSymbolsFilter handles its own status messages
+      } else if (meta.mutation.kind === 'param-sweep') {
+        markDiffResolved(msg, 'applied');
+        await dispatchParamSweep(meta.mutation.sweep);
+        return;
       }
       // Mark this diff message as resolved=applied.
       markDiffResolved(msg, 'applied');
     } catch (err) {
       await appendMessage('assistant', `⚠️ ${describeErr(err)}`);
+    }
+  };
+
+  /** Run a screener Python program against the live universe and inject
+   *  the resulting passing-symbols array into draft_symbols.  Polls the
+   *  /api/screener/result endpoint up to ~90s. */
+  const dispatchSymbolsFilter = async (filter: ScreenerFilter) => {
+    await appendMessage(
+      'assistant',
+      t('workspace.chat.filter_running', {
+        defaultValue: '⚙ 正在运行筛选：{{desc}}…',
+        desc: filter.description,
+      }),
+    );
+    try {
+      // The backend screener runs a Python program — we synthesize a
+      // tiny one based on the filter rule_kind.  This keeps the chat
+      // protocol declarative while reusing the existing screener
+      // infrastructure (sandbox-service path) end-to-end.
+      const code = synthesizeScreenerCode(filter);
+      const start = await cremote.startScreener({
+        code,
+        config: { market: 'futures', lookback_days: 1 },
+      });
+      // Poll up to 90s
+      const deadline = Date.now() + 90_000;
+      let done: { passed: string[]; total: number } | null = null;
+      while (Date.now() < deadline) {
+        const r = await cremote.getScreenerResult({ task_id: start.task_id });
+        if (r.status === 'done') {
+          const results =
+            (r.result as { results?: Array<{ symbol: string; passed: boolean }> } | undefined)
+              ?.results ?? [];
+          done = {
+            passed: results.filter((x) => x.passed).map((x) => x.symbol),
+            total: results.length,
+          };
+          break;
+        }
+        if (r.status === 'failed') {
+          throw new Error(r.error?.message ?? 'screener failed');
+        }
+        await sleep(1500);
+      }
+      if (!done) throw new Error('screener timed out');
+      await patchDraft({ draftSymbols: done.passed });
+      await appendMessage(
+        'assistant',
+        t('workspace.chat.filter_done', {
+          defaultValue: '✓ 筛出 {{n}} 个币（共 {{total}}），已写入。',
+          n: done.passed.length,
+          total: done.total,
+        }),
+      );
+    } catch (err) {
+      await appendMessage(
+        'assistant',
+        `⚠️ ${t('workspace.chat.filter_failed', {
+          defaultValue: '筛选失败：',
+        })} ${describeErr(err)}`,
+      );
+    }
+  };
+
+  /** Dispatch a parameter sweep via mode='optimization' backtest.  Validates
+   *  axes against strategy.params_schema first; if any axis is unknown,
+   *  surfaces a chat error instead of dispatching. */
+  const dispatchParamSweep = async (sweep: ParamSweepRequest) => {
+    const schema = (strategy?.params_schema ?? null) as Record<string, unknown> | null;
+    const v = validateSweepAgainstSchema(sweep, schema);
+    if (!v.ok) {
+      await appendMessage(
+        'assistant',
+        t('workspace.chat.sweep_unknown_axis', {
+          defaultValue:
+            '⚠️ 参数 {{axes}} 不在策略的 params_schema 里，先在代码里加上 self.params。',
+          axes: v.unknownAxes.join(', '),
+        }),
+      );
+      return;
+    }
+    if (!draftCode || draftSymbols.length === 0 || !strategyId) {
+      await appendMessage(
+        'assistant',
+        t('workspace.chat.sweep_incomplete', {
+          defaultValue: '⚠️ 调参之前先把代码和币列表都备齐。',
+        }),
+      );
+      return;
+    }
+    await appendMessage(
+      'assistant',
+      t('workspace.chat.sweep_running', {
+        defaultValue: '⚙ 调参运行中：{{desc}}…',
+        desc: sweep.description ?? Object.keys(sweep.axes).join(' × '),
+      }),
+    );
+    try {
+      const task = await cremote.startBacktest({
+        code: draftCode,
+        config: {
+          symbols: draftSymbols,
+          interval: '1h',
+          from: Math.floor(Date.now() / 1000) - 30 * 24 * 3600,
+          to: Math.floor(Date.now() / 1000),
+          mode: 'optimization' as 'preview' | 'deep',
+          param_grid: sweep.axes,
+        } as components['schemas']['BacktestConfig'],
+        strategy_id: strategyId,
+      });
+      await appendMessage(
+        'assistant',
+        t('workspace.chat.sweep_dispatched', {
+          defaultValue: '✓ 已派发 (task {{id}})。结果会出现在「结果」tab。',
+          id: task.task_id.slice(0, 8),
+        }),
+      );
+      void pollBacktestResult(task.task_id);
+    } catch (err) {
+      await appendMessage(
+        'assistant',
+        `⚠️ ${describeErr(err)}`,
+      );
     }
   };
 
@@ -218,6 +360,7 @@ export function StrategyWorkspaceScreen() {
     if (!canRun || !strategyId || !draftCode) return;
     setRunError(null);
     setRunning(true);
+    setResolvedResult(null);
     try {
       const task = await cremote.startBacktest({
         code: draftCode,
@@ -229,9 +372,6 @@ export function StrategyWorkspaceScreen() {
         },
         strategy_id: strategyId,
       });
-      // Persist the task id on the strategy via patchDraft so re-opens
-      // remember which backtest fired (Group 6 will resolve the result
-      // once it lands; for now we just write the task id).
       await patchDraft({
         lastBacktest: {
           task_id: task.task_id,
@@ -239,10 +379,62 @@ export function StrategyWorkspaceScreen() {
           ran_at: Math.floor(Date.now() / 1000),
         },
       });
+      // Kick off polling — non-blocking; UI flips when poll completes.
+      void pollBacktestResult(task.task_id);
     } catch (err) {
       setRunError(describeErr(err));
     } finally {
       setRunning(false);
+    }
+  };
+
+  /** Poll for backtest task completion and write the resolved
+   *  BacktestResultExtended payload into both local state (for
+   *  immediate UI render) and strategy.last_backtest (so re-opens of
+   *  the strategy show the result without re-running).  Polls every
+   *  1500ms for up to ~3 minutes. */
+  const pollBacktestResult = async (taskId: string) => {
+    setResultLoading(true);
+    lastPolledTaskIdRef.current = taskId;
+    const start = Date.now();
+    const TIMEOUT_MS = 3 * 60_000;
+    const INTERVAL_MS = 1500;
+    try {
+      while (Date.now() - start < TIMEOUT_MS) {
+        // If user moved on to a different backtest, abort this poll.
+        if (lastPolledTaskIdRef.current !== taskId) return;
+        const tr = await cremote.getBacktestResult({ task_id: taskId });
+        if (tr.status === 'done') {
+          const result = (tr.result ?? null) as BacktestResultExtended | null;
+          setResolvedResult(result);
+          // Update last_backtest with the resolved summary so re-opens
+          // see this run without re-running.
+          if (result) {
+            const totalReturn = result.summary?.metrics?.total_return ?? null;
+            await patchDraft({
+              lastBacktest: {
+                task_id: taskId,
+                summary: {
+                  pnl_pct: typeof totalReturn === 'number' ? totalReturn * 100 : null,
+                  ...result.summary?.metrics,
+                },
+                ran_at: tr.finished_at ?? Math.floor(Date.now() / 1000),
+              },
+            });
+          }
+          return;
+        }
+        if (tr.status === 'failed') {
+          setRunError(tr.error?.message ?? 'backtest failed');
+          return;
+        }
+        await sleep(INTERVAL_MS);
+      }
+      setRunError('backtest timed out');
+    } catch (err) {
+      setRunError(describeErr(err));
+    } finally {
+      setResultLoading(false);
     }
   };
 
@@ -293,7 +485,14 @@ export function StrategyWorkspaceScreen() {
         main={
           <div className="flex flex-col h-full">
             <div className="flex-1 min-h-0">
-              <WorkspaceCenterPane focusedSymbol={focusedSymbol} />
+              <WorkspaceCenterPane
+                focusedSymbol={focusedSymbol}
+                result={resolvedResult}
+                resultLoading={resultLoading}
+                resultStale={hasChanges && !!strategy?.last_backtest && !resultLoading}
+                onRerunBacktest={handleRunBacktest}
+                onFocusSymbolFromResult={setFocusedSymbol}
+              />
             </div>
             <ActionBar
               hasChanges={hasChanges}
@@ -434,6 +633,56 @@ function describeErr(err: unknown): string {
   return `${body.code}: ${body.message}`;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Translate a high-level ScreenerFilter into a runnable Screener Python
+ * snippet for the sandbox.  Today only `top_quote_vol` is supported (rank
+ * by 24h quote volume between [start, end] inclusive).  Future rule_kinds
+ * are an additive change here.
+ *
+ * The synthesised code targets the claw.screener.Screener base class.
+ */
+function synthesizeScreenerCode(filter: ScreenerFilter): string {
+  const safeNum = (k: string, fallback: number) => {
+    const v = (filter.params as Record<string, unknown>)[k];
+    if (typeof v === 'number' && Number.isFinite(v)) return v;
+    if (typeof v === 'string') {
+      const n = Number(v);
+      if (Number.isFinite(n)) return n;
+    }
+    return fallback;
+  };
+
+  if (filter.rule_kind === 'top_quote_vol') {
+    const start = Math.max(1, Math.floor(safeNum('start', 1)));
+    const end = Math.max(start, Math.floor(safeNum('end', 30)));
+    return [
+      'from claw.screener import Screener',
+      '',
+      'class TopVolScreener(Screener):',
+      '    """Auto-generated by AI strategist — top quote-volume rank filter."""',
+      '    def filter(self, symbol, klines, metadata):',
+      '        rank = metadata.get("rank")',
+      '        if rank is None: return False',
+      `        return ${start} <= rank <= ${end}`,
+      '',
+    ].join('\n');
+  }
+
+  // Fallback — keep all symbols.  Better than failing.
+  return [
+    'from claw.screener import Screener',
+    '',
+    'class PassThroughScreener(Screener):',
+    '    def filter(self, symbol, klines, metadata):',
+    '        return True',
+    '',
+  ].join('\n');
+}
+
 function isDiffPreview(m: ChatMessage): boolean {
   const meta = m.metadata as { kind?: string } | null;
   return !!meta && meta.kind === 'diff-preview';
@@ -446,5 +695,8 @@ function proposeReason(meta: DiffPreviewMetadata): string {
   if (meta.mutation.kind === 'symbols') {
     return `建议更新币列表 (${meta.mutation.symbols.length} 个)`;
   }
-  return meta.mutation.filter.description;
+  if (meta.mutation.kind === 'filter') {
+    return meta.mutation.filter.description;
+  }
+  return meta.mutation.sweep.description ?? '调参建议';
 }

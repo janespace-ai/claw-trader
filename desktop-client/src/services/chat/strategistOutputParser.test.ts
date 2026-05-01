@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { parseStrategistTurn, shouldProposeName } from './strategistOutputParser';
+import {
+  parseStrategistTurn,
+  shouldProposeName,
+  parseNaturalLanguageParamSweep,
+  validateSweepAgainstSchema,
+} from './strategistOutputParser';
 
 describe('parseStrategistTurn — prose-only response', () => {
   it('returns prose, no mutation, no warnings', () => {
@@ -101,6 +106,109 @@ describe('parseStrategistTurn — at most ONE mutation per turn', () => {
     expect(r.mutation?.kind).toBe('code');
     expect(r.warnings.length).toBe(1);
     expect(r.warnings[0]).toMatch(/Ignored extra mutation/);
+  });
+});
+
+describe('parseStrategistTurn — optimize mutation (Group 8)', () => {
+  it('extracts an axes object from ```optimize block', () => {
+    const r = parseStrategistTurn(
+      '```optimize\n{"axes": {"rsi_period": [14, 21, 28]}, "description": "RSI sweep"}\n```',
+    );
+    expect(r.mutation?.kind).toBe('param-sweep');
+    if (r.mutation?.kind === 'param-sweep') {
+      expect(r.mutation.sweep.axes).toEqual({ rsi_period: [14, 21, 28] });
+      expect(r.mutation.sweep.description).toBe('RSI sweep');
+    }
+  });
+
+  it('also accepts ```optimization lang tag', () => {
+    const r = parseStrategistTurn('```optimization\n{"axes": {"x": [1, 2]}}\n```');
+    expect(r.mutation?.kind).toBe('param-sweep');
+  });
+
+  it('coerces stringified numbers in axes', () => {
+    const r = parseStrategistTurn(
+      '```optimize\n{"axes": {"rsi": ["14", "21", "x", 28]}}\n```',
+    );
+    expect(r.mutation?.kind).toBe('param-sweep');
+    if (r.mutation?.kind === 'param-sweep') {
+      expect(r.mutation.sweep.axes.rsi).toEqual([14, 21, 28]);
+    }
+  });
+
+  it('drops empty / zero-axis sweeps', () => {
+    const r = parseStrategistTurn('```optimize\n{"axes": {"rsi": []}}\n```');
+    expect(r.mutation).toBeNull();
+  });
+});
+
+describe('parseNaturalLanguageParamSweep — Group 8 NL detection', () => {
+  it('detects "试 RSI 14, 21, 28"', () => {
+    const r = parseNaturalLanguageParamSweep('试 RSI 14, 21, 28');
+    expect(r).not.toBeNull();
+    expect(r!.axes).toEqual({ rsi: [14, 21, 28] });
+  });
+
+  it('detects "试一下 SMA 10, 20, 50"', () => {
+    const r = parseNaturalLanguageParamSweep('试一下 SMA 10, 20, 50');
+    expect(r).not.toBeNull();
+    expect(r!.axes).toEqual({ sma: [10, 20, 50] });
+  });
+
+  it('detects "try RSI 14, 21, 28" (English)', () => {
+    const r = parseNaturalLanguageParamSweep('try RSI 14, 21, 28');
+    expect(r).not.toBeNull();
+    expect(r!.axes.rsi).toEqual([14, 21, 28]);
+  });
+
+  it('handles full-width Chinese commas', () => {
+    const r = parseNaturalLanguageParamSweep('试 RSI 14，21，28');
+    expect(r).not.toBeNull();
+    expect(r!.axes.rsi).toEqual([14, 21, 28]);
+  });
+
+  it('returns null when message lacks try-verb', () => {
+    expect(parseNaturalLanguageParamSweep('帮我看一下 RSI 14 21 28')).toBeNull();
+  });
+
+  it('returns null when only one number per axis', () => {
+    expect(parseNaturalLanguageParamSweep('试 RSI 14')).toBeNull();
+  });
+
+  it('detects multiple axes in one message', () => {
+    const r = parseNaturalLanguageParamSweep('试 RSI 14, 21, 28 SMA 10, 20');
+    expect(r).not.toBeNull();
+    expect(r!.axes.rsi).toEqual([14, 21, 28]);
+    expect(r!.axes.sma).toEqual([10, 20]);
+  });
+});
+
+describe('validateSweepAgainstSchema — Group 8 axis check', () => {
+  it('ok when schema is empty/null', () => {
+    expect(
+      validateSweepAgainstSchema({ axes: { rsi: [14, 21] } }, null),
+    ).toEqual({ ok: true });
+    expect(
+      validateSweepAgainstSchema({ axes: { rsi: [14, 21] } }, {}),
+    ).toEqual({ ok: true });
+  });
+
+  it('ok when all axes present (case-insensitive)', () => {
+    expect(
+      validateSweepAgainstSchema(
+        { axes: { rsi: [14, 21] } },
+        { RSI: { default: 14 }, sma: { default: 20 } },
+      ),
+    ).toEqual({ ok: true });
+  });
+
+  it('flags unknown axes', () => {
+    expect(
+      validateSweepAgainstSchema(
+        { axes: { unknown_param: [1, 2] } },
+        { rsi: { default: 14 } },
+      ),
+    ).toEqual({ ok: false, unknownAxes: ['unknown_param'] });
   });
 });
 

@@ -271,12 +271,34 @@ function DiffPreviewMessage({
     kind = 'symbols';
     before = JSON.stringify(meta.before.symbols ?? [], null, 2);
     after = JSON.stringify(meta.mutation.symbols, null, 2);
-  } else {
-    // 'filter' kind — don't render a diff card; render a status line.
+  } else if (meta.mutation.kind === 'filter') {
+    // Filter kind — don't render a diff card; render a status line.
     return (
       <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[color:var(--accent-primary-dim)] text-[11px] text-accent-primary">
         <span aria-hidden>⚙</span>
         <span>{meta.mutation.filter.description}</span>
+      </div>
+    );
+  } else {
+    // Param-sweep kind — also a status line, with apply button on the
+    // sweep dispatcher.
+    const desc =
+      meta.mutation.sweep.description ??
+      Object.entries(meta.mutation.sweep.axes)
+        .map(([k, v]) => `${k}=${v.join(',')}`)
+        .join(' × ');
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[color:var(--accent-primary-dim)] text-[11px] text-accent-primary">
+        <span aria-hidden>🎚</span>
+        <span className="flex-1">{desc}</span>
+        {!meta.resolved && (
+          <button
+            onClick={() => onApply?.(msg, meta)}
+            className="h-6 px-2 rounded text-[10px] font-semibold bg-accent-primary text-fg-inverse hover:opacity-90"
+          >
+            跑
+          </button>
+        )}
       </div>
     );
   }

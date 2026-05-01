@@ -1,11 +1,27 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useStrategySessionStore } from '@/stores/strategySessionStore';
+import { BacktestResultPane } from './BacktestResultPane';
+import type { components } from '@/types/api';
 
 type CenterTab = 'code' | 'chart' | 'result';
 
+type BacktestResultExtended = components['schemas']['BacktestResultExtended'];
+
 interface Props {
   focusedSymbol: string | null;
+  /** Tab state hoisted so the parent can auto-switch to "result" once
+   *  a backtest finishes (Group 6 trigger). */
+  activeTab?: CenterTab;
+  onTabChange?: (t: CenterTab) => void;
+  /** Pre-resolved result payload (set by the parent via polling).  When
+   *  null + last_backtest exists, the result tab shows a loading state. */
+  result: BacktestResultExtended | null;
+  resultLoading: boolean;
+  /** Stale = workspace has changed since this backtest finished. */
+  resultStale: boolean;
+  onRerunBacktest?: () => void;
+  onFocusSymbolFromResult?: (symbol: string) => void;
 }
 
 /**
@@ -14,17 +30,45 @@ interface Props {
  * switches to result when a backtest just completed.  Mirrors the
  * Pencil frame `czDSt`.
  */
-export function WorkspaceCenterPane({ focusedSymbol }: Props) {
+export function WorkspaceCenterPane({
+  focusedSymbol,
+  activeTab,
+  onTabChange,
+  result,
+  resultLoading,
+  resultStale,
+  onRerunBacktest,
+  onFocusSymbolFromResult,
+}: Props) {
   const { t } = useTranslation();
   const strategy = useStrategySessionStore((s) => s.strategy);
-  const [tab, setTab] = useState<CenterTab>('chart');
+  const [internalTab, setInternalTab] = useState<CenterTab>('chart');
+  const tab: CenterTab = activeTab ?? internalTab;
+  const setTab = (t: CenterTab) => {
+    setInternalTab(t);
+    onTabChange?.(t);
+  };
+
+  // Auto-switch to result tab once a backtest result becomes available
+  // and the user hasn't explicitly picked another tab in the meantime.
+  useEffect(() => {
+    if (result && !resultLoading) {
+      setTab('result');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [result, resultLoading]);
 
   const draftCode = strategy?.draft_code ?? null;
   const lastBacktest = strategy?.last_backtest;
-  const pnlPct =
-    typeof lastBacktest?.summary?.pnl_pct === 'number'
-      ? (lastBacktest.summary.pnl_pct as number)
-      : null;
+  // Aggregate PnL — prefer the resolved result's summary; fall back to
+  // the cached last_backtest payload (which may be a "pending" stub
+  // until polling completes).
+  const pnlPct = (() => {
+    const m = result?.summary?.metrics?.total_return;
+    if (typeof m === 'number') return m * 100;
+    const fallback = lastBacktest?.summary?.pnl_pct;
+    return typeof fallback === 'number' ? fallback : null;
+  })();
 
   return (
     <div className="flex flex-col h-full">
@@ -58,7 +102,16 @@ export function WorkspaceCenterPane({ focusedSymbol }: Props) {
       <div className="flex-1 overflow-auto">
         {tab === 'code' && <CodeView code={draftCode} />}
         {tab === 'chart' && <ChartView focusedSymbol={focusedSymbol} />}
-        {tab === 'result' && <ResultView lastBacktest={lastBacktest ?? null} />}
+        {tab === 'result' && (
+          <ResultView
+            result={result}
+            loading={resultLoading}
+            stale={resultStale}
+            lastBacktest={lastBacktest ?? null}
+            onRerun={onRerunBacktest}
+            onFocusSymbol={onFocusSymbolFromResult}
+          />
+        )}
       </div>
     </div>
   );
@@ -129,11 +182,23 @@ function ChartView({ focusedSymbol }: { focusedSymbol: string | null }) {
 }
 
 function ResultView({
+  result,
+  loading,
+  stale,
   lastBacktest,
+  onRerun,
+  onFocusSymbol,
 }: {
+  result: BacktestResultExtended | null;
+  loading: boolean;
+  stale: boolean;
   lastBacktest: { task_id: string; summary: Record<string, unknown>; ran_at: number } | null;
+  onRerun?: () => void;
+  onFocusSymbol?: (symbol: string) => void;
 }) {
   const { t } = useTranslation();
+
+  // No backtest at all yet
   if (!lastBacktest) {
     return (
       <div className="p-8 text-sm text-fg-muted leading-relaxed">
@@ -144,25 +209,28 @@ function ResultView({
       </div>
     );
   }
-  // Group 6 will replace this placeholder with the real
-  // multi-symbol-backtest-results component (aggregate metrics + per-symbol drill-down).
+  // Pending: backtest dispatched but result not yet resolved
+  if (loading || !result) {
+    return (
+      <div className="p-8 text-sm text-fg-muted leading-relaxed flex items-center gap-3">
+        <span className="animate-spin" aria-hidden>
+          ⟳
+        </span>
+        <span>
+          {t('workspace.center.result.pending', {
+            defaultValue: '回测进行中…',
+          })}
+        </span>
+      </div>
+    );
+  }
+  // Resolved — render the proper Group 6 result pane
   return (
-    <div className="p-6 space-y-3">
-      <h3 className="font-heading font-bold text-fg-primary">
-        {t('workspace.center.result.title', { defaultValue: '回测结果' })}
-      </h3>
-      <div className="text-xs text-fg-muted">
-        Task: <span className="font-mono">{lastBacktest.task_id}</span>
-      </div>
-      <pre className="p-3 bg-surface-secondary rounded-md text-[11px] font-mono whitespace-pre-wrap">
-        {JSON.stringify(lastBacktest.summary, null, 2)}
-      </pre>
-      <div className="text-[11px] text-fg-muted italic">
-        {t('workspace.center.result.todo', {
-          defaultValue:
-            'Group 6 of unified-strategy-workspace will replace this with aggregate metrics + sortable per-symbol table.',
-        })}
-      </div>
-    </div>
+    <BacktestResultPane
+      result={result}
+      stale={stale}
+      onRerun={onRerun}
+      onFocusSymbol={onFocusSymbol}
+    />
   );
 }

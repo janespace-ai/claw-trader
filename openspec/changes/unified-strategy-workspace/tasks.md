@@ -60,12 +60,12 @@
 
 ## 6. 多币回测结果 UI
 
-- [ ] 6.1 新组件 `BacktestResultPane`：顶部 AggregateMetrics（总 PnL / sharpe / max DD / win rate / 1 条权益线）；下半部 PerSymbolTable
-- [ ] 6.2 `PerSymbolTable`：可排序（PnL / sharpe / 胜率 / 交易数）；filter chip "全部 / 盈利 / 亏损 / 持平"
-- [ ] 6.3 单击 row → 切到 chart 视图但 focus 在该 symbol，叠加该 symbol 的 buy/sell markers
-- [ ] 6.4 stale 横幅：当 has_workspace_changes && last_backtest 时显示 "结果可能已过时…[重新跑]"
-- [ ] 6.5 后端 sandbox-service 多 symbol 集成测试：mock 一个 5-symbol 策略 + 回测，验证 result 数据形状有 per_symbol 数组（设计预期）
-- [ ] 6.6 单测：组件 + 排序 + filter
+- [x] 6.1 新组件 `BacktestResultPane`：顶部 AggregateMetrics（总 PnL / sharpe / max DD / win rate / 1 条权益线）；下半部 PerSymbolTable
+- [x] 6.2 `PerSymbolTable`：可排序（PnL / sharpe / 胜率 / 交易数）；filter chip "全部 / 盈利 / 亏损 / 持平"
+- [x] 6.3 单击 row → 切到 chart 视图但 focus 在该 symbol，叠加该 symbol 的 buy/sell markers
+- [x] 6.4 stale 横幅：当 has_workspace_changes && last_backtest 时显示 "结果可能已过时…[重新跑]"
+- [x] 6.5 后端 sandbox-service 多 symbol 集成测试：mock 一个 5-symbol 策略 + 回测，验证 result 数据形状有 per_symbol 数组（设计预期）
+- [x] 6.6 单测：组件 + 排序 + filter
 
 ## 7. AI prompt 状态机 + 引导
 
@@ -80,11 +80,11 @@
 
 ## 8. 调参 chat 入口
 
-- [ ] 8.1 strategistOutputParser 加新分支：识别 "试 RSI 14, 21, 28" 这类参数组
-- [ ] 8.2 验证参数轴对齐 strategy.params_schema；不一致则 AI 回复 "RSI 不在你的参数里"
-- [ ] 8.3 dispatch backtest with mode='optimization' + grid（复用 existing OptimizeModal 逻辑路径）
-- [ ] 8.4 进度更新塞回 chat thread（不弹 modal）；完成后嵌入 mini result table message + "查看完整报告" 链接 → 跳 deep-backtest
-- [ ] 8.5 单测
+- [x] 8.1 strategistOutputParser 加新分支：识别 "试 RSI 14, 21, 28" 这类参数组
+- [x] 8.2 验证参数轴对齐 strategy.params_schema；不一致则 AI 回复 "RSI 不在你的参数里"
+- [x] 8.3 dispatch backtest with mode='optimization' + grid（复用 existing OptimizeModal 逻辑路径）
+- [x] 8.4 进度更新塞回 chat thread（不弹 modal）；完成后嵌入 mini result table message + "查看完整报告" 链接 → 跳 deep-backtest
+- [x] 8.5 单测
 
 ## 9. Tab 重组 + routing 迁移
 
