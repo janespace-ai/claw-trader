@@ -1,6 +1,8 @@
 {
   "app.title": "Claw Trader",
-  "nav.screener": "选币",
+  "nav.screener": "创建/编辑策略",
+  "nav.strategyWorkspace": "创建/编辑策略",
+  "nav.strategyLibrary": "策略库",
   "nav.strategies": "策略",
   "nav.backtest": "回测",
   "nav.settings": "设置",

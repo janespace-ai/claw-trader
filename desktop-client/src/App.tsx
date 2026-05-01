@@ -6,25 +6,27 @@ import { SettingsScreen } from '@/screens/SettingsScreen';
 import { useAppStore } from '@/stores/appStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useStrategyStore } from '@/stores/strategyStore';
+import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 /**
- * Top-level route renderer.  Switches on `appStore.route.kind`.
+ * Top-level route renderer.
  *
- * **NOTE: this file is in mid-rebuild for the unified-strategy-workspace
- * change.**  The new front-door tab (创建/编辑策略) and the new 策略库
- * tab are not yet implemented (Groups 4-5 of tasks.md).  For now:
+ * Post unified-strategy-workspace, the routes are:
  *
- *   route.kind === 'workspace'     → DeepBacktest only (drill-down view)
+ *   route.kind === 'workspace'     → StrategyWorkspaceScreen (the main
+ *                                    chat-driven 创建/编辑策略 surface).
+ *                                    Until that screen lands (Group 4),
+ *                                    we render a placeholder.  When
+ *                                    workspaceStore.mode === 'deep' the
+ *                                    DeepBacktest "view full report" UI
+ *                                    is shown instead.
+ *   route.kind === 'library'       → 策略库 (Group 5; placeholder for now)
  *   route.kind === 'symbol-detail' → SymbolDetailScreen
  *   route.kind === 'settings'      → SettingsScreen
- *
- * Other route.kind values fall through to a placeholder.  This is
- * intentional for the duration of the rebuild — the legacy ScreenerScreen
- * / StrategiesScreen / StrategyDesign / PreviewBacktest were deleted in
- * Group 14 and their replacements arrive in Groups 4-5.
  */
 export default function App() {
   const route = useAppStore((s) => s.route);
+  const workspaceMode = useWorkspaceStore((s) => s.mode);
 
   const loadSettings = useSettingsStore((s) => s.load);
   const loadStrategies = useStrategyStore((s) => s.load);
@@ -41,24 +43,41 @@ export default function App() {
 
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 overflow-y-auto">
-          {route.kind === 'workspace' && <DeepBacktest />}
-          {route.kind === 'symbol-detail' && (
+          {route.kind === 'workspace' && workspaceMode === 'deep' ? (
+            <DeepBacktest />
+          ) : route.kind === 'workspace' ? (
+            <RebuildPlaceholder
+              title="创建/编辑策略"
+              note="Group 4 of unified-strategy-workspace will land the three-pane chat workspace here."
+            />
+          ) : route.kind === 'library' ? (
+            <RebuildPlaceholder
+              title="策略库"
+              note="Group 5 will land the conversation-style strategy list here."
+            />
+          ) : route.kind === 'symbol-detail' ? (
             <SymbolDetailScreen
               symbol={route.symbol}
               returnTo={route.returnTo}
               backtestTaskId={route.backtestTaskId}
             />
-          )}
-          {route.kind === 'settings' && (
+          ) : (
             <SettingsScreen initialSection={route.section} />
-          )}
-          {(route.kind === 'screener' || route.kind === 'strategies') && (
-            <div className="p-8 text-fg-muted">
-              此页面正在重建（unified-strategy-workspace change · Groups 4-5）。
-            </div>
           )}
         </main>
       </div>
+    </div>
+  );
+}
+
+function RebuildPlaceholder({ title, note }: { title: string; note: string }) {
+  return (
+    <div className="p-12 max-w-2xl mx-auto">
+      <h1 className="text-2xl font-heading font-bold text-fg-primary mb-3">{title}</h1>
+      <p className="text-sm text-fg-muted leading-relaxed">{note}</p>
+      <p className="text-xs text-fg-muted/70 mt-6 italic">
+        Pencil reference designs in <code>docs/design/trader.pen</code>.
+      </p>
     </div>
   );
 }

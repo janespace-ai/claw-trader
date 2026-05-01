@@ -30,13 +30,13 @@
 
 ## 3. 前端核心 store + state machine
 
-- [ ] 3.1 新建 `stores/strategySessionStore.ts`：取代 workspaceDraftStore + screenerRunStore + 部分 conversationStore；字段对齐 design.md 数据模型
-- [ ] 3.2 store 的 `loadStrategy(id)` 行为：从服务端拉 strategy + 从客户端 SQLite 拉 chat_messages；`saveStrategy()` 调 POST /save；`archiveDraft()` 调 POST /archive_draft
-- [ ] 3.3 store 的 state-machine 派生：`getCurrentState(): 'S0' | 'S1a' | 'S1b' | 'S2' | 'S3' | 'S5'`，纯函数从 draft_*、last_backtest、auto_backtest_done 计算
-- [ ] 3.4 First-message-creates-strategy 流程：用户敲第一条消息 → 客户端先 POST /api/strategies 创建 row → 拿到 id → 写 chat 消息 → 流式发到 LLM
-- [ ] 3.5 Auto-backtest trigger：监听 store 的 draft_code / draft_symbols 变化；当从"非完整"→"完整"且 auto_backtest_done=false 时一次性 dispatch；rate-limit 60s 兜底
-- [ ] 3.6 单测：state machine 派生表驱动测试（覆盖 S0/S1a/S1b/S2/S3 切换条件）
-- [ ] 3.7 单测：first-message-creates-strategy 失败重试逻辑（服务端 500 → 不写 chat）
+- [x] 3.1 新建 `stores/strategySessionStore.ts`：取代 workspaceDraftStore + screenerRunStore + 部分 conversationStore；字段对齐 design.md 数据模型
+- [x] 3.2 store 的 `loadStrategy(id)` 行为：从服务端拉 strategy + 从客户端 SQLite 拉 chat_messages；`saveStrategy()` 调 POST /save；`archiveDraft()` 调 POST /archive_draft
+- [x] 3.3 store 的 state-machine 派生：`getCurrentState(): 'S0' | 'S1a' | 'S1b' | 'S2' | 'S3' | 'S5'`，纯函数从 draft_*、last_backtest、auto_backtest_done 计算
+- [x] 3.4 First-message-creates-strategy 流程：用户敲第一条消息 → 客户端先 POST /api/strategies 创建 row → 拿到 id → 写 chat 消息 → 流式发到 LLM
+- [x] 3.5 Auto-backtest trigger：监听 store 的 draft_code / draft_symbols 变化；当从"非完整"→"完整"且 auto_backtest_done=false 时一次性 dispatch；rate-limit 60s 兜底
+- [x] 3.6 单测：state machine 派生表驱动测试（覆盖 S0/S1a/S1b/S2/S3 切换条件）
+- [x] 3.7 单测：first-message-creates-strategy 失败重试逻辑（服务端 500 → 不写 chat）
 
 ## 4. 前端 UI 组件 — 三栏 workspace
 
@@ -88,11 +88,11 @@
 
 ## 9. Tab 重组 + routing 迁移
 
-- [ ] 9.1 修改 `types/navigation.ts`：移除 `kind: 'screener'`；`workspace` 重命名为 `strategy`（或保留 workspace 但语义变）
-- [ ] 9.2 修改 `appStore.ts`：默认路由切到新 tab 1；删除 setTab 的 'screener' 分支
-- [ ] 9.3 顶部 Tab Bar 组件：tab 标签从 `选币 / 策略 / 回测` → `创建/编辑策略 / 策略库 / settings`
-- [ ] 9.4 旧路由 fallback：persisted last-route 是 'screener' → 静默 redirect 到新 tab 1
-- [ ] 9.5 i18n：`nav.strategyWorkspace`、`nav.strategyLibrary` 等 key 加到 en/zh/zh-TW；`nav.screener` 标记为 deprecated 但保留 1 个 release（避免运行期 missing key 错误）
+- [x] 9.1 修改 `types/navigation.ts`：移除 `kind: 'screener'`；`workspace` 重命名为 `strategy`（或保留 workspace 但语义变）
+- [x] 9.2 修改 `appStore.ts`：默认路由切到新 tab 1；删除 setTab 的 'screener' 分支
+- [x] 9.3 顶部 Tab Bar 组件：tab 标签从 `选币 / 策略 / 回测` → `创建/编辑策略 / 策略库 / settings`
+- [x] 9.4 旧路由 fallback：persisted last-route 是 'screener' → 静默 redirect 到新 tab 1
+- [x] 9.5 i18n：`nav.strategyWorkspace`、`nav.strategyLibrary` 等 key 加到 en/zh/zh-TW；`nav.screener` 标记为 deprecated 但保留 1 个 release（避免运行期 missing key 错误）
 
 ## 10. 旧屏 / 旧 store / 旧逻辑清理
 

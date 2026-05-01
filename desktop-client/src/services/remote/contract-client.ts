@@ -112,6 +112,36 @@ export const cremote = {
     });
   },
 
+  // unified-strategy-workspace endpoints (migration 006).  TS regen of
+  // api.d.ts is part of Group 2.8 — for now the body shapes are typed
+  // here directly to unblock store work in Group 3.
+  async patchStrategyDraft(params: {
+    id: string;
+    draft_code?: string;
+    draft_symbols?: string[];
+    last_backtest?: { task_id: string; summary: Record<string, unknown>; ran_at: number };
+  }): Promise<Strategy> {
+    const { id, ...body } = params;
+    return iface().fetch(`/api/strategies/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body,
+    });
+  },
+
+  async saveStrategy(params: { id: string; name?: string }): Promise<Strategy> {
+    const { id, ...body } = params;
+    return iface().fetch(`/api/strategies/${encodeURIComponent(id)}/save`, {
+      method: 'POST',
+      body,
+    });
+  },
+
+  async archiveStrategyDraft(params: { id: string }): Promise<{ id: string; is_archived_draft: boolean }> {
+    return iface().fetch(`/api/strategies/${encodeURIComponent(params.id)}/archive_draft`, {
+      method: 'POST',
+    });
+  },
+
   // Backtest -----------------------------------------------------------------
 
   async startBacktest(body: {

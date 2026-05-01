@@ -5,10 +5,10 @@ import { routeToLegacyTab } from '@/types/navigation';
 /**
  * Top-level app state.
  *
- * `route: AppRoute` is the canonical route representation. The legacy
- * `currentTab` is derived from it for backward compat during the
- * migration — existing code reading `currentTab` continues to work
- * until each call-site is ported.
+ * `route: AppRoute` is the canonical route representation.  After the
+ * unified-strategy-workspace change, the only top-level tabs are
+ * `workspace` (创建/编辑策略, default) / `library` (策略库) / `settings`.
+ * `currentTab` is derived for backward-compat during the rebuild.
  */
 export type Tab = LegacyTab;
 
@@ -18,8 +18,9 @@ interface AppState {
   aiPanelCollapsed: boolean;
 
   navigate: (route: AppRoute) => void;
-  /** @deprecated Use navigate({ kind: ... }). Kept for backward compat. */
-  setTab: (t: Tab) => void;
+  /** Convenience setter for the top-level tab.  Maps the simple tab
+   *  identifier to a default AppRoute for that tab. */
+  setTab: (t: 'workspace' | 'library' | 'settings') => void;
   setAIPanelWidth: (w: number) => void;
   toggleAIPanel: () => void;
 }
@@ -31,7 +32,7 @@ export const useAppStore = create<AppState & { currentTab: Tab }>((set, get) => 
   // `currentTab` is a static field mirror; kept in sync inside navigate().
   // Using an actual field (not a getter) keeps it compatible with selectors
   // like `useAppStore((s) => s.currentTab)`.
-  currentTab: routeToLegacyTab(initialRoute) ?? 'backtest',
+  currentTab: routeToLegacyTab(initialRoute) ?? 'workspace',
   aiPanelWidth: 420,
   aiPanelCollapsed: false,
 
@@ -40,10 +41,10 @@ export const useAppStore = create<AppState & { currentTab: Tab }>((set, get) => 
   },
   setTab(t) {
     const route: AppRoute =
-      t === 'screener'
-        ? { kind: 'screener' }
-        : t === 'strategies'
-          ? { kind: 'strategies' }
+      t === 'library'
+        ? { kind: 'library' }
+        : t === 'settings'
+          ? { kind: 'settings' }
           : { kind: 'workspace' };
     set({ route, currentTab: t });
   },
