@@ -19,6 +19,7 @@ import {
   type ParamSweepRequest,
   type ScreenerFilter,
 } from '@/services/chat/strategistOutputParser';
+import { recordEvent } from '@/services/featureFlags';
 import type { ChatMessage as LLMMessage } from '@/types/domain';
 import type { components } from '@/types/api';
 
@@ -332,6 +333,7 @@ export function StrategyWorkspaceScreen() {
   const handleRejectDiff = (msg: ChatMessage, meta: DiffPreviewMetadata) => {
     if (meta.resolved) return;
     markDiffResolved(msg, 'rejected');
+    recordEvent('diff_rejected', { mutation_kind: meta.mutation.kind });
   };
 
   /** Mutate a chat message's metadata in the store.  We don't have an

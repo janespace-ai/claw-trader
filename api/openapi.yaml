@@ -230,7 +230,12 @@ components:
 
     Strategy:
       type: object
-      required: [id, name, code_type, code, created_at, updated_at]
+      required: [id, name, code, created_at, updated_at]
+      description: |
+        Stored user-submitted strategy.  After unified-strategy-workspace
+        (migration 006) a strategy carries a workspace zone (chat-driven
+        draft fields) plus a saved zone (snapshot taken when the user
+        clicks 保存策略).  Legacy `code_type` is omitempty on new rows.
       properties:
         id:
           type: string
@@ -240,6 +245,7 @@ components:
         code_type:
           type: string
           enum: [strategy, screener]
+          description: Legacy discriminator; not set on rows created via the unified workspace.
         code:
           type: string
         params_schema:
@@ -254,6 +260,84 @@ components:
           type: integer
         updated_at:
           type: integer
+
+        # ---- workspace zone (mutates with chat) -----------------------
+        draft_code:
+          type: string
+          nullable: true
+          description: Latest in-flight strategy code from the chat workspace.
+        draft_symbols:
+          type: array
+          items: { type: string }
+          nullable: true
+          description: Latest in-flight symbol universe.
+        last_backtest:
+          oneOf:
+            - $ref: "#/components/schemas/LastBacktestSummary"
+            - type: "null"
+
+        # ---- saved zone (mutates only via /save) ----------------------
+        saved_code:
+          type: string
+          nullable: true
+        saved_symbols:
+          type: array
+          items: { type: string }
+          nullable: true
+        saved_at:
+          type: integer
+          nullable: true
+          description: Unix seconds of the last 保存策略 action.  Null until first save.
+
+        # ---- lifecycle ------------------------------------------------
+        is_archived_draft:
+          type: boolean
+          default: false
+          description: |
+            True when the user pressed "+ 创建新策略" while this session was
+            dirty.  Such rows still appear in the library under the
+            "归档草稿" filter.
+
+    LastBacktestSummary:
+      type: object
+      description: |
+        Cached backtest summary stored on the strategy so re-opening it
+        shows the most recent run without re-dispatching.  The summary
+        payload is opaque on this surface (key:value of metric).
+      required: [task_id, summary, ran_at]
+      properties:
+        task_id:
+          type: string
+          format: uuid
+        summary:
+          type: object
+          additionalProperties: true
+        ran_at:
+          type: integer
+          description: Unix seconds when the backtest finished.
+
+    PatchStrategyDraftBody:
+      type: object
+      description: |
+        Body of PATCH /api/strategies/{id}.  Workspace-zone only — saved
+        fields are NOT touched by this endpoint.  Any omitted field
+        leaves the corresponding column unchanged.
+      properties:
+        draft_code: { type: string }
+        draft_symbols:
+          type: array
+          items: { type: string }
+        last_backtest:
+          $ref: "#/components/schemas/LastBacktestSummary"
+
+    SaveStrategyBody:
+      type: object
+      description: |
+        Body of POST /api/strategies/{id}/save.  `name` is optional;
+        sent on the FIRST save (when strategy.name is null and the user
+        just typed one in the save dialog).
+      properties:
+        name: { type: string }
 
     # --- Backtest -----------------------------------------------------------
 
@@ -829,6 +913,99 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Strategy" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+    patch:
+      operationId: patchStrategyDraft
+      summary: Update workspace-draft fields of a strategy
+      description: |
+        Updates `draft_code`, `draft_symbols`, and/or `last_backtest`
+        without touching the saved zone (`saved_code`, `saved_symbols`,
+        `saved_at`).  The dedicated POST `/save` endpoint is the only
+        way to mutate the saved fields — that separation guarantees
+        chat-driven edits never accidentally clobber a deliberate save.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PatchStrategyDraftBody" }
+      responses:
+        "200":
+          description: Updated strategy (full envelope)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Strategy" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/strategies/{id}/save:
+    post:
+      operationId: saveStrategy
+      summary: Snapshot draft → saved
+      description: |
+        Atomically copies `draft_code` → `saved_code`, `draft_symbols` →
+        `saved_symbols`, sets `saved_at = now()`, clears `is_archived_draft`,
+        and (if `name` is supplied) updates the strategy name.  This is
+        the ONLY endpoint that may mutate saved-zone fields.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SaveStrategyBody" }
+      responses:
+        "200":
+          description: Updated strategy (full envelope)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Strategy" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /api/strategies/{id}/archive_draft:
+    post:
+      operationId: archiveStrategyDraft
+      summary: Mark a strategy session as an archived draft
+      description: |
+        Sets `is_archived_draft = true` so the row sinks to the
+        "归档草稿" filter in the library tab.  Used by the desktop
+        client when the user presses "+ 创建新策略" while the active
+        session is dirty: the previous strategy is preserved as a
+        recoverable draft instead of being silently lost.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Acknowledgement payload
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, is_archived_draft]
+                properties:
+                  id: { type: string, format: uuid }
+                  is_archived_draft: { type: boolean }
         "404":
           description: Not found
           content:

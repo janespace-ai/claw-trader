@@ -36,9 +36,12 @@ Iterate until the numbers look like something you'd stake real money on. **Live 
 
 ## What you can do
 
-- **Talk to AI, get a strategy.** Describe the idea in natural language. The AI strategist writes the code. Tweak the prompt, re-run, iterate.
-- **See how it would have played out.** Run the strategy against years of real historical market data. Metrics, trade journal, equity curve, drawdown — all in one place.
-- **Compare ideas across many markets at once.** Write a filter ("volume over $100M, trend up, RSI below 70"), see the matches ranked, drill into any of them.
+- **One unified workspace per trading idea.** Each "strategy" is a chat session — open it, see the running history of decisions, the current code, the picked coin universe, the latest backtest result. Re-open later and pick up exactly where you left off.
+- **Talk to AI, get a strategy.** Describe the idea in natural language. The AI strategist writes the code. Iterate; every change shows up as a diff card you accept or reject.
+- **AI picks the universe too.** Say "筛 24h 成交额 top 30" and the AI runs a real screener for you, writes the resulting symbol list into the workspace.
+- **See how it would have played out.** When both halves are present (code + symbols), the workspace fires an automatic backtest. Aggregate metrics across all symbols + a sortable per-symbol drill-down so you see "this works on majors but loses on small caps".
+- **Sweep parameters in chat.** "试 RSI 14, 21, 28" — the workspace dispatches an optimization run, picks the winner, writes it back into the strategy.
+- **Save when satisfied.** A strategy is "saved" only when you click 保存策略 — chat-driven edits accumulate in a draft zone until then.
 - **Keep everything on your machine.** No cloud accounts, no uploaded data, no telemetry. Your API keys and results never leave your laptop.
 
 *Already fluent in Python?* You can edit the AI's output or write strategies from scratch — the `Strategy` class is plain Python with `on_bar`, `buy`, `sell`, `close` methods.
@@ -104,13 +107,21 @@ The app opens against your local services. On first launch it asks for an AI API
               │ HTTP 8081
               ▼
               ┌─────────────────────────┐
-              │ service-api         │
+              │ service-api             │
               │ (Go + Hertz)            │
+              │  • /api/strategies/*    │
+              │     (workspace +        │
+              │      saved snapshot)    │
               │  • /api/backtest/*      │
               │  • /api/screener/*      │
+              │     (used internally    │
+              │     by AI strategist)   │
               │  • /api/klines /symbols │
               │    /gaps (data gateway) │
-              │  • spawns Python sandbox│
+              │  • Gate 1 (AST) +       │
+              │    Gate 2 (AI review)   │
+              │  • dispatches sandbox-  │
+              │    service via HTTP     │
               └───────┬─────────────────┘
                       │ SQL (read)
                       ▼

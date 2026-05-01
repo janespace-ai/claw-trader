@@ -26,25 +26,15 @@
 
 import { create } from 'zustand';
 import { cremote } from '@/services/remote/contract-client';
+import { recordEvent } from '@/services/featureFlags';
 import type { components } from '@/types/api';
 
-type ApiStrategy = components['schemas']['Strategy'];
-
-/** Strategy enriched with the migration-006 fields the contract types
- *  haven't been regenerated for yet.  Drop this when api.d.ts catches up. */
-export interface WorkspaceStrategy extends ApiStrategy {
-  draft_code?: string | null;
-  draft_symbols?: string[] | null;
-  saved_code?: string | null;
-  saved_symbols?: string[] | null;
-  saved_at?: number | null;
-  last_backtest?: {
-    task_id: string;
-    summary: Record<string, unknown>;
-    ran_at: number;
-  } | null;
-  is_archived_draft?: boolean;
-}
+/** Re-export of the canonical contract type — post 2.8/2.9 the
+ *  generated `Strategy` schema includes the unified-strategy-workspace
+ *  fields (draft_code, draft_symbols, saved_code, saved_symbols,
+ *  saved_at, last_backtest, is_archived_draft).  We keep the alias name
+ *  for ergonomic call sites elsewhere in the codebase. */
+export type WorkspaceStrategy = components['schemas']['Strategy'];
 
 export interface ChatMessage {
   strategy_id: string;
@@ -259,10 +249,15 @@ export const useStrategySessionStore = create<StrategySessionState & StrategySes
     async saveStrategy(name) {
       const sid = get().strategyId;
       if (!sid) return;
+      const wasCommitted = get().isCommitted();
       set({ saving: true, error: null });
       try {
         const saved = (await cremote.saveStrategy({ id: sid, name })) as WorkspaceStrategy;
         set({ strategy: saved, saving: false });
+        recordEvent(wasCommitted ? 'strategy_save_overwrite' : 'strategy_save_first', {
+          strategy_id: sid,
+          named: name != null && name.length > 0,
+        });
       } catch (err) {
         set({ saving: false, error: describe(err) });
         throw err;
@@ -324,6 +319,10 @@ export const useStrategySessionStore = create<StrategySessionState & StrategySes
       const since = Date.now() - get().lastAutoBacktestAt;
       if (since < AUTO_BACKTEST_RATE_LIMIT_MS) return;
       set({ lastAutoBacktestAt: Date.now() });
+      recordEvent('auto_backtest_fired', {
+        strategy_id: get().strategyId,
+        symbol_count: s.draft_symbols?.length ?? 0,
+      });
       try {
         await runBacktest(s.draft_code as string, s.draft_symbols as string[]);
       } finally {

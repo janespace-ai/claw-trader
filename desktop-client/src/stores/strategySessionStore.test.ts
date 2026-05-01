@@ -57,7 +57,7 @@ function fixture(overrides: Partial<WorkspaceStrategy> = {}): WorkspaceStrategy 
     saved_code: null,
     saved_symbols: null,
     saved_at: null,
-    last_backtest: null,
+    last_backtest: undefined,
     is_archived_draft: false,
     ...overrides,
   };

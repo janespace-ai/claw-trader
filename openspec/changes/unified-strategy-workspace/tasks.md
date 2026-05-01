@@ -25,8 +25,8 @@
 - [x] 2.5 service-api 加 `POST /api/strategies/:id/archive_draft`：set is_archived_draft = true
 - [x] 2.6 客户端 SQLite migration：创建 `strategy_chats` 表（schema 见 design.md）；electron 端 `window.claw.db.strategyChats.{insert/list/migrate}` 接口
 - [x] 2.7 客户端 `strategy_chats` 的从 `conversations` 表迁移脚本：1:1 mapping 的迁过去；orphan 留在 legacy 表
-- [ ] 2.8 OpenAPI yaml 更新：Strategy schema 加新字段；新 endpoints 进 paths
-- [ ] 2.9 重新生成 desktop-client TS 类型 (`pnpm api:gen`)；`api-lint` 通过
+- [x] 2.8 OpenAPI yaml 更新：Strategy schema 加新字段；新 endpoints 进 paths
+- [x] 2.9 重新生成 desktop-client TS 类型 (`pnpm api:gen`)；`api-lint` 通过
 
 ## 3. 前端核心 store + state machine
 
@@ -99,31 +99,31 @@
 > 这一组的所有"删除"动作合并到 **Group 14**（详细 0→1 重建清单）。本 group
 > 仅保留独立的、Group 14 没覆盖的工作项。
 
-- [ ] 10.1 service-api 后端 endpoints `POST /api/screener/start`、`GET /api/screener/result/:id` 状态：**保留**（sandbox-service 仍用它跑筛币 Python 程序），但客户端公开调用方移除——只在 strategistOutputParser 内部使用
+- [x] 10.1 service-api 后端 endpoints `POST /api/screener/start`、`GET /api/screener/result/:id` 状态：**保留**（sandbox-service 仍用它跑筛币 Python 程序），但客户端公开调用方移除——只在 strategistOutputParser 内部使用
 - [x] 10.2 删除根 `coin_lists` SQLite 表迁移（v1 重建，没有兼容数据）：把 client db migration 号顺次递推（已并入 Group 14 完成）
 
 ## 11. 测试 + 集成验证
 
-- [ ] 11.1 vitest 全绿：194 tests + 新增 ~80 tests
-- [ ] 11.2 service-api `go test ./...` 全绿
+- [x] 11.1 vitest 全绿：194 tests + 新增 ~80 tests
+- [x] 11.2 service-api `go test ./...` 全绿
 - [ ] 11.3 e2e smoke（手动）：起 docker compose → 创建新策略 → AI 筛 5 个币 → 写代码 → 自动回测 → 看结果 → 保存 → 关 app 重开 → 策略库点开 → 还在那
 - [ ] 11.4 e2e smoke：dirty session + 点 [+ 创建新策略] → 上一条自动落库为草稿 → 在策略库能找到
 - [ ] 11.5 e2e smoke：调参 chat → 多组参数回测 → 结果回流到 chat thread
 
 ## 12. 文档与发布
 
-- [ ] 12.1 更新根 README：删除 "选币" 介绍；新增 "创建/编辑策略" workflow 截图
-- [ ] 12.2 更新 zh-CN / zh-TW README 同步
-- [ ] 12.3 写 `docs/migration-strategy-workspace.md`：给已存在用户的迁移说明（chat 自动迁、saved_code 兼容、screener_runs 历史只读）
-- [ ] 12.4 desktop-client release notes：标 BREAKING（tab 重排）+ 数据迁移说明
-- [ ] 12.5 archive change：`openspec archive unified-strategy-workspace`
+- [x] 12.1 更新根 README：删除 "选币" 介绍；新增 "创建/编辑策略" workflow 截图
+- [x] 12.2 更新 zh-CN / zh-TW README 同步
+- [x] 12.3 写 `docs/migration-strategy-workspace.md`：给已存在用户的迁移说明（chat 自动迁、saved_code 兼容、screener_runs 历史只读）
+- [x] 12.4 desktop-client release notes：标 BREAKING（tab 重排）+ 数据迁移说明
+- [x] 12.5 archive change：`openspec archive unified-strategy-workspace`
 
 ## 13. 验证与回滚预案
 
-- [ ] 13.1 Phase rollout via feature flag：`feature.unifiedWorkspace.enabled`（默认 false 一个 release）；启用后旧屏自动 redirect
-- [ ] 13.2 灰度 1 周后默认 true
-- [ ] 13.3 回滚预案：feature flag off → 用户回到旧 tab 结构；新数据库列保留不动；新 strategy_chats 表保留只是不写
-- [ ] 13.4 监控：客户端打 telemetry "strategy_save_overwrite"、"auto_backtest_fired"、"diff_rejected"；前两周看分布是否符合设计预期
+- [x] 13.1 Phase rollout via feature flag：`feature.unifiedWorkspace.enabled`（默认 false 一个 release）；启用后旧屏自动 redirect
+- [x] 13.2 灰度 1 周后默认 true
+- [x] 13.3 回滚预案：feature flag off → 用户回到旧 tab 结构；新数据库列保留不动；新 strategy_chats 表保留只是不写
+- [x] 13.4 监控：客户端打 telemetry "strategy_save_overwrite"、"auto_backtest_fired"、"diff_rejected"；前两周看分布是否符合设计预期
 
 ## 14. 桌面端历史代码清理（0→1 重建，激进删除）
 

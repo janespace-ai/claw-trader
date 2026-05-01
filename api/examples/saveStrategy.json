@@ -1,0 +1,19 @@
+{
+  "id": "00000000-0000-0000-0000-000000000001",
+  "name": "BTC 均值回归 v1",
+  "code": "from claw.strategy import Strategy\n\nclass MeanReversion(Strategy):\n    def setup(self):\n        self.rsi = self.indicator('RSI', 21)\n    def on_bar(self, bar):\n        if self.rsi.iloc[-1] < 30:\n            self.buy(size=1)\n",
+  "current_version": 1,
+  "created_at": 1743768000,
+  "updated_at": 1744500100,
+  "draft_code": "from claw.strategy import Strategy\n\nclass MeanReversion(Strategy):\n    def setup(self):\n        self.rsi = self.indicator('RSI', 21)\n    def on_bar(self, bar):\n        if self.rsi.iloc[-1] < 30:\n            self.buy(size=1)\n",
+  "draft_symbols": ["BTC/USDT", "ETH/USDT", "SOL/USDT"],
+  "saved_code": "from claw.strategy import Strategy\n\nclass MeanReversion(Strategy):\n    def setup(self):\n        self.rsi = self.indicator('RSI', 21)\n    def on_bar(self, bar):\n        if self.rsi.iloc[-1] < 30:\n            self.buy(size=1)\n",
+  "saved_symbols": ["BTC/USDT", "ETH/USDT", "SOL/USDT"],
+  "saved_at": 1744500100,
+  "last_backtest": {
+    "task_id": "00000000-0000-0000-0000-0000000000aa",
+    "summary": { "pnl_pct": 18.3, "sharpe": 1.81 },
+    "ran_at": 1744500050
+  },
+  "is_archived_draft": false
+}

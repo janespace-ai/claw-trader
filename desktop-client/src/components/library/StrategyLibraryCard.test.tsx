@@ -95,7 +95,7 @@ describe('StrategyLibraryCard — draft strategy', () => {
         strategy={fixture({
           name: '未命名',
           saved_at: null,
-          last_backtest: null,
+          last_backtest: undefined,
           is_archived_draft: false,
         })}
         lastMessage={null}
