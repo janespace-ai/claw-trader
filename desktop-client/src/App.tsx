@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
 import { DeepBacktest } from '@/screens/workspace/DeepBacktest';
+import { StrategyWorkspaceScreen } from '@/screens/StrategyWorkspaceScreen';
 import { SymbolDetailScreen } from '@/screens/SymbolDetailScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { useAppStore } from '@/stores/appStore';
@@ -46,10 +47,7 @@ export default function App() {
           {route.kind === 'workspace' && workspaceMode === 'deep' ? (
             <DeepBacktest />
           ) : route.kind === 'workspace' ? (
-            <RebuildPlaceholder
-              title="创建/编辑策略"
-              note="Group 4 of unified-strategy-workspace will land the three-pane chat workspace here."
-            />
+            <StrategyWorkspaceScreen />
           ) : route.kind === 'library' ? (
             <RebuildPlaceholder
               title="策略库"

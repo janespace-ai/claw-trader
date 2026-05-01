@@ -40,15 +40,15 @@
 
 ## 4. 前端 UI 组件 — 三栏 workspace
 
-- [ ] 4.1 新建 `screens/StrategyWorkspaceScreen.tsx`（替代 StrategyDesign.tsx + ScreenerScreen.tsx）：根据 task 1.3 设计稿落地三栏 ResizableLayout
-- [ ] 4.2 左栏 `SymbolListPane`：渲染 draft_symbols；勾选/移除单个；底部 [+ AI 改] 按钮聚焦到 chat 输入框预填 "去掉 / 加入 ..."
-- [ ] 4.3 中栏 `WorkspaceCenterPane`：tab 切换（code/chart/result）；code 视图嵌入 strategist 草稿编辑器（read-only by default，AI 改后通过 diff 接受才更新）；chart 视图聚焦当前 symbol；result 视图见 task 6
-- [ ] 4.4 右栏 `StrategyChatPane`：替代 AIPanel；顶部状态 badge + checklist；中部消息列表；diff 预览卡片为 inline message variant
-- [ ] 4.5 Diff 预览卡片：和 AI 消息同 thread；展示 before/after；[应用] 写 store；[拒绝] 标记消息为 rejected 但不删
-- [ ] 4.6 [运行回测] 按钮：disabled 当 draft 不全；点击调 startBacktest（多 symbol）；写 last_backtest
-- [ ] 4.7 [保存策略] 按钮：disabled 当 draft 不全；首次保存弹 NameDialog；写 saved_*；toast 反馈
-- [ ] 4.8 dirty 状态指示：badge 加 ●、保存按钮高亮 primary
-- [ ] 4.9 单测：组件级 + 集成（with mock store）
+- [x] 4.1 新建 `screens/StrategyWorkspaceScreen.tsx`（替代 StrategyDesign.tsx + ScreenerScreen.tsx）：根据 task 1.3 设计稿落地三栏 ResizableLayout
+- [x] 4.2 左栏 `SymbolListPane`：渲染 draft_symbols；勾选/移除单个；底部 [+ AI 改] 按钮聚焦到 chat 输入框预填 "去掉 / 加入 ..."
+- [x] 4.3 中栏 `WorkspaceCenterPane`：tab 切换（code/chart/result）；code 视图嵌入 strategist 草稿编辑器（read-only by default，AI 改后通过 diff 接受才更新）；chart 视图聚焦当前 symbol；result 视图见 task 6
+- [x] 4.4 右栏 `StrategyChatPane`：替代 AIPanel；顶部状态 badge + checklist；中部消息列表；diff 预览卡片为 inline message variant
+- [x] 4.5 Diff 预览卡片：和 AI 消息同 thread；展示 before/after；[应用] 写 store；[拒绝] 标记消息为 rejected 但不删
+- [x] 4.6 [运行回测] 按钮：disabled 当 draft 不全；点击调 startBacktest（多 symbol）；写 last_backtest
+- [x] 4.7 [保存策略] 按钮：disabled 当 draft 不全；首次保存弹 NameDialog；写 saved_*；toast 反馈
+- [x] 4.8 dirty 状态指示：badge 加 ●、保存按钮高亮 primary
+- [x] 4.9 单测：组件级 + 集成（with mock store）
 
 ## 5. 前端 UI — 策略库重设计
 
