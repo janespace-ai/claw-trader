@@ -5,8 +5,15 @@ import { SymbolListPane } from '@/components/workspace/SymbolListPane';
 import { WorkspaceCenterPane } from '@/components/workspace/WorkspaceCenterPane';
 import { StrategyChatPane } from '@/components/workspace/StrategyChatPane';
 import { SaveStrategyDialog } from '@/components/workspace/SaveStrategyDialog';
-import { useStrategySessionStore } from '@/stores/strategySessionStore';
+import {
+  useStrategySessionStore,
+  type ChatMessage,
+} from '@/stores/strategySessionStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import { cremote, toErrorBody } from '@/services/remote/contract-client';
+import { runStrategistTurn, type DiffPreviewMetadata } from '@/services/chat/strategistRunner';
+import { shouldProposeName } from '@/services/chat/strategistOutputParser';
+import type { ChatMessage as LLMMessage } from '@/types/domain';
 
 /**
  * The "创建/编辑策略" tab — the unified-strategy-workspace front door.
@@ -34,13 +41,19 @@ export function StrategyWorkspaceScreen() {
   const createStrategy = useStrategySessionStore((s) => s.createStrategy);
   const patchDraft = useStrategySessionStore((s) => s.patchDraft);
 
+  const currentState = useStrategySessionStore((s) => s.currentState());
+
+  const { defaultProvider, providers, aiLanguagePolicy } = useSettingsStore();
+
   const [focusedSymbol, setFocusedSymbol] = useState<string | null>(null);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState(false);
 
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
+  void aiLanguagePolicy; // (Group 7 future: thread reply lang into prompt; v1 lets the model auto-detect)
 
   // When draft_symbols changes and there's no focused symbol, default
   // to the first one so the chart pane has something to render.
@@ -64,28 +77,141 @@ export function StrategyWorkspaceScreen() {
   };
 
   const handleUserMessage = async (text: string) => {
+    if (streaming) return;
+
     // First message creates the strategy if there isn't one yet.
-    let activeId = strategyId;
-    if (!activeId) {
+    if (!strategyId) {
       try {
-        activeId = await createStrategy();
+        await createStrategy();
       } catch (err) {
-        setRunError(`${describeErr(err)}`);
+        setRunError(describeErr(err));
         return;
       }
     }
     await appendMessage('user', text);
 
-    // Group 7 wires the AI here.  For Group 4 we only persist the
-    // user's message — the AI roundtrip becomes Group 7's job (state-
-    // aware strategist prompt + diff-preview generation).  This stub
-    // lets us smoke-test the full chat persistence cycle in the
-    // meantime.
-    await appendMessage('assistant', t('workspace.chat.stub_response', {
-      defaultValue:
-        '(AI 还没接上 — Group 7 of unified-strategy-workspace will hook the strategist persona here.)',
+    const cfg = providers[defaultProvider];
+    if (!cfg?.apiKey) {
+      await appendMessage(
+        'assistant',
+        t('workspace.chat.no_api_key', {
+          defaultValue: '⚠️ 还没配置 AI Provider — 在「设置」里填 API Key 再来试。',
+        }),
+      );
+      return;
+    }
+
+    // Build LLM history from the local store (excluding the diff-preview
+    // metadata-only assistant messages, which are UI artifacts not real
+    // model turns).
+    const storeState = useStrategySessionStore.getState();
+    const llmHistory: LLMMessage[] = storeState.messages
+      .filter((m) => !isDiffPreview(m))
+      .map((m) => ({
+        role: m.role,
+        content: m.content,
+        ts: m.created_at,
+      }));
+
+    setStreaming(true);
+    try {
+      const ctx = {
+        state: storeState.currentState(),
+        strategyName: storeState.strategy?.name ?? null,
+        isCommitted: storeState.isCommitted(),
+        draftCode: storeState.strategy?.draft_code ?? null,
+        draftSymbols: storeState.strategy?.draft_symbols ?? null,
+        notes: shouldProposeName(storeState.messages.length, !!storeState.strategy?.name)
+          ? 'NAMING_HINT: please propose a short strategy name in your prose response (the user can accept or override).'
+          : undefined,
+      };
+      await runStrategistTurn({
+        provider: defaultProvider,
+        model: cfg.model,
+        apiKey: cfg.apiKey,
+        baseURL: cfg.baseURL,
+        context: ctx,
+        history: llmHistory,
+        userMessage: text,
+        onComplete: async (result) => {
+          if (result.prose) {
+            await appendMessage('assistant', result.prose);
+          }
+          if (result.diffPreviewMeta) {
+            // Persist a SECOND assistant message whose content is the
+            // mutation reason (we use the prose snippet as a proxy) and
+            // whose metadata carries the diff payload for the chat pane.
+            await appendMessage(
+              'assistant',
+              proposeReason(result.diffPreviewMeta),
+              result.diffPreviewMeta as unknown as Record<string, unknown>,
+            );
+          }
+          if (result.warnings.length > 0) {
+            // eslint-disable-next-line no-console
+            console.warn('[strategist] parse warnings', result.warnings);
+          }
+        },
+        onError: async (err) => {
+          await appendMessage('assistant', `⚠️ ${err}`);
+        },
+      });
+    } catch (err) {
+      await appendMessage('assistant', `⚠️ ${describeErr(err)}`);
+    } finally {
+      setStreaming(false);
+    }
+  };
+
+  const handleApplyDiff = async (msg: ChatMessage, meta: DiffPreviewMetadata) => {
+    if (meta.resolved) return;
+    try {
+      if (meta.mutation.kind === 'code') {
+        await patchDraft({ draftCode: meta.mutation.code });
+      } else if (meta.mutation.kind === 'symbols') {
+        await patchDraft({ draftSymbols: meta.mutation.symbols });
+      } else if (meta.mutation.kind === 'filter') {
+        // Group 8 will wire `symbols-filter` to the actual screener
+        // dispatch.  For now, just acknowledge.
+        await appendMessage(
+          'assistant',
+          t('workspace.chat.filter_pending', {
+            defaultValue: '(symbols-filter 调度将在 Group 8 接入)',
+          }),
+        );
+      }
+      // Mark this diff message as resolved=applied.
+      markDiffResolved(msg, 'applied');
+    } catch (err) {
+      await appendMessage('assistant', `⚠️ ${describeErr(err)}`);
+    }
+  };
+
+  const handleRejectDiff = (msg: ChatMessage, meta: DiffPreviewMetadata) => {
+    if (meta.resolved) return;
+    markDiffResolved(msg, 'rejected');
+  };
+
+  /** Mutate a chat message's metadata in the store.  We don't have an
+   *  "update message" API (chat is append-only at the persistence
+   *  layer per Group 14 spec), so we shallow-replace the in-memory
+   *  copy.  The persisted SQLite row stays as originally written —
+   *  which is fine, the resolved bit is a UI-only "I already pressed
+   *  this" hint. */
+  const markDiffResolved = (msg: ChatMessage, resolution: 'applied' | 'rejected') => {
+    useStrategySessionStore.setState((s) => ({
+      messages: s.messages.map((m) =>
+        m.strategy_id === msg.strategy_id && m.msg_idx === msg.msg_idx
+          ? {
+              ...m,
+              metadata: {
+                ...((m.metadata ?? {}) as Record<string, unknown>),
+                resolved: resolution,
+              },
+            }
+          : m,
+      ),
     }));
-    void activeId;
   };
 
   const handleRunBacktest = async () => {
@@ -187,6 +313,9 @@ export function StrategyWorkspaceScreen() {
           <StrategyChatPane
             inputRef={chatInputRef}
             onUserMessage={handleUserMessage}
+            onApplyDiff={handleApplyDiff}
+            onRejectDiff={handleRejectDiff}
+            streaming={streaming}
           />
         }
       />
@@ -303,4 +432,19 @@ function ActionBar({
 function describeErr(err: unknown): string {
   const body = toErrorBody(err);
   return `${body.code}: ${body.message}`;
+}
+
+function isDiffPreview(m: ChatMessage): boolean {
+  const meta = m.metadata as { kind?: string } | null;
+  return !!meta && meta.kind === 'diff-preview';
+}
+
+function proposeReason(meta: DiffPreviewMetadata): string {
+  if (meta.mutation.kind === 'code') {
+    return '建议改动代码';
+  }
+  if (meta.mutation.kind === 'symbols') {
+    return `建议更新币列表 (${meta.mutation.symbols.length} 个)`;
+  }
+  return meta.mutation.filter.description;
 }

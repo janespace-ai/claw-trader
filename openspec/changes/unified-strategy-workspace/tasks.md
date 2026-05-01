@@ -69,14 +69,14 @@
 
 ## 7. AI prompt 状态机 + 引导
 
-- [ ] 7.1 重写 strategist 系统 prompt 为 state-aware（template + 6 个 state guidance 块），见 design.md
-- [ ] 7.2 prompt 始终注入 `<workspace_state>` 块，含 draft_code、draft_symbols、state code
-- [ ] 7.3 sliding-window history：最近 30 条 + 系统 prompt + workspace_state；老消息保留在 store 但不进 prompt
-- [ ] 7.4 AI 输出协议：python 代码块或 ```symbols``` 块（每条消息最多一个 mutation）；解析逻辑写到 `services/chat/strategistOutputParser.ts`
-- [ ] 7.5 一旦 AI 输出 mutation → 不立即写 store，先生成一个 diff-preview 消息节点等用户确认
-- [ ] 7.6 用户接受 / 拒绝的 IPC：accept → patch /api/strategies/:id；reject → 仅 mark message as rejected
-- [ ] 7.7 AI 自动取名：第 ~5 条 user-AI 交互且 strategy.name 仍为 null → 注入"建议起名 X"指令；用户接受写 name
-- [ ] 7.8 单测：prompt 构建（覆盖 6 个 state）；output 解析；diff 应用；rate limit
+- [x] 7.1 重写 strategist 系统 prompt 为 state-aware（template + 6 个 state guidance 块），见 design.md
+- [x] 7.2 prompt 始终注入 `<workspace_state>` 块，含 draft_code、draft_symbols、state code
+- [x] 7.3 sliding-window history：最近 30 条 + 系统 prompt + workspace_state；老消息保留在 store 但不进 prompt
+- [x] 7.4 AI 输出协议：python 代码块或 ```symbols``` 块（每条消息最多一个 mutation）；解析逻辑写到 `services/chat/strategistOutputParser.ts`
+- [x] 7.5 一旦 AI 输出 mutation → 不立即写 store，先生成一个 diff-preview 消息节点等用户确认
+- [x] 7.6 用户接受 / 拒绝的 IPC：accept → patch /api/strategies/:id；reject → 仅 mark message as rejected
+- [x] 7.7 AI 自动取名：第 ~5 条 user-AI 交互且 strategy.name 仍为 null → 注入"建议起名 X"指令；用户接受写 name
+- [x] 7.8 单测：prompt 构建（覆盖 6 个 state）；output 解析；diff 应用；rate limit
 
 ## 8. 调参 chat 入口
 

@@ -3,7 +3,10 @@ import { useTranslation } from 'react-i18next';
 import {
   useStrategySessionStore,
   type WorkspaceStrategy,
+  type ChatMessage,
 } from '@/stores/strategySessionStore';
+import { DiffPreviewCard } from './DiffPreviewCard';
+import type { DiffPreviewMetadata } from '@/services/chat/strategistRunner';
 
 interface Props {
   /** Optional ref so the parent screen (e.g. left rail's "AI 帮我改币种"
@@ -15,6 +18,16 @@ interface Props {
    *  diff-preview cards).  In Group 7 this becomes the strategist
    *  state-aware prompt entry point. */
   onUserMessage?: (text: string) => void;
+  /** Called when user clicks [应用] on a diff-preview card.  The
+   *  parent screen patches strategy.draft_* via the store and updates
+   *  the message's metadata.resolved to 'applied'. */
+  onApplyDiff?: (msg: ChatMessage, meta: DiffPreviewMetadata) => void;
+  /** Called when user clicks [拒绝] on a diff-preview card.  Just
+   *  marks the metadata.resolved = 'rejected' so the buttons disappear. */
+  onRejectDiff?: (msg: ChatMessage, meta: DiffPreviewMetadata) => void;
+  /** True while a strategist turn is streaming — disables the input
+   *  to prevent double-sends. */
+  streaming?: boolean;
 }
 
 /**
@@ -28,7 +41,13 @@ interface Props {
  *
  * Mirrors Pencil frame `kYB4N`.
  */
-export function StrategyChatPane({ inputRef, onUserMessage }: Props) {
+export function StrategyChatPane({
+  inputRef,
+  onUserMessage,
+  onApplyDiff,
+  onRejectDiff,
+  streaming = false,
+}: Props) {
   const { t } = useTranslation();
   const strategy = useStrategySessionStore((s) => s.strategy);
   const messages = useStrategySessionStore((s) => s.messages);
@@ -138,13 +157,27 @@ export function StrategyChatPane({ inputRef, onUserMessage }: Props) {
             })}
           </div>
         ) : (
-          messages.map((m) => (
-            <ChatBubble
-              key={`${m.strategy_id}-${m.msg_idx}`}
-              role={m.role}
-              content={m.content}
-            />
-          ))
+          messages.map((m) => {
+            const meta = m.metadata as DiffPreviewMetadata | { kind?: string } | null;
+            if (meta && (meta as DiffPreviewMetadata).kind === 'diff-preview') {
+              return (
+                <DiffPreviewMessage
+                  key={`${m.strategy_id}-${m.msg_idx}`}
+                  msg={m}
+                  meta={meta as DiffPreviewMetadata}
+                  onApply={onApplyDiff}
+                  onReject={onRejectDiff}
+                />
+              );
+            }
+            return (
+              <ChatBubble
+                key={`${m.strategy_id}-${m.msg_idx}`}
+                role={m.role}
+                content={m.content}
+              />
+            );
+          })
         )}
       </div>
 
@@ -156,10 +189,15 @@ export function StrategyChatPane({ inputRef, onUserMessage }: Props) {
             rows={2}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder={t('workspace.chat.input.placeholder', {
-              defaultValue: '描述你的想法… (Enter 发送, Shift+Enter 换行)',
-            })}
-            className="flex-1 bg-transparent outline-none resize-none text-[12px] text-fg-primary placeholder:text-fg-muted"
+            disabled={streaming}
+            placeholder={
+              streaming
+                ? t('workspace.chat.streaming', { defaultValue: '思考中…' })
+                : t('workspace.chat.input.placeholder', {
+                    defaultValue: '描述你的想法… (Enter 发送, Shift+Enter 换行)',
+                  })
+            }
+            className="flex-1 bg-transparent outline-none resize-none text-[12px] text-fg-primary placeholder:text-fg-muted disabled:opacity-50"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -169,14 +207,14 @@ export function StrategyChatPane({ inputRef, onUserMessage }: Props) {
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim()}
+            disabled={!input.trim() || streaming}
             className={
               'w-7 h-7 rounded-md grid place-items-center text-sm transition-opacity ' +
               'bg-accent-primary text-fg-inverse disabled:opacity-40 disabled:cursor-not-allowed'
             }
             aria-label={t('action.send', { defaultValue: 'Send' })}
           >
-            ↑
+            {streaming ? '⟳' : '↑'}
           </button>
         </div>
       </div>
@@ -208,6 +246,51 @@ function useChecklist(
       done: hasResult,
     },
   ];
+}
+
+function DiffPreviewMessage({
+  msg,
+  meta,
+  onApply,
+  onReject,
+}: {
+  msg: ChatMessage;
+  meta: DiffPreviewMetadata;
+  onApply?: (msg: ChatMessage, meta: DiffPreviewMetadata) => void;
+  onReject?: (msg: ChatMessage, meta: DiffPreviewMetadata) => void;
+}) {
+  // Build before/after strings for the DiffPreviewCard.
+  let before = '';
+  let after = '';
+  let kind: 'code' | 'symbols' = 'code';
+  if (meta.mutation.kind === 'code') {
+    kind = 'code';
+    before = meta.before.code ?? '';
+    after = meta.mutation.code;
+  } else if (meta.mutation.kind === 'symbols') {
+    kind = 'symbols';
+    before = JSON.stringify(meta.before.symbols ?? [], null, 2);
+    after = JSON.stringify(meta.mutation.symbols, null, 2);
+  } else {
+    // 'filter' kind — don't render a diff card; render a status line.
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-[color:var(--accent-primary-dim)] text-[11px] text-accent-primary">
+        <span aria-hidden>⚙</span>
+        <span>{meta.mutation.filter.description}</span>
+      </div>
+    );
+  }
+  return (
+    <DiffPreviewCard
+      kind={kind}
+      reason={msg.content || (kind === 'code' ? '代码改动' : '币列表更新')}
+      before={before}
+      after={after}
+      resolved={meta.resolved ?? undefined}
+      onApply={() => onApply?.(msg, meta)}
+      onReject={() => onReject?.(msg, meta)}
+    />
+  );
 }
 
 function ChatBubble({
