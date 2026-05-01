@@ -157,12 +157,16 @@ func (s *Store) CreateStrategy(ctx context.Context, st model.Strategy) (string, 
 }
 
 // GetStrategy reads by ID, joining `strategy_versions` for the row's
-// current version to populate `Code` + `ParamsSchema`.
+// current version to populate `Code` + `ParamsSchema`, and loading the
+// post-migration-006 workspace + saved fields.
 func (s *Store) GetStrategy(ctx context.Context, id string) (model.Strategy, bool, error) {
 	sqlStr := fmt.Sprintf(`
 		SELECT s.id, s.name, s.code_type, s.current_version,
 		       v.code, COALESCE(v.params_schema, '{}'::jsonb),
-		       s.created_at, s.updated_at
+		       s.created_at, s.updated_at,
+		       s.draft_code, s.draft_symbols,
+		       s.saved_code, s.saved_symbols, s.saved_at,
+		       s.last_backtest, s.is_archived_draft
 		FROM %[1]s.strategies s
 		JOIN %[1]s.strategy_versions v
 		  ON v.strategy_id = s.id AND v.version = s.current_version
@@ -170,10 +174,14 @@ func (s *Store) GetStrategy(ctx context.Context, id string) (model.Strategy, boo
 	`, s.schema)
 	var st model.Strategy
 	var params []byte
+	var draftSyms, savedSyms, lastBT []byte
 	err := s.pool.QueryRow(ctx, sqlStr, id).Scan(
 		&st.ID, &st.Name, &st.CodeType, &st.CurrentVersion,
 		&st.Code, &params,
 		&st.CreatedAt, &st.UpdatedAt,
+		&st.DraftCode, &draftSyms,
+		&st.SavedCode, &savedSyms, &st.SavedAt,
+		&lastBT, &st.IsArchivedDraft,
 	)
 	if err != nil {
 		if strings.Contains(err.Error(), "no rows") {
@@ -182,7 +190,93 @@ func (s *Store) GetStrategy(ctx context.Context, id string) (model.Strategy, boo
 		return model.Strategy{}, false, err
 	}
 	_ = json.Unmarshal(params, &st.ParamsSchema)
+	if len(draftSyms) > 0 {
+		_ = json.Unmarshal(draftSyms, &st.DraftSymbols)
+	}
+	if len(savedSyms) > 0 {
+		_ = json.Unmarshal(savedSyms, &st.SavedSymbols)
+	}
+	if len(lastBT) > 0 && string(lastBT) != "null" {
+		var lbt model.LastBacktestSummary
+		if err := json.Unmarshal(lastBT, &lbt); err == nil {
+			st.LastBacktest = &lbt
+		}
+	}
 	return st, true, nil
+}
+
+// PatchStrategyDraft updates only draft_code / draft_symbols / last_backtest
+// on an existing strategy.  saved_* fields are NOT touched — that path is
+// reserved for SaveStrategy.  Any nil argument leaves the corresponding
+// column unchanged.
+func (s *Store) PatchStrategyDraft(ctx context.Context, id string,
+	draftCode *string, draftSymbols *[]string, lastBacktest *model.LastBacktestSummary,
+) error {
+	sets := []string{"updated_at = now()"}
+	args := []any{id}
+	if draftCode != nil {
+		args = append(args, *draftCode)
+		sets = append(sets, fmt.Sprintf("draft_code = $%d", len(args)))
+	}
+	if draftSymbols != nil {
+		b, _ := json.Marshal(*draftSymbols)
+		args = append(args, b)
+		sets = append(sets, fmt.Sprintf("draft_symbols = $%d::jsonb", len(args)))
+	}
+	if lastBacktest != nil {
+		b, _ := json.Marshal(lastBacktest)
+		args = append(args, b)
+		sets = append(sets, fmt.Sprintf("last_backtest = $%d::jsonb", len(args)))
+	}
+	if len(sets) == 1 {
+		// nothing to update
+		return nil
+	}
+	sqlStr := fmt.Sprintf(`
+		UPDATE %[1]s.strategies
+		SET %[2]s
+		WHERE id = $1
+	`, s.schema, strings.Join(sets, ", "))
+	_, err := s.pool.Exec(ctx, sqlStr, args...)
+	return err
+}
+
+// SaveStrategy snapshots draft_code / draft_symbols into saved_*, sets
+// saved_at = now(), and optionally updates the strategy name.  Atomic
+// in a single UPDATE.
+func (s *Store) SaveStrategy(ctx context.Context, id string, newName *string) error {
+	sets := []string{
+		"saved_code = draft_code",
+		"saved_symbols = COALESCE(draft_symbols, '[]'::jsonb)",
+		"saved_at = now()",
+		"is_archived_draft = false",
+		"updated_at = now()",
+	}
+	args := []any{id}
+	if newName != nil {
+		args = append(args, *newName)
+		sets = append(sets, fmt.Sprintf("name = $%d", len(args)))
+	}
+	sqlStr := fmt.Sprintf(`
+		UPDATE %[1]s.strategies
+		SET %[2]s
+		WHERE id = $1
+	`, s.schema, strings.Join(sets, ", "))
+	_, err := s.pool.Exec(ctx, sqlStr, args...)
+	return err
+}
+
+// ArchiveStrategyDraft flips is_archived_draft=true.  Used when the user
+// presses "+ 新建策略" while the active session is dirty — the previous
+// session is preserved as a recoverable draft in the library.
+func (s *Store) ArchiveStrategyDraft(ctx context.Context, id string) error {
+	sqlStr := fmt.Sprintf(`
+		UPDATE %[1]s.strategies
+		SET is_archived_draft = true, updated_at = now()
+		WHERE id = $1
+	`, s.schema)
+	_, err := s.pool.Exec(ctx, sqlStr, id)
+	return err
 }
 
 // ListStrategies returns the N most recent strategies, joining each
@@ -200,12 +294,15 @@ func (s *Store) ListStrategies(ctx context.Context, codeType string, limit int) 
 	sqlStr := fmt.Sprintf(`
 		SELECT s.id, s.name, s.code_type, s.current_version,
 		       v.code, COALESCE(v.params_schema, '{}'::jsonb),
-		       s.created_at, s.updated_at
+		       s.created_at, s.updated_at,
+		       s.draft_code, s.draft_symbols,
+		       s.saved_code, s.saved_symbols, s.saved_at,
+		       s.last_backtest, s.is_archived_draft
 		FROM %[1]s.strategies s
 		JOIN %[1]s.strategy_versions v
 		  ON v.strategy_id = s.id AND v.version = s.current_version
 		%[2]s
-		ORDER BY s.created_at DESC
+		ORDER BY s.updated_at DESC
 		LIMIT $1
 	`, s.schema, where)
 
@@ -218,12 +315,27 @@ func (s *Store) ListStrategies(ctx context.Context, codeType string, limit int) 
 	result := []model.Strategy{}
 	for rows.Next() {
 		var st model.Strategy
-		var params []byte
+		var params, draftSyms, savedSyms, lastBT []byte
 		if err := rows.Scan(&st.ID, &st.Name, &st.CodeType, &st.CurrentVersion,
-			&st.Code, &params, &st.CreatedAt, &st.UpdatedAt); err != nil {
+			&st.Code, &params, &st.CreatedAt, &st.UpdatedAt,
+			&st.DraftCode, &draftSyms,
+			&st.SavedCode, &savedSyms, &st.SavedAt,
+			&lastBT, &st.IsArchivedDraft); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal(params, &st.ParamsSchema)
+		if len(draftSyms) > 0 {
+			_ = json.Unmarshal(draftSyms, &st.DraftSymbols)
+		}
+		if len(savedSyms) > 0 {
+			_ = json.Unmarshal(savedSyms, &st.SavedSymbols)
+		}
+		if len(lastBT) > 0 && string(lastBT) != "null" {
+			var lbt model.LastBacktestSummary
+			if err := json.Unmarshal(lastBT, &lbt); err == nil {
+				st.LastBacktest = &lbt
+			}
+		}
 		result = append(result, st)
 	}
 	return result, rows.Err()

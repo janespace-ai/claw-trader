@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cremote } from '@/services/remote/contract-client';
 import { useOptimLensStore } from '@/stores/optimlensStore';
-import { useWorkspaceDraftStore } from '@/stores/workspaceDraftStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 import { applyImprovement, PatchError } from '@/services/strategyPatcher';
 import { ImprovementCard } from './ImprovementCard';
@@ -25,9 +24,14 @@ export function ImprovementList({ strategyId }: Props) {
   const dismiss = useOptimLensStore((s) => s.dismiss);
   const undismiss = useOptimLensStore((s) => s.undismiss);
   const enterDesign = useWorkspaceStore((s) => s.enterDesign);
-  const setDraft = useWorkspaceDraftStore((s) => s.setDraft);
-  const draftSummary = useWorkspaceDraftStore((s) => s.summary);
-  const draftCode = useWorkspaceDraftStore((s) => s.code);
+  // workspaceDraftStore removed in Group 14 cleanup.  When the new
+  // strategySessionStore (Group 3 of unified-strategy-workspace) lands,
+  // re-wire these to its selectors.  For now ImprovementList always
+  // fetches the latest saved code from the backend, which is the safer
+  // default anyway (no stale draft race).
+  const setDraft = (_args: unknown): void => { void _args; };
+  const draftSummary: { name?: string } | null = null;
+  const draftCode = '';
 
   const [applyingKey, setApplyingKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +58,7 @@ export function ImprovementList({ strategyId }: Props) {
             summary: `OptimLens: ${im.title}`,
           },
         });
-        if (draftSummary) {
+        if (draftSummary && setDraft) {
           setDraft({ strategyId, summary: draftSummary, code: patched });
         }
         enterDesign(strategyId);

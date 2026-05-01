@@ -312,23 +312,6 @@ export function installBrowserStub(): void {
           return list.find((r) => r.id === id) ?? null;
         },
       },
-      coinLists: {
-        save: async (l: any) => {
-          const id = l.id ?? uid();
-          const all = lsGet<any[]>('coin_lists', []);
-          const i = all.findIndex((x) => x.id === id);
-          const row = { ...l, id, updated_at: new Date().toISOString(), created_at: l.created_at ?? new Date().toISOString() };
-          if (i >= 0) all[i] = row;
-          else all.unshift(row);
-          lsSet('coin_lists', all);
-          return id;
-        },
-        list: async () => lsGet<any[]>('coin_lists', []),
-        get: async (id: string) => {
-          const all = lsGet<any[]>('coin_lists', []);
-          return all.find((x) => x.id === id) ?? null;
-        },
-      },
       settings: {
         get: async (key: string) => lsGet<any>(`setting:${key}`, null),
         set: async (key: string, value: any) => lsSet(`setting:${key}`, value),

@@ -103,3 +103,76 @@ func (h *StrategyHandler) Get(ctx context.Context, c *app.RequestContext) {
 	}
 	RespondOK(c, st)
 }
+
+// patchDraftReq is the body for PATCH /api/strategies/:id (workspace
+// fields only — does NOT touch saved_*).  Pointer fields so callers can
+// update a single column without disturbing the others.
+type patchDraftReq struct {
+	DraftCode    *string                    `json:"draft_code,omitempty"`
+	DraftSymbols *[]string                  `json:"draft_symbols,omitempty"`
+	LastBacktest *model.LastBacktestSummary `json:"last_backtest,omitempty"`
+}
+
+// PatchDraft handles PATCH /api/strategies/:id.  Updates workspace-zone
+// fields only; `saved_*` requires the explicit Save endpoint.
+func (h *StrategyHandler) PatchDraft(ctx context.Context, c *app.RequestContext) {
+	id := c.Param("id")
+	var req patchDraftReq
+	if err := c.BindJSON(&req); err != nil {
+		RespondError(c, apierr.Wrap(err, apierr.CodeInvalidRange, "bind request: "+err.Error()))
+		return
+	}
+	if err := h.store.PatchStrategyDraft(ctx, id, req.DraftCode, req.DraftSymbols, req.LastBacktest); err != nil {
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
+		return
+	}
+	st, ok, err := h.store.GetStrategy(ctx, id)
+	if err != nil {
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
+		return
+	}
+	if !ok {
+		RespondError(c, apierr.New(apierr.CodeStrategyNotFound, "strategy not found"))
+		return
+	}
+	RespondOK(c, st)
+}
+
+// saveStrategyReq is the body for POST /api/strategies/:id/save.  `Name`
+// is optional — sent on the FIRST save (when the strategy was created
+// with name=null and the user just typed one in the save dialog).
+type saveStrategyReq struct {
+	Name *string `json:"name,omitempty"`
+}
+
+// Save handles POST /api/strategies/:id/save.  Snapshots draft → saved.
+func (h *StrategyHandler) Save(ctx context.Context, c *app.RequestContext) {
+	id := c.Param("id")
+	var req saveStrategyReq
+	// body is optional (no name change); ignore bind errors gracefully.
+	_ = c.BindJSON(&req)
+	if err := h.store.SaveStrategy(ctx, id, req.Name); err != nil {
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
+		return
+	}
+	st, ok, err := h.store.GetStrategy(ctx, id)
+	if err != nil {
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
+		return
+	}
+	if !ok {
+		RespondError(c, apierr.New(apierr.CodeStrategyNotFound, "strategy not found"))
+		return
+	}
+	RespondOK(c, st)
+}
+
+// ArchiveDraft handles POST /api/strategies/:id/archive_draft.
+func (h *StrategyHandler) ArchiveDraft(ctx context.Context, c *app.RequestContext) {
+	id := c.Param("id")
+	if err := h.store.ArchiveStrategyDraft(ctx, id); err != nil {
+		RespondError(c, apierr.Wrap(err, apierr.CodeInternalError, err.Error()))
+		return
+	}
+	RespondOK(c, map[string]any{"id": id, "is_archived_draft": true})
+}

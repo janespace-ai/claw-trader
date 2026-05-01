@@ -1,10 +1,8 @@
 import { useEffect } from 'react';
 import { TopBar } from '@/components/layout/TopBar';
-import { ScreenerScreen } from '@/screens/ScreenerScreen';
-import { StrategiesScreen } from '@/screens/StrategiesScreen';
-import { StrategyDesign } from '@/screens/workspace/StrategyDesign';
-import { PreviewBacktest } from '@/screens/workspace/PreviewBacktest';
 import { DeepBacktest } from '@/screens/workspace/DeepBacktest';
+import { StrategyWorkspaceScreen } from '@/screens/StrategyWorkspaceScreen';
+import { LibraryScreen } from '@/screens/LibraryScreen';
 import { SymbolDetailScreen } from '@/screens/SymbolDetailScreen';
 import { SettingsScreen } from '@/screens/SettingsScreen';
 import { useAppStore } from '@/stores/appStore';
@@ -13,20 +11,20 @@ import { useStrategyStore } from '@/stores/strategyStore';
 import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 /**
- * Top-level route renderer. Switches on `appStore.route.kind`.
+ * Top-level route renderer.
  *
- *   route.kind === 'screener'      → ScreenerScreen (chart-first)
- *   route.kind === 'strategies'    → StrategiesScreen (card grid + history)
- *   route.kind === 'workspace'     → StrategyDesign | PreviewBacktest |
- *                                    DeepBacktest depending on
- *                                    workspaceStore.mode
+ * Post unified-strategy-workspace, the routes are:
+ *
+ *   route.kind === 'workspace'     → StrategyWorkspaceScreen (the main
+ *                                    chat-driven 创建/编辑策略 surface).
+ *                                    Until that screen lands (Group 4),
+ *                                    we render a placeholder.  When
+ *                                    workspaceStore.mode === 'deep' the
+ *                                    DeepBacktest "view full report" UI
+ *                                    is shown instead.
+ *   route.kind === 'library'       → 策略库 (Group 5; placeholder for now)
  *   route.kind === 'symbol-detail' → SymbolDetailScreen
- *   route.kind === 'settings'      → SettingsScreen (full-page)
- *
- * The AI chat panel is now rendered **inside each screen's**
- * `WorkspaceShell.rightRail` (wrapped in `AIPersonaShell`). The old
- * top-level `<aside><AIPanel /></aside>` was removed to avoid showing
- * duplicate AI panels on the same screen.
+ *   route.kind === 'settings'      → SettingsScreen
  */
 export default function App() {
   const route = useAppStore((s) => s.route);
@@ -47,23 +45,35 @@ export default function App() {
 
       <div className="flex flex-1 overflow-hidden">
         <main className="flex-1 overflow-y-auto">
-          {route.kind === 'screener' && <ScreenerScreen />}
-          {route.kind === 'strategies' && <StrategiesScreen />}
-          {route.kind === 'workspace' && workspaceMode === 'design' && <StrategyDesign />}
-          {route.kind === 'workspace' && workspaceMode === 'preview' && <PreviewBacktest />}
-          {route.kind === 'workspace' && workspaceMode === 'deep' && <DeepBacktest />}
-          {route.kind === 'symbol-detail' && (
+          {route.kind === 'workspace' && workspaceMode === 'deep' ? (
+            <DeepBacktest />
+          ) : route.kind === 'workspace' ? (
+            <StrategyWorkspaceScreen />
+          ) : route.kind === 'library' ? (
+            <LibraryScreen />
+          ) : route.kind === 'symbol-detail' ? (
             <SymbolDetailScreen
               symbol={route.symbol}
               returnTo={route.returnTo}
               backtestTaskId={route.backtestTaskId}
             />
-          )}
-          {route.kind === 'settings' && (
+          ) : (
             <SettingsScreen initialSection={route.section} />
           )}
         </main>
       </div>
+    </div>
+  );
+}
+
+function RebuildPlaceholder({ title, note }: { title: string; note: string }) {
+  return (
+    <div className="p-12 max-w-2xl mx-auto">
+      <h1 className="text-2xl font-heading font-bold text-fg-primary mb-3">{title}</h1>
+      <p className="text-sm text-fg-muted leading-relaxed">{note}</p>
+      <p className="text-xs text-fg-muted/70 mt-6 italic">
+        Pencil reference designs in <code>docs/design/trader.pen</code>.
+      </p>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 {
   "app.title": "Claw Trader",
-  "nav.screener": "Screener",
+  "nav.screener": "Strategy Workspace",
+  "nav.strategyWorkspace": "Strategy Workspace",
+  "nav.strategyLibrary": "Strategy Library",
   "nav.strategies": "Strategies",
   "nav.backtest": "Backtest",
   "nav.settings": "Settings",

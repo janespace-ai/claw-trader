@@ -109,6 +109,61 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
+        /**
+         * Update workspace-draft fields of a strategy
+         * @description Updates `draft_code`, `draft_symbols`, and/or `last_backtest`
+         *     without touching the saved zone (`saved_code`, `saved_symbols`,
+         *     `saved_at`).  The dedicated POST `/save` endpoint is the only
+         *     way to mutate the saved fields — that separation guarantees
+         *     chat-driven edits never accidentally clobber a deliberate save.
+         */
+        patch: operations["patchStrategyDraft"];
+        trace?: never;
+    };
+    "/api/strategies/{id}/save": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Snapshot draft → saved
+         * @description Atomically copies `draft_code` → `saved_code`, `draft_symbols` →
+         *     `saved_symbols`, sets `saved_at = now()`, clears `is_archived_draft`,
+         *     and (if `name` is supplied) updates the strategy name.  This is
+         *     the ONLY endpoint that may mutate saved-zone fields.
+         */
+        post: operations["saveStrategy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/strategies/{id}/archive_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mark a strategy session as an archived draft
+         * @description Sets `is_archived_draft = true` so the row sinks to the
+         *     "归档草稿" filter in the library tab.  Used by the desktop
+         *     client when the user presses "+ 创建新策略" while the active
+         *     session is dirty: the previous strategy is preserved as a
+         *     recoverable draft instead of being silently lost.
+         */
+        post: operations["archiveStrategyDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
         patch?: never;
         trace?: never;
     };
@@ -474,12 +529,21 @@ export interface components {
             retry_count?: number;
             error?: string | null;
         };
+        /**
+         * @description Stored user-submitted strategy.  After unified-strategy-workspace
+         *     (migration 006) a strategy carries a workspace zone (chat-driven
+         *     draft fields) plus a saved zone (snapshot taken when the user
+         *     clicks 保存策略).  Legacy `code_type` is omitempty on new rows.
+         */
         Strategy: {
             /** Format: uuid */
             id: string;
             name: string;
-            /** @enum {string} */
-            code_type: "strategy" | "screener";
+            /**
+             * @description Legacy discriminator; not set on rows created via the unified workspace.
+             * @enum {string}
+             */
+            code_type?: "strategy" | "screener";
             code: string;
             params_schema?: {
                 [key: string]: unknown;
@@ -488,6 +552,54 @@ export interface components {
             current_version?: number;
             created_at: number;
             updated_at: number;
+            /** @description Latest in-flight strategy code from the chat workspace. */
+            draft_code?: string | null;
+            /** @description Latest in-flight symbol universe. */
+            draft_symbols?: string[] | null;
+            last_backtest?: components["schemas"]["LastBacktestSummary"];
+            saved_code?: string | null;
+            saved_symbols?: string[] | null;
+            /** @description Unix seconds of the last 保存策略 action.  Null until first save. */
+            saved_at?: number | null;
+            /**
+             * @description True when the user pressed "+ 创建新策略" while this session was
+             *     dirty.  Such rows still appear in the library under the
+             *     "归档草稿" filter.
+             * @default false
+             */
+            is_archived_draft: boolean;
+        };
+        /**
+         * @description Cached backtest summary stored on the strategy so re-opening it
+         *     shows the most recent run without re-dispatching.  The summary
+         *     payload is opaque on this surface (key:value of metric).
+         */
+        LastBacktestSummary: {
+            /** Format: uuid */
+            task_id: string;
+            summary: {
+                [key: string]: unknown;
+            };
+            /** @description Unix seconds when the backtest finished. */
+            ran_at: number;
+        };
+        /**
+         * @description Body of PATCH /api/strategies/{id}.  Workspace-zone only — saved
+         *     fields are NOT touched by this endpoint.  Any omitted field
+         *     leaves the corresponding column unchanged.
+         */
+        PatchStrategyDraftBody: {
+            draft_code?: string;
+            draft_symbols?: string[];
+            last_backtest?: components["schemas"]["LastBacktestSummary"];
+        };
+        /**
+         * @description Body of POST /api/strategies/{id}/save.  `name` is optional;
+         *     sent on the FIRST save (when strategy.name is null and the user
+         *     just typed one in the save dialog).
+         */
+        SaveStrategyBody: {
+            name?: string;
         };
         BacktestConfig: {
             symbols: string[];
@@ -942,6 +1054,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Strategy"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    patchStrategyDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PatchStrategyDraftBody"];
+            };
+        };
+        responses: {
+            /** @description Updated strategy (full envelope) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Strategy"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    saveStrategy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SaveStrategyBody"];
+            };
+        };
+        responses: {
+            /** @description Updated strategy (full envelope) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Strategy"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    archiveStrategyDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Acknowledgement payload */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        is_archived_draft: boolean;
+                    };
                 };
             };
             /** @description Not found */

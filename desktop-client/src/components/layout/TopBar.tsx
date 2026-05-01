@@ -1,33 +1,29 @@
 import { useTranslation } from 'react-i18next';
-import { useAppStore, type Tab } from '@/stores/appStore';
+import { useAppStore } from '@/stores/appStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { useWorkspaceStore } from '@/stores/workspaceStore';
 
 interface Props {
   onOpenSettings: () => void;
 }
 
+type TabKey = 'workspace' | 'library';
+
 export function TopBar({ onOpenSettings }: Props) {
   const { t } = useTranslation();
   const tab = useAppStore((s) => s.currentTab);
   const setTab = useAppStore((s) => s.setTab);
-  const enterDesign = useWorkspaceStore((s) => s.enterDesign);
   const remoteConnected = useSettingsStore((s) => s.remoteConnected);
 
-  // "Backtest" tab maps to the workspace route. Clicking it from any
-  // other tab should land on the Strategy Design sub-mode rather than
-  // whatever mode the user left behind previously.
-  const handleTabClick = (key: Tab) => {
+  const handleTabClick = (key: TabKey) => {
     setTab(key);
-    if (key === 'backtest') {
-      enterDesign();
-    }
   };
 
-  const tabs: { key: Tab; labelKey: string }[] = [
-    { key: 'screener', labelKey: 'nav.screener' },
-    { key: 'strategies', labelKey: 'nav.strategies' },
-    { key: 'backtest', labelKey: 'nav.backtest' },
+  // Post unified-strategy-workspace: only 2 work tabs.  Settings opens
+  // via the gear icon on the right.  The legacy 选币 (screener) tab is
+  // gone — coin filtering happens inside the workspace's AI chat.
+  const tabs: { key: TabKey; labelKey: string }[] = [
+    { key: 'workspace', labelKey: 'nav.strategyWorkspace' },
+    { key: 'library', labelKey: 'nav.strategyLibrary' },
   ];
 
   return (

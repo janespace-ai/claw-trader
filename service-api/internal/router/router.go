@@ -47,6 +47,9 @@ func Register(h *server.Hertz, st *store.Store, bs *service.BacktestService, ss 
 		api.POST("/strategies", th.Create)
 		api.GET("/strategies", th.List)
 		api.GET("/strategies/:id", th.Get)
+		api.PATCH("/strategies/:id", th.PatchDraft)
+		api.POST("/strategies/:id/save", th.Save)
+		api.POST("/strategies/:id/archive_draft", th.ArchiveDraft)
 
 		api.GET("/strategies/:id/versions", svh.List)
 		api.POST("/strategies/:id/versions", svh.Create)
