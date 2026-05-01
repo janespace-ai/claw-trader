@@ -27,7 +27,11 @@ services:
       # sandbox-service dispatch target (internal network name).
       SERVICE_API_SANDBOX_SERVICE_URL: http://sandbox-service:8090
       # Callback URL that sandbox-service workers post progress/complete/error to.
-      SERVICE_API_CALLBACK_BASE: http://claw-service-api:8081
+      # Use the docker compose service name (NOT the container_name) so the
+      # hostname in the callback URL matches sandbox-service's allowlist.
+      # Both names resolve in the compose network, but the allowlist uses
+      # service names.
+      SERVICE_API_CALLBACK_BASE: http://service-api:8081
       # Gate 2 AI reviewer — leave DEEPSEEK_API_KEY empty to run with Gate 1 only.
       DEEPSEEK_API_KEY: "${DEEPSEEK_API_KEY:-}"
       SERVICE_API_AI_REVIEW_ENABLED: "${SERVICE_API_AI_REVIEW_ENABLED:-false}"
