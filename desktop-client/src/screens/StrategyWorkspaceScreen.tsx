@@ -3,12 +3,16 @@ import { useTranslation } from 'react-i18next';
 import { WorkspaceShell } from '@/components/primitives';
 import { SymbolListPane } from '@/components/workspace/SymbolListPane';
 import { WorkspaceCenterPane } from '@/components/workspace/WorkspaceCenterPane';
+import { SymbolKlinePane } from '@/components/workspace/SymbolKlinePane';
+import { WorkspaceTabsPane } from '@/components/workspace/WorkspaceTabsPane';
 import { StrategyChatPane } from '@/components/workspace/StrategyChatPane';
 import { SaveStrategyDialog } from '@/components/workspace/SaveStrategyDialog';
 import {
   useStrategySessionStore,
   type ChatMessage,
 } from '@/stores/strategySessionStore';
+import { useAppStore } from '@/stores/appStore';
+import { useUniverseStore } from '@/stores/universeStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { cremote, toErrorBody } from '@/services/remote/contract-client';
 import { runStrategistTurn, type DiffPreviewMetadata } from '@/services/chat/strategistRunner';
@@ -19,7 +23,7 @@ import {
   type ParamSweepRequest,
   type ScreenerFilter,
 } from '@/services/chat/strategistOutputParser';
-import { recordEvent } from '@/services/featureFlags';
+import { recordEvent, readFlagSync } from '@/services/featureFlags';
 import type { ChatMessage as LLMMessage } from '@/types/domain';
 import type { components } from '@/types/api';
 
@@ -50,12 +54,24 @@ export function StrategyWorkspaceScreen() {
   const appendMessage = useStrategySessionStore((s) => s.appendMessage);
   const createStrategy = useStrategySessionStore((s) => s.createStrategy);
   const patchDraft = useStrategySessionStore((s) => s.patchDraft);
+  const setLastFilteredSymbols = useStrategySessionStore(
+    (s) => s.setLastFilteredSymbols,
+  );
+  const setBottomTab = useStrategySessionStore((s) => s.setBottomTab);
+  const bottomTab = useStrategySessionStore((s) => s.bottomTab);
 
   const currentState = useStrategySessionStore((s) => s.currentState());
 
   const { defaultProvider, providers, aiLanguagePolicy } = useSettingsStore();
 
-  const [focusedSymbol, setFocusedSymbol] = useState<string | null>(null);
+  // Workspace-three-zone-layout: focusedSymbol now lives in appStore
+  // so it's mutex-shared between SymbolListPane (left) and
+  // FilteredSymbolsTab (center bottom).
+  const focusedSymbol = useAppStore((s) => s.focusedSymbol);
+  const setFocusedSymbol = useAppStore((s) => s.setFocusedSymbol);
+  const loadUniverse = useUniverseStore((s) => s.loadUniverse);
+  const threeZoneLayout = readFlagSync('workspaceThreeZone');
+
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -68,16 +84,25 @@ export function StrategyWorkspaceScreen() {
   const lastPolledTaskIdRef = useRef<string | null>(null);
   void aiLanguagePolicy; // (Group 7 future: thread reply lang into prompt; v1 lets the model auto-detect)
 
-  // When draft_symbols changes and there's no focused symbol, default
-  // to the first one so the chart pane has something to render.
+  // Workspace-three-zone-layout: load the universe (left rail) once
+  // on mount.  Cached for 60s in localStorage by the store.
   useEffect(() => {
-    const syms = strategy?.draft_symbols ?? [];
-    if (focusedSymbol && !syms.includes(focusedSymbol)) {
-      setFocusedSymbol(syms[0] ?? null);
-    } else if (!focusedSymbol && syms.length > 0) {
-      setFocusedSymbol(syms[0]);
+    void loadUniverse();
+    recordEvent('workspace_load', {
+      layout: threeZoneLayout ? 'three_zone' : 'legacy',
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Default focusedSymbol if nothing is set yet.  loadStrategy already
+  // initializes it; this is a fallback for sessions that mount before
+  // any strategy is loaded.
+  useEffect(() => {
+    if (!focusedSymbol) {
+      const first = strategy?.draft_symbols?.[0] ?? 'BTC_USDT';
+      setFocusedSymbol(first);
     }
-  }, [strategy?.draft_symbols, focusedSymbol]);
+  }, [focusedSymbol, strategy?.draft_symbols, setFocusedSymbol]);
 
   // Both halves complete?  Action bar enabled.
   const draftCode = strategy?.draft_code ?? null;
@@ -189,6 +214,14 @@ export function StrategyWorkspaceScreen() {
     try {
       if (meta.mutation.kind === 'code') {
         await patchDraft({ draftCode: meta.mutation.code });
+        // Workspace-three-zone-layout: surface the new code to the user
+        // by switching to the "代码" tab.
+        setBottomTab('code');
+        recordEvent('tab_auto_switch', {
+          to: 'code',
+          from: bottomTab,
+          trigger: 'code_apply',
+        });
       } else if (meta.mutation.kind === 'symbols') {
         await patchDraft({ draftSymbols: meta.mutation.symbols });
       } else if (meta.mutation.kind === 'filter') {
@@ -249,11 +282,25 @@ export function StrategyWorkspaceScreen() {
         await sleep(1500);
       }
       if (!done) throw new Error('screener timed out');
-      await patchDraft({ draftSymbols: done.passed });
+      // Workspace-three-zone-layout: write filter results into
+      // `lastFilteredSymbols` (NOT `draft_symbols`) so the user can
+      // cherry-pick from the "选出的币" tab.  Also strong-switch the
+      // bottom tab so the result is immediately visible.
+      setLastFilteredSymbols({
+        symbols: done.passed,
+        runAt: Date.now(),
+        criteria: filter.description,
+      });
+      setBottomTab('filtered');
+      recordEvent('tab_auto_switch', {
+        to: 'filtered',
+        from: bottomTab,
+        trigger: 'filter_done',
+      });
       await appendMessage(
         'assistant',
         t('workspace.chat.filter_done', {
-          defaultValue: '✓ 筛出 {{n}} 个币（共 {{total}}），已写入。',
+          defaultValue: '✓ 筛出 {{n}} 个币（共 {{total}}），详情见中下「选出的币」页签 →',
           n: done.passed.length,
           total: done.total,
         }),
@@ -424,6 +471,14 @@ export function StrategyWorkspaceScreen() {
               },
             });
           }
+          // Workspace-three-zone-layout: strong-switch to "回测" tab so
+          // the user immediately sees the result without hunting.
+          setBottomTab('result');
+          recordEvent('tab_auto_switch', {
+            to: 'result',
+            from: bottomTab,
+            trigger: 'backtest_done',
+          });
           return;
         }
         if (tr.status === 'failed') {
@@ -478,23 +533,39 @@ export function StrategyWorkspaceScreen() {
         leftRailWidth={240}
         rightRailWidth={340}
         leftRail={
-          <SymbolListPane
-            focusedSymbol={focusedSymbol ?? undefined}
-            onFocusSymbol={setFocusedSymbol}
-            onAskAI={handleAskAI}
-          />
+          <SymbolListPane />
         }
         main={
           <div className="flex flex-col h-full">
             <div className="flex-1 min-h-0">
-              <WorkspaceCenterPane
-                focusedSymbol={focusedSymbol}
-                result={resolvedResult}
-                resultLoading={resultLoading}
-                resultStale={hasChanges && !!strategy?.last_backtest && !resultLoading}
-                onRerunBacktest={handleRunBacktest}
-                onFocusSymbolFromResult={setFocusedSymbol}
-              />
+              {threeZoneLayout ? (
+                /* Workspace-three-zone-layout: vertical split.  Top
+                   K-line is fixed-height and persistent regardless
+                   of which BOTTOM tab is active. */
+                <div className="flex flex-col h-full">
+                  <SymbolKlinePane />
+                  <div className="flex-1 min-h-0 border-t border-border-subtle">
+                    <WorkspaceTabsPane
+                      result={resolvedResult}
+                      resultLoading={resultLoading}
+                      resultStale={
+                        hasChanges && !!strategy?.last_backtest && !resultLoading
+                      }
+                      onRerunBacktest={handleRunBacktest}
+                      onFocusSymbolFromResult={setFocusedSymbol}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <WorkspaceCenterPane
+                  focusedSymbol={focusedSymbol}
+                  result={resolvedResult}
+                  resultLoading={resultLoading}
+                  resultStale={hasChanges && !!strategy?.last_backtest && !resultLoading}
+                  onRerunBacktest={handleRunBacktest}
+                  onFocusSymbolFromResult={setFocusedSymbol}
+                />
+              )}
             </div>
             <ActionBar
               hasChanges={hasChanges}

@@ -22,7 +22,7 @@ reading the visual or asking for tweaks.
 
 | ID | Name | Position | Status |
 |---|---|---|---|
-| `OUv6E` | USW · 创建/编辑策略 · Dark (master) | (0, 4760) | ✅ done |
+| `OUv6E` | USW · 创建/编辑策略 · Dark (master) | (0, 4760) | ✅ done — superseded by `A7ubw` (see follow-on change `workspace-three-zone-layout`) |
 | `twKvt` | USW · 策略库 · Dark (master) | (3040, 4760) | ✅ done |
 | `anV13` | USW · State S0 · 空 workspace | (0, 5760) | ✅ done (annotated reference) |
 | `cAVZS` | USW · State Annotations · S1a / S1b | (1520, 5760) | ✅ done (text-only spec card) |
@@ -30,6 +30,19 @@ reading the visual or asking for tweaks.
 | `SfSed` | USW · Chat · Diff 预览卡 (standalone) | (0, 6760) | ✅ done |
 | `Od6yq` | USW · 保存策略对话框 | (560, 6760) | ✅ done |
 | `JJMjZ` | USW · Chat · 调参结果卡 | (1120, 6760) | ✅ done |
+
+### Follow-on change `workspace-three-zone-layout` (3)
+
+Layout pivot: left rail = full universe (NOT `draft_symbols`); center splits
+vertically into persistent K-line on top + 3-tab area on bottom (选出的币 /
+代码 / 回测).  Chat stays in right rail.  See proposal at
+`openspec/changes/workspace-three-zone-layout/`.
+
+| ID | Name | Position | Status |
+|---|---|---|---|
+| `A7ubw` | USW3Z · 创建/编辑策略 · Dark (new master) | (0, 8000) | ✅ done — replaces `OUv6E` for impl |
+| `V8qt9` | USW3Z · 中下 · 代码 tab | (1520, 8000) | ✅ done — bottom-area state |
+| `O8TIU2` | USW3Z · 中下 · 回测 tab | (1520, 8460) | ✅ done — bottom-area state |
 
 ### Kept legacy frames (still relevant)
 

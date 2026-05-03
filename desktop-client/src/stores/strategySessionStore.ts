@@ -27,6 +27,7 @@
 import { create } from 'zustand';
 import { cremote } from '@/services/remote/contract-client';
 import { recordEvent } from '@/services/featureFlags';
+import { useAppStore } from '@/stores/appStore';
 import type { components } from '@/types/api';
 
 /** Re-export of the canonical contract type — post 2.8/2.9 the
@@ -48,6 +49,20 @@ export interface ChatMessage {
 /** State machine code derived from current strategy + ephemeral flags. */
 export type WorkspaceState = 'S0' | 'S1a' | 'S1b' | 'S2' | 'S3' | 'S5';
 
+/** Workspace-three-zone-layout: which tab in the BOTTOM zone is active. */
+export type BottomTab = 'filtered' | 'code' | 'result';
+
+/** Workspace-three-zone-layout: in-memory record of the most recent
+ *  AI-driven screener result.  NOT persisted server-side; survives only
+ *  for the current workspace session. */
+export interface LastFilteredSymbols {
+  symbols: string[];
+  /** unix ms of when the AI completed the screener. */
+  runAt: number;
+  /** Short human-readable description of the filter, e.g. "24h 成交额 top 30". */
+  criteria: string;
+}
+
 interface StrategySessionState {
   /** Active strategy id (null = nothing loaded yet, will create on first message). */
   strategyId: string | null;
@@ -60,6 +75,11 @@ interface StrategySessionState {
   autoBacktestDoneForCurrentPair: boolean;
   paramSweepInFlight: boolean;
   lastAutoBacktestAt: number; // unix ms; rate-limit guard
+
+  /** Workspace-three-zone-layout: most recent AI screener result. */
+  lastFilteredSymbols: LastFilteredSymbols | null;
+  /** Workspace-three-zone-layout: which BOTTOM tab is active. */
+  bottomTab: BottomTab;
 
   /** Loading flags so UI can show spinners. */
   loading: boolean;
@@ -113,6 +133,10 @@ interface StrategySessionActions {
 
   /** For tests: explicitly mark auto-backtest as already fired. */
   _markAutoBacktestDone: () => void;
+
+  // ---- workspace-three-zone-layout ----
+  setLastFilteredSymbols: (p: LastFilteredSymbols | null) => void;
+  setBottomTab: (t: BottomTab) => void;
 }
 
 const AUTO_BACKTEST_RATE_LIMIT_MS = 60_000;
@@ -124,6 +148,8 @@ const initialState: StrategySessionState = {
   autoBacktestDoneForCurrentPair: false,
   paramSweepInFlight: false,
   lastAutoBacktestAt: 0,
+  lastFilteredSymbols: null,
+  bottomTab: 'filtered',
   loading: false,
   saving: false,
   error: null,
@@ -150,7 +176,18 @@ export const useStrategySessionStore = create<StrategySessionState & StrategySes
           autoBacktestDoneForCurrentPair: !!strategy.last_backtest,
           paramSweepInFlight: false,
           loading: false,
+          lastFilteredSymbols: null,
+          bottomTab: 'filtered',
         });
+        // Workspace-three-zone-layout: initialize focusedSymbol on
+        // strategy load.  Default = first draft symbol if any, else
+        // BTC_USDT.  Skip if user already has a focus set this session.
+        const app = useAppStore.getState();
+        if (!app.focusedSymbol) {
+          const first =
+            (strategy.draft_symbols && strategy.draft_symbols[0]) || 'BTC_USDT';
+          app.setFocusedSymbol(first);
+        }
       } catch (err) {
         set({ loading: false, error: describe(err) });
       }
@@ -177,6 +214,8 @@ export const useStrategySessionStore = create<StrategySessionState & StrategySes
         autoBacktestDoneForCurrentPair: false,
         paramSweepInFlight: false,
         lastAutoBacktestAt: 0,
+        lastFilteredSymbols: null,
+        bottomTab: 'filtered',
         error: null,
       });
       return created.id;
@@ -332,6 +371,13 @@ export const useStrategySessionStore = create<StrategySessionState & StrategySes
 
     _markAutoBacktestDone() {
       set({ autoBacktestDoneForCurrentPair: true });
+    },
+
+    setLastFilteredSymbols(p) {
+      set({ lastFilteredSymbols: p });
+    },
+    setBottomTab(t) {
+      set({ bottomTab: t });
     },
   }),
 );
