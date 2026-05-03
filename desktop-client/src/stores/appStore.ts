@@ -17,12 +17,19 @@ interface AppState {
   aiPanelWidth: number;
   aiPanelCollapsed: boolean;
 
+  /** Workspace-three-zone-layout: which symbol's K-line is currently
+   *  shown in the center-top zone.  Single source of truth for the
+   *  mutex-highlight between the left rail and the "选出的币" tab. */
+  focusedSymbol: string | null;
+
   navigate: (route: AppRoute) => void;
   /** Convenience setter for the top-level tab.  Maps the simple tab
    *  identifier to a default AppRoute for that tab. */
   setTab: (t: 'workspace' | 'library' | 'settings') => void;
   setAIPanelWidth: (w: number) => void;
   toggleAIPanel: () => void;
+
+  setFocusedSymbol: (s: string) => void;
 }
 
 const initialRoute: AppRoute = { kind: 'workspace' };
@@ -35,6 +42,7 @@ export const useAppStore = create<AppState & { currentTab: Tab }>((set, get) => 
   currentTab: routeToLegacyTab(initialRoute) ?? 'workspace',
   aiPanelWidth: 420,
   aiPanelCollapsed: false,
+  focusedSymbol: null,
 
   navigate(route) {
     set({ route, currentTab: routeToLegacyTab(route) ?? get().currentTab });
@@ -53,5 +61,8 @@ export const useAppStore = create<AppState & { currentTab: Tab }>((set, get) => 
   },
   toggleAIPanel() {
     set({ aiPanelCollapsed: !get().aiPanelCollapsed });
+  },
+  setFocusedSymbol(s) {
+    set({ focusedSymbol: s });
   },
 }));

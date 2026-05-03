@@ -29,6 +29,14 @@ const DEFAULTS: Record<string, boolean> = {
    *  pipeline (Group 8).  Off-by-default forces all sweeps through the
    *  LLM, which is more flexible but slower. */
   nlParamSweepIntercept: true,
+  /** Workspace-three-zone-layout: render the new three-zone workspace
+   *  (left=universe / center=K-line+tabs / right=chat).  Default true
+   *  in dev, false in prod for the rollout window.  See proposal at
+   *  openspec/changes/workspace-three-zone-layout/. */
+  workspaceThreeZone:
+    typeof process !== 'undefined' && process.env?.NODE_ENV === 'production'
+      ? false
+      : true,
 };
 
 export type FlagKey = keyof typeof DEFAULTS;

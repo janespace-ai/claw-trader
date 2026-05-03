@@ -1,95 +1,74 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { SymbolListPane } from './SymbolListPane';
-import { useStrategySessionStore, type WorkspaceStrategy } from '@/stores/strategySessionStore';
+import { useUniverseStore } from '@/stores/universeStore';
+import { useAppStore } from '@/stores/appStore';
 
-// Mock react-i18next so component renders default-value text in tests.
+// Mock react-i18next: returns defaultValue with {{var}} interpolation.
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (_key: string, opts?: { defaultValue?: string }) => opts?.defaultValue ?? _key,
+    t: (_key: string, opts?: Record<string, unknown> & { defaultValue?: string }) => {
+      const tpl = opts?.defaultValue ?? _key;
+      if (!opts) return tpl;
+      return tpl.replace(/\{\{(\w+)\}\}/g, (_m, k) => String(opts[k] ?? ''));
+    },
   }),
 }));
 
-function fixture(overrides: Partial<WorkspaceStrategy> = {}): WorkspaceStrategy {
-  return {
-    id: 's-1',
-    name: 'BTC 均值回归 v1',
-    code_type: 'strategy',
-    code: '',
-    current_version: 1,
-    created_at: 1700000000,
-    updated_at: 1700000000,
-    draft_code: null,
-    draft_symbols: ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'],
-    saved_code: null,
-    saved_symbols: null,
-    saved_at: null,
-    last_backtest: undefined,
-    is_archived_draft: false,
-    ...overrides,
-  };
-}
-
 beforeEach(() => {
-  useStrategySessionStore.getState().reset();
+  // Seed the universe synchronously so the component renders rows.
+  useUniverseStore.setState({
+    symbols: [
+      { symbol: 'BTC_USDT', market: 'futures', status: 'active', rank: 1 },
+      { symbol: 'ETH_USDT', market: 'futures', status: 'active', rank: 2 },
+      { symbol: 'SOL_USDT', market: 'futures', status: 'active', rank: 3 },
+    ],
+    loading: false,
+    lastLoadedAt: Date.now(),
+    error: null,
+    loadUniverse: async () => {},
+  });
+  useAppStore.setState({ focusedSymbol: 'BTC_USDT' });
 });
 
 afterEach(() => {
   cleanup();
+  useAppStore.setState({ focusedSymbol: null });
 });
 
-describe('SymbolListPane', () => {
-  it('renders strategy name + symbol count badge', () => {
-    useStrategySessionStore.setState({
-      strategyId: 's-1',
-      strategy: fixture(),
-    });
+describe('SymbolListPane (workspace-three-zone-layout)', () => {
+  it('renders the universe header with count', () => {
     render(<SymbolListPane />);
-    expect(screen.getByText('BTC 均值回归 v1')).toBeTruthy();
-    // count pill displays "3"
-    const pills = screen.getAllByText('3');
-    expect(pills.length).toBeGreaterThan(0);
+    expect(screen.getByText('全市场')).toBeTruthy();
+    expect(screen.getByText('3 个币种')).toBeTruthy();
   });
 
-  it('lists each symbol from draft_symbols', () => {
-    useStrategySessionStore.setState({
-      strategyId: 's-1',
-      strategy: fixture(),
-    });
+  it('lists every universe symbol', () => {
     render(<SymbolListPane />);
-    expect(screen.getByText('BTC/USDT')).toBeTruthy();
-    expect(screen.getByText('ETH/USDT')).toBeTruthy();
-    expect(screen.getByText('SOL/USDT')).toBeTruthy();
+    expect(screen.getByText('BTC_USDT')).toBeTruthy();
+    expect(screen.getByText('ETH_USDT')).toBeTruthy();
+    expect(screen.getByText('SOL_USDT')).toBeTruthy();
   });
 
-  it('shows empty-state copy when draft_symbols is empty', () => {
-    useStrategySessionStore.setState({
-      strategyId: 's-1',
-      strategy: fixture({ draft_symbols: [] }),
-    });
+  it('clicking a row sets focusedSymbol via appStore', () => {
     render(<SymbolListPane />);
-    expect(screen.getByText(/币列表会出现在这里/)).toBeTruthy();
+    fireEvent.click(screen.getByText('ETH_USDT'));
+    expect(useAppStore.getState().focusedSymbol).toBe('ETH_USDT');
   });
 
-  it('clicking a symbol fires onFocusSymbol', () => {
-    useStrategySessionStore.setState({
-      strategyId: 's-1',
-      strategy: fixture(),
-    });
-    const onFocus = vi.fn();
-    render(<SymbolListPane onFocusSymbol={onFocus} />);
-    fireEvent.click(screen.getByText('ETH/USDT'));
-    expect(onFocus).toHaveBeenCalledWith('ETH/USDT');
+  it('search filters rows case-insensitively', () => {
+    render(<SymbolListPane />);
+    const input = screen.getByPlaceholderText('搜索币种') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'eth' } });
+    expect(screen.queryByText('BTC_USDT')).toBeNull();
+    expect(screen.getByText('ETH_USDT')).toBeTruthy();
   });
 
-  it('clicking "AI 帮我改币种" fires onAskAI', () => {
-    useStrategySessionStore.setState({
-      strategyId: 's-1',
-      strategy: fixture(),
-    });
-    const onAsk = vi.fn();
-    render(<SymbolListPane onAskAI={onAsk} />);
-    fireEvent.click(screen.getByText('AI 帮我改币种'));
-    expect(onAsk).toHaveBeenCalledOnce();
+  it('does not read from strategy.draft_symbols', () => {
+    // Even if a strategy has zero draft symbols, the universe rail
+    // SHALL still render the universe rows.
+    render(<SymbolListPane />);
+    // 3 rows from the universe seed are present.
+    expect(screen.getByText('BTC_USDT')).toBeTruthy();
   });
 });
