@@ -20,7 +20,8 @@
     "api:mocks": "node scripts/gen-msw-handlers.mjs",
     "test:visual": "playwright test",
     "test:visual:update": "playwright test --update-snapshots",
-    "test:visual:ui": "playwright test --ui"
+    "test:visual:ui": "playwright test --ui",
+    "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",
@@ -28,11 +29,12 @@
     "better-sqlite3": "^11.5.0",
     "i18next": "^23.16.5",
     "i18next-browser-languagedetector": "^8.0.0",
-    "lightweight-charts": "^4.2.0",
+    "lightweight-charts": "^5.2.0",
     "openai": "^4.70.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-i18next": "^15.1.1",
+    "technicalindicators": "^3.1.0",
     "zustand": "^5.0.1"
   },
   "devDependencies": {
@@ -82,5 +84,13 @@
     "win": {
       "target": "nsis"
     }
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-builder",
+      "better-sqlite3",
+      "esbuild"
+    ]
   }
 }

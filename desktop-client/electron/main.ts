@@ -29,7 +29,14 @@ function createWindow() {
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    // Auto-open DevTools only when CLAW_DEVTOOLS=1.  Default-off in
+    // dev keeps the terminal quiet — Chromium's DevTools spams
+    // unrelated `Autofill.enable` / `Unknown VE context` errors on
+    // every open, which masks our own logs.  Open manually with
+    // ⌥⌘I (mac) / Ctrl+Shift+I (Linux/Windows) when needed.
+    if (process.env.CLAW_DEVTOOLS === '1') {
+      mainWindow.webContents.openDevTools({ mode: 'detach' });
+    }
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }

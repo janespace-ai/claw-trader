@@ -99,6 +99,8 @@ export function SymbolListPane() {
               key={s.symbol}
               symbol={s.symbol}
               focused={focusedSymbol === s.symbol}
+              lastPrice={s.last_price ?? null}
+              change24hPct={s.change_24h_pct ?? null}
               onClick={() => handleClick(s.symbol)}
             />
           ))
@@ -111,9 +113,19 @@ export function SymbolListPane() {
 function UniverseRow(props: {
   symbol: string;
   focused: boolean;
+  lastPrice: number | null | undefined;
+  change24hPct: number | null | undefined;
   onClick: () => void;
 }) {
-  const { symbol, focused, onClick } = props;
+  const { symbol, focused, lastPrice, change24hPct, onClick } = props;
+  const pctTone =
+    change24hPct == null
+      ? 'text-fg-muted'
+      : change24hPct > 0
+        ? 'text-accent-green'
+        : change24hPct < 0
+          ? 'text-accent-red'
+          : 'text-fg-secondary';
   return (
     <button
       onClick={onClick}
@@ -133,12 +145,32 @@ function UniverseRow(props: {
       >
         {symbol}
       </span>
-      {/* Price + 24h pct columns are populated by a future ticker
-          subscription (out of scope for this change — universe
-          endpoint doesn't return last price; engineers wire it in
-          Group 11 telemetry phase). */}
+      <span className="flex flex-col items-end gap-0.5 leading-tight">
+        <span className="font-mono text-[12px] text-fg-primary">
+          {lastPrice == null ? '—' : formatPrice(lastPrice)}
+        </span>
+        <span className={'font-mono text-[10.5px] ' + pctTone}>
+          {change24hPct == null
+            ? '—'
+            : `${change24hPct > 0 ? '+' : ''}${change24hPct.toFixed(2)}%`}
+        </span>
+      </span>
     </button>
   );
+}
+
+/**
+ * Magnitude-aware price formatter.
+ *  ≥ 1000 → thousand-sep + 2dp (67,432.10)
+ *  [1, 1000) → 2dp (84.18)
+ *  [0.01, 1) → 4dp (0.4123)
+ *  < 0.01  → 6dp (0.000457)
+ */
+function formatPrice(p: number): string {
+  if (p >= 1000) return p.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+  if (p >= 1) return p.toFixed(2);
+  if (p >= 0.01) return p.toFixed(4);
+  return p.toFixed(6);
 }
 
 function SkeletonRows() {

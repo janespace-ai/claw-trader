@@ -19,8 +19,23 @@ beforeEach(() => {
   // Seed the universe synchronously so the component renders rows.
   useUniverseStore.setState({
     symbols: [
-      { symbol: 'BTC_USDT', market: 'futures', status: 'active', rank: 1 },
-      { symbol: 'ETH_USDT', market: 'futures', status: 'active', rank: 2 },
+      {
+        symbol: 'BTC_USDT',
+        market: 'futures',
+        status: 'active',
+        rank: 1,
+        last_price: 67432.1,
+        change_24h_pct: 2.41,
+      },
+      {
+        symbol: 'ETH_USDT',
+        market: 'futures',
+        status: 'active',
+        rank: 2,
+        last_price: 3247.88,
+        change_24h_pct: -1.83,
+      },
+      // SOL has no price data — assert "—" fallback works.
       { symbol: 'SOL_USDT', market: 'futures', status: 'active', rank: 3 },
     ],
     loading: false,
@@ -70,5 +85,20 @@ describe('SymbolListPane (workspace-three-zone-layout)', () => {
     render(<SymbolListPane />);
     // 3 rows from the universe seed are present.
     expect(screen.getByText('BTC_USDT')).toBeTruthy();
+  });
+
+  it('renders price + 24h % per row with green/red coloring', () => {
+    render(<SymbolListPane />);
+    expect(screen.getByText('67,432.10')).toBeTruthy();
+    expect(screen.getByText('+2.41%')).toBeTruthy();
+    expect(screen.getByText('3,247.88')).toBeTruthy();
+    expect(screen.getByText('-1.83%')).toBeTruthy();
+  });
+
+  it('falls back to "—" when last_price/change_24h_pct are null', () => {
+    render(<SymbolListPane />);
+    // SOL_USDT has no price/pct → 2 dashes for that row.
+    const dashes = screen.getAllByText('—');
+    expect(dashes.length).toBeGreaterThanOrEqual(2);
   });
 });

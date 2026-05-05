@@ -80,4 +80,12 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
   },
+  optimizeDeps: {
+    // `technicalindicators` ships ESM under `lib/` but uses
+    // extensionless relative imports (`from "./Utils/Foo"`).  Vite's
+    // browser dev server can't resolve those raw — it has to be
+    // pre-bundled into a single chunk via esbuild.  Without this
+    // include, the renderer black-screens at module load.
+    include: ['technicalindicators'],
+  },
 });

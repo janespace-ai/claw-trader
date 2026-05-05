@@ -1,8 +1,13 @@
 import { useEffect, useRef } from 'react';
 import {
   createChart,
+  createSeriesMarkers,
+  CandlestickSeries,
+  HistogramSeries,
+  LineSeries,
   type IChartApi,
   type ISeriesApi,
+  type ISeriesMarkersPluginApi,
   type CandlestickData,
   type UTCTimestamp,
   type SeriesMarker,
@@ -141,7 +146,7 @@ export function Candles({
     const up = convention === 'green-up' ? t.accentGreen : t.accentRed;
     const down = convention === 'green-up' ? t.accentRed : t.accentGreen;
 
-    const candles = chart.addCandlestickSeries({
+    const candles = chart.addSeries(CandlestickSeries, {
       upColor: up,
       downColor: down,
       wickUpColor: up,
@@ -151,7 +156,7 @@ export function Candles({
     candleSeriesRef.current = candles;
 
     if (showVolume) {
-      const vol = chart.addHistogramSeries({
+      const vol = chart.addSeries(HistogramSeries, {
         priceFormat: { type: 'volume' },
         priceScaleId: 'volume',
       });
@@ -321,7 +326,7 @@ export function Candles({
       // via getComputedStyle so callers can pass token names for free.
       const resolvedColor = resolveCssColor(ov.color) ?? themeVars.accentPrimary;
       if (!ser) {
-        ser = chart.addLineSeries({
+        ser = chart.addSeries(LineSeries, {
           color: resolvedColor,
           lineWidth: ov.lineWidth ?? 2,
           priceLineVisible: false,
@@ -331,7 +336,10 @@ export function Candles({
       } else {
         ser.applyOptions({ color: resolvedColor, lineWidth: ov.lineWidth ?? 2 });
       }
-      ser.setData(
+      // ser is guaranteed defined at this point (either reused from
+      // existing or freshly created above); narrow for tsc.
+      const series = ser!;
+      series.setData(
         ov.data.map((p) =>
           p.value == null || !Number.isFinite(p.value)
             ? { time: p.ts as UTCTimestamp }
@@ -346,6 +354,10 @@ export function Candles({
   }, [overlays]);
 
   // -- Markers ----------------------------------------------------------------
+  // v5 moved series.setMarkers() to a separate plugin: we attach it
+  // once via createSeriesMarkers(series), then call .setMarkers() on
+  // the plugin handle whenever the input changes.
+  const markersPluginRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
   useEffect(() => {
     const series = candleSeriesRef.current;
     if (!series) return;
@@ -357,7 +369,11 @@ export function Candles({
       color: m.color ?? t.accentPrimary,
       text: m.text,
     }));
-    series.setMarkers(mapped);
+    if (!markersPluginRef.current) {
+      markersPluginRef.current = createSeriesMarkers(series, mapped);
+    } else {
+      markersPluginRef.current.setMarkers(mapped);
+    }
   }, [markers]);
 
   // -- Right price-scale minimum width --------------------------------------

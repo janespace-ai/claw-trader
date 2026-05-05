@@ -190,6 +190,14 @@ components:
         volume_24h_quote:
           type: number
           nullable: true
+        last_price:
+          type: number
+          nullable: true
+          description: Most recent close from the smallest-interval bar. Null when no recent bar exists.
+        change_24h_pct:
+          type: number
+          nullable: true
+          description: Percent change vs the close ~24h ago. Null when comparison data is missing.
         status:
           type: string
           enum: [active, inactive]

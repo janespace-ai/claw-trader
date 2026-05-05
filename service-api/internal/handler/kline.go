@@ -68,10 +68,24 @@ func (h *KlineHandler) Query(ctx context.Context, c *app.RequestContext) {
 			`299 - "Deprecated: pass from/to as Unix seconds. String formats accepted for one release."`,
 		)
 	}
-	if from.IsZero() {
+	// Default windowing rules:
+	// - Both empty → "last 30 days" convenience window for the
+	//   no-args case (initial chart paint of a new symbol).
+	// - Only `to` set → caller is paginating older history via
+	//   "give me the most recent N before T" semantics; default
+	//   `from` to epoch so the limit slice (further down) returns
+	//   the N bars immediately before `to`, rather than from a
+	//   30-day-ago boundary that would silently kill pan-left
+	//   pagination once the user scrolls past 30 days.
+	// - Only `from` set → caller wants forward fill from that
+	//   timestamp; default `to` to now.
+	switch {
+	case from.IsZero() && to.IsZero():
 		from = time.Now().UTC().Add(-30 * 24 * time.Hour)
-	}
-	if to.IsZero() {
+		to = time.Now().UTC()
+	case from.IsZero():
+		from = time.Unix(0, 0).UTC()
+	case to.IsZero():
 		to = time.Now().UTC()
 	}
 	if !to.After(from) {

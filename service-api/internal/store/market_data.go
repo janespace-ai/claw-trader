@@ -82,16 +82,28 @@ func (s *Store) QueryKlines(ctx context.Context, market, interval, symbol string
 }
 
 // Symbol mirrors data-aggregator's symbol payload shape.
+//
+// LastPrice + Change24hPct (added in workspace-market-depth-and-indicators)
+// are populated by ListActiveSymbols via a LATERAL JOIN against the
+// 5m klines hypertable.  Both fields are nullable: cold-cache symbols
+// or symbols with no recent bars surface as null on the wire.
 type Symbol struct {
 	Symbol         string    `json:"symbol"`
 	Market         string    `json:"market"`
 	Rank           *int      `json:"rank"`
 	Volume24hQuote float64   `json:"volume_24h_quote"`
+	LastPrice      *float64  `json:"last_price"`
+	Change24hPct   *float64  `json:"change_24h_pct"`
 	Status         string    `json:"status"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // ListActiveSymbols returns ranked active symbols for a given market.
+//
+// Each row is enriched with LastPrice (close of the most recent 5m bar)
+// and Change24hPct (percent change vs the close ~24h ago).  Both are
+// nullable: when the underlying join returns no matching klines row,
+// the field is left as nil and the JSON wire format emits null.
 func (s *Store) ListActiveSymbols(ctx context.Context, market string, limit int) ([]Symbol, error) {
 	if market == "" {
 		market = "futures"
@@ -99,13 +111,36 @@ func (s *Store) ListActiveSymbols(ctx context.Context, market string, limit int)
 	if limit <= 0 {
 		limit = 300
 	}
+	// LATERAL subqueries fetch latest 5m bar + bar from ~24h ago for
+	// each row in one round trip, leveraging the (symbol, ts DESC)
+	// hypertable index.  Postgres planner inlines this efficiently
+	// for a few hundred rows.
+	klinesTable := fmt.Sprintf("%s.%s_5m", s.schema, market)
 	sql := fmt.Sprintf(`
-		SELECT symbol, market, rank, COALESCE(volume_24h_quote, 0), status, updated_at
-		FROM %s.symbols
-		WHERE market = $1 AND rank IS NOT NULL AND status = 'active'
-		ORDER BY rank ASC
-		LIMIT $2
-	`, s.schema)
+		WITH active AS (
+			SELECT symbol, market, rank, COALESCE(volume_24h_quote, 0) AS vol_q, status, updated_at
+			FROM %s.symbols
+			WHERE market = $1 AND rank IS NOT NULL AND status = 'active'
+			ORDER BY rank ASC
+			LIMIT $2
+		)
+		SELECT a.symbol, a.market, a.rank, a.vol_q, a.status, a.updated_at,
+		       last.close AS last_price,
+		       prev.close AS prev_close
+		FROM active a
+		LEFT JOIN LATERAL (
+			SELECT close FROM %s
+			WHERE symbol = a.symbol
+			ORDER BY ts DESC
+			LIMIT 1
+		) last ON true
+		LEFT JOIN LATERAL (
+			SELECT close FROM %s
+			WHERE symbol = a.symbol AND ts <= NOW() - INTERVAL '24 hours'
+			ORDER BY ts DESC
+			LIMIT 1
+		) prev ON true
+	`, s.schema, klinesTable, klinesTable)
 	rows, err := s.pool.Query(ctx, sql, market, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list symbols: %w", err)
@@ -116,10 +151,18 @@ func (s *Store) ListActiveSymbols(ctx context.Context, market string, limit int)
 	for rows.Next() {
 		var sym Symbol
 		var rank *int
-		if err := rows.Scan(&sym.Symbol, &sym.Market, &rank, &sym.Volume24hQuote, &sym.Status, &sym.UpdatedAt); err != nil {
+		var lastPrice, prevClose *float64
+		if err := rows.Scan(&sym.Symbol, &sym.Market, &rank, &sym.Volume24hQuote, &sym.Status, &sym.UpdatedAt, &lastPrice, &prevClose); err != nil {
 			return nil, err
 		}
 		sym.Rank = rank
+		sym.LastPrice = lastPrice
+		// 24h pct = (last - prev) / prev * 100; null when either
+		// missing or prev is zero.
+		if lastPrice != nil && prevClose != nil && *prevClose != 0 {
+			pct := (*lastPrice - *prevClose) / *prevClose * 100
+			sym.Change24hPct = &pct
+		}
 		result = append(result, sym)
 	}
 	return result, rows.Err()

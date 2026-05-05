@@ -360,5 +360,14 @@
   "workspace.tabs.result.pending": "回测进行中…",
   "workspace.kline.empty": "选择左侧任意一个币种,看它的 K 线",
   "workspace.kline.loading": "加载 K 线...",
-  "workspace.kline.noData": "该币种暂无 K 线数据"
+  "workspace.kline.noData": "该币种暂无 K 线数据",
+  "workspace.kline.vol24h": "24h 成交额",
+  "workspace.kline.bars": "Bars",
+  "workspace.indicators.label": "指标",
+  "workspace.indicators.button": "+ 指标",
+  "workspace.indicators.search": "搜索指标",
+  "workspace.indicators.overlays": "叠加在主图",
+  "workspace.indicators.subcharts": "独立子图",
+  "workspace.indicators.cap": "最多 {{cap}} 个子图,先关一个再加",
+  "workspace.indicators.dragHint": "拖动子图分隔线可调高度"
 }

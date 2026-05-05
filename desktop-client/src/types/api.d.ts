@@ -509,6 +509,10 @@ export interface components {
             market: components["schemas"]["Market"];
             rank?: number | null;
             volume_24h_quote?: number | null;
+            /** @description Most recent close from the smallest-interval bar. Null when no recent bar exists. */
+            last_price?: number | null;
+            /** @description Percent change vs the close ~24h ago. Null when comparison data is missing. */
+            change_24h_pct?: number | null;
             /** @enum {string} */
             status: "active" | "inactive";
             /** @description Unix seconds. */
@@ -556,7 +560,7 @@ export interface components {
             draft_code?: string | null;
             /** @description Latest in-flight symbol universe. */
             draft_symbols?: string[] | null;
-            last_backtest?: components["schemas"]["LastBacktestSummary"];
+            last_backtest?: components["schemas"]["LastBacktestSummary"] | null;
             saved_code?: string | null;
             saved_symbols?: string[] | null;
             /** @description Unix seconds of the last 保存策略 action.  Null until first save. */
