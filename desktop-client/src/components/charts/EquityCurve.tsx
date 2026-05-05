@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import {
   createChart,
   ColorType,
+  AreaSeries,
   type IChartApi,
   type UTCTimestamp,
 } from 'lightweight-charts';
@@ -36,7 +37,7 @@ export function EquityCurve({ points, height = 160, color }: Props) {
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
     });
-    const series = chart.addAreaSeries({
+    const series = chart.addSeries(AreaSeries, {
       lineColor: color ?? readToken('--accent-primary'),
       topColor: (color ?? readToken('--accent-primary')) + '55',
       bottomColor: (color ?? readToken('--accent-primary')) + '00',

@@ -95,6 +95,65 @@ func TestListActiveSymbols(t *testing.T) {
 	if got[0].Symbol != "BTC_USDT" {
 		t.Errorf("order wrong: first=%s", got[0].Symbol)
 	}
+	// Without seeded klines, LastPrice + Change24hPct are nil — assert.
+	if got[0].LastPrice != nil {
+		t.Errorf("expected nil LastPrice when klines empty, got %v", *got[0].LastPrice)
+	}
+	if got[0].Change24hPct != nil {
+		t.Errorf("expected nil Change24hPct when klines empty, got %v", *got[0].Change24hPct)
+	}
+}
+
+// TestListActiveSymbols_PriceAndChange seeds both symbols and 5m klines
+// (one recent + one ~24h ago) and asserts that LastPrice +
+// Change24hPct are populated correctly.
+func TestListActiveSymbols_PriceAndChange(t *testing.T) {
+	st := testdb.New(t)
+	ctx := context.Background()
+
+	symbols := fmt.Sprintf("%s.symbols", st.Schema())
+	klines := fmt.Sprintf("%s.futures_5m", st.Schema())
+
+	if _, err := st.Pool().Exec(ctx,
+		fmt.Sprintf(`INSERT INTO %s (symbol, market, rank, volume_24h_quote, status) VALUES ($1,'futures',$2,$3,'active')`, symbols),
+		"BTC_USDT", 1, 1e9,
+	); err != nil {
+		t.Fatalf("seed symbol: %v", err)
+	}
+
+	now := time.Now().UTC()
+	// 24h-ago bar: close=100
+	if _, err := st.Pool().Exec(ctx,
+		fmt.Sprintf(`INSERT INTO %s (ts, symbol, open, high, low, close, volume) VALUES ($1,$2,$3,$4,$5,$6,$7)`, klines),
+		now.Add(-25*time.Hour), "BTC_USDT", 99.0, 101.0, 98.0, 100.0, 1234.0,
+	); err != nil {
+		t.Fatalf("seed prev kline: %v", err)
+	}
+	// Recent bar: close=110 → +10%
+	if _, err := st.Pool().Exec(ctx,
+		fmt.Sprintf(`INSERT INTO %s (ts, symbol, open, high, low, close, volume) VALUES ($1,$2,$3,$4,$5,$6,$7)`, klines),
+		now.Add(-5*time.Minute), "BTC_USDT", 109.0, 111.0, 108.0, 110.0, 5678.0,
+	); err != nil {
+		t.Fatalf("seed recent kline: %v", err)
+	}
+
+	got, err := st.ListActiveSymbols(ctx, "futures", 10)
+	if err != nil {
+		t.Fatalf("ListActiveSymbols: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 symbol, got %d", len(got))
+	}
+	row := got[0]
+	if row.LastPrice == nil || *row.LastPrice != 110.0 {
+		t.Errorf("LastPrice = %v, want 110", row.LastPrice)
+	}
+	if row.Change24hPct == nil {
+		t.Fatalf("Change24hPct unexpectedly nil")
+	}
+	if pct := *row.Change24hPct; pct < 9.99 || pct > 10.01 {
+		t.Errorf("Change24hPct = %v, want ~10", pct)
+	}
 }
 
 func TestQueryGaps(t *testing.T) {

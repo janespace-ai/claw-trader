@@ -360,5 +360,14 @@
   "workspace.tabs.result.pending": "Backtest in progress…",
   "workspace.kline.empty": "Pick any symbol on the left to see its K-line",
   "workspace.kline.loading": "Loading K-line…",
-  "workspace.kline.noData": "No K-line data for this symbol"
+  "workspace.kline.noData": "No K-line data for this symbol",
+  "workspace.kline.vol24h": "24h Vol",
+  "workspace.kline.bars": "Bars",
+  "workspace.indicators.label": "Indicators",
+  "workspace.indicators.button": "+ Indicator",
+  "workspace.indicators.search": "Search indicators",
+  "workspace.indicators.overlays": "Overlay on price",
+  "workspace.indicators.subcharts": "Subcharts",
+  "workspace.indicators.cap": "Up to {{cap}} subcharts — close one before adding another",
+  "workspace.indicators.dragHint": "Drag the pane separator to resize"
 }

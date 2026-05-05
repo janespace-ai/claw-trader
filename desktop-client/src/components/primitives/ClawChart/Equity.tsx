@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import {
   createChart,
+  AreaSeries,
+  LineSeries,
   type IChartApi,
   type UTCTimestamp,
 } from 'lightweight-charts';
@@ -57,7 +59,7 @@ export function Equity({
 
     // Top pane: equity (+ compare) OR drawdown depending on variant
     if (variant === 'drawdown') {
-      const series = topChart.addAreaSeries({
+      const series = topChart.addSeries(AreaSeries, {
         lineColor: t.accentRed,
         topColor: t.accentRed,
         bottomColor: `${t.accentRed}22`,
@@ -65,14 +67,14 @@ export function Equity({
       });
       series.setData(data.map((p) => ({ time: p.ts as UTCTimestamp, value: p.value })));
     } else {
-      const primary = topChart.addLineSeries({
+      const primary = topChart.addSeries(LineSeries, {
         color: t.accentPrimary,
         lineWidth: 2,
         priceLineVisible: false,
       });
       primary.setData(data.map((p) => ({ time: p.ts as UTCTimestamp, value: p.value })));
       if (compare && compare.length) {
-        const bench = topChart.addLineSeries({
+        const bench = topChart.addSeries(LineSeries, {
           color: t.accentYellow ?? '#F59E0B',
           lineWidth: 1,
           priceLineVisible: false,
@@ -88,7 +90,7 @@ export function Equity({
         chartOptionsFromTheme(bottomRef.current.clientWidth, bottomHeight),
       );
       bottomChartRef.current = bottomChart;
-      const series = bottomChart.addAreaSeries({
+      const series = bottomChart.addSeries(AreaSeries, {
         lineColor: t.accentRed,
         topColor: `${t.accentRed}55`,
         bottomColor: `${t.accentRed}11`,

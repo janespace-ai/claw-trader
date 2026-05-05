@@ -18,7 +18,20 @@ const CACHE_KEY = 'claw:universe-cache';
 const CACHE_TTL_MS = 60_000;
 const PAGE_LIMIT = 250; // a little headroom over "top 200"
 
+/**
+ * Cache schema version — bump whenever the `Symbol` shape changes
+ * (e.g. backend adds new fields).  Stale caches are silently
+ * discarded on hydrate.  Without this, a long-lived browser would
+ * keep returning the old shape even after a backend redeploy.
+ *
+ * Version history:
+ *   1 — initial: { symbol, market, rank, volume_24h_quote, status }
+ *   2 — added last_price + change_24h_pct
+ */
+const CACHE_VERSION = 2;
+
 interface CacheEnvelope {
+  version: number;
   loadedAt: number;
   symbols: UniverseSymbol[];
 }
@@ -46,6 +59,17 @@ function readCache(): CacheEnvelope | null {
     if (typeof env?.loadedAt !== 'number' || !Array.isArray(env?.symbols)) {
       return null;
     }
+    // Schema version mismatch → discard.  Catches the case where the
+    // backend gained new Symbol fields (e.g. last_price) but the cache
+    // still has the old shape from before the redeploy.
+    if (env.version !== CACHE_VERSION) {
+      try {
+        localStorage.removeItem(CACHE_KEY);
+      } catch {
+        /* best-effort */
+      }
+      return null;
+    }
     return env;
   } catch {
     return null;
@@ -55,7 +79,11 @@ function readCache(): CacheEnvelope | null {
 function writeCache(symbols: UniverseSymbol[]): void {
   if (typeof localStorage === 'undefined') return;
   try {
-    const env: CacheEnvelope = { loadedAt: Date.now(), symbols };
+    const env: CacheEnvelope = {
+      version: CACHE_VERSION,
+      loadedAt: Date.now(),
+      symbols,
+    };
     localStorage.setItem(CACHE_KEY, JSON.stringify(env));
   } catch {
     // best-effort; quota exceeded etc.
@@ -81,6 +109,16 @@ export const useUniverseStore = create<UniverseState>((set, get) => ({
     try {
       const page = await cremote.listSymbols({ limit: PAGE_LIMIT });
       const symbols = (page?.items ?? []) as UniverseSymbol[];
+      // TEMP DEBUG — remove once left-rail price/24h% issue is closed.
+      // Logs the first item's keys + values so we can tell at a glance
+      // whether the backend redeploy actually shipped last_price.
+      if (typeof console !== 'undefined' && symbols.length > 0) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[universeStore] /api/symbols sample:',
+          JSON.stringify(symbols[0], null, 2),
+        );
+      }
       // Sort by rank ascending (nulls last) so the universe naturally
       // shows BTC/ETH/etc at the top.
       symbols.sort((a, b) => {

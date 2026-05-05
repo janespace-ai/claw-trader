@@ -44,6 +44,19 @@ vertically into persistent K-line on top + 3-tab area on bottom (选出的币 /
 | `V8qt9` | USW3Z · 中下 · 代码 tab | (1520, 8000) | ✅ done — bottom-area state |
 | `O8TIU2` | USW3Z · 中下 · 回测 tab | (1520, 8460) | ✅ done — bottom-area state |
 
+### Follow-on change `workspace-market-depth-and-indicators` (1)
+
+K-line zone restructured to support full market info bar + multiple
+stacked indicator subcharts (klinecharts-backed).
+
+| ID | Name | Position | Status |
+|---|---|---|---|
+| `C3zfc` | USW3Z+ · K线 · 多指标 · Dark | (0, 9000) | ✅ done — main K-line + VOL/RSI/MACD subcharts + indicator picker reference |
+| `JHpLq` | USW3Z++ · K线 · 指标交互 · Dark | (0, 9820) | ⚠ superseded by `k2SWCB` — the chip-+-popover model below proved too hidden; flat strip preferred |
+| `k2SWCB` | USW3Z+++ · K线 · 平铺指标条 · Dark | (0, 10700) | ⚠ superseded by `o6P9z` — single-row strip preferred over 2-row 主图/副图 split |
+| `o6P9z` | USW3Z++++ · K线 · 紧凑布局 · Dark | (0, 10940) | ⚠ partly superseded — top bar split was still wrapping to 2 lines on narrow widths; see `sFW5d` for the truly-1-line design.  K-line 430 + single-row indicator strip parts unchanged |
+| `sFW5d` | USW3Z+++++ · 顶部栏单行紧凑 · Dark | (0, 11580) | ✅ done — 48 px hard single-line top bar: drops Gate.io/Futures sublabel, drops the per-bar pct change under price, surfaces +0.01% as an inline pill next to the price; 24h stats become `H/L/Vol/Bars` label-value pairs (gate.com style) |
+
 ### Kept legacy frames (still relevant)
 
 | ID | Name | Position | Reason kept |

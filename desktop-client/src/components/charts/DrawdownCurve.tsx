@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import {
   createChart,
   ColorType,
+  AreaSeries,
   type UTCTimestamp,
 } from 'lightweight-charts';
 
@@ -35,7 +36,7 @@ export function DrawdownCurve({ points, height = 140 }: Props) {
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
     });
-    const series = chart.addAreaSeries({
+    const series = chart.addSeries(AreaSeries, {
       lineColor: red,
       topColor: red + '00',
       bottomColor: red + '88',

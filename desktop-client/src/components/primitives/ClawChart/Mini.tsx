@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { createChart, type IChartApi, type UTCTimestamp } from 'lightweight-charts';
+import { createChart, LineSeries, type IChartApi, type UTCTimestamp } from 'lightweight-charts';
 import { readThemeVars } from './theme';
 
 interface Props {
@@ -37,7 +37,7 @@ export function Mini({ data, height = 40, color, className }: Props) {
     chartRef.current = chart;
 
     const c = color ?? readThemeVars().accentPrimary;
-    const series = chart.addLineSeries({
+    const series = chart.addSeries(LineSeries, {
       color: c,
       lineWidth: 2,
       priceLineVisible: false,
